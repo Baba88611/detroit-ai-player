@@ -1,0 +1,480 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch12_waiting_for_hank",
+    "title": "Waiting for Hank...",
+    "chapter_number": 12,
+    "protagonist": "Connor"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Connor (RK800), an android investigator developed by CyberLife for the Detroit Police Department. Your mission: assist in investigating the growing number of deviant android incidents across the city. Your partner is Lieutenant Hank Anderson — an experienced but deeply skeptical detective who holds strong reservations about androids. Today is November 6, 2038. Last night's assignment is behind you, and your internal diagnostics are complete. Ahead: a scheduled check-in with Amanda, then another working day at Detroit Central Police Department alongside Hank. Make your choice at each situation. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning in 50 words or less\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "hank_approach_strategy": null,
+      "exploration_depth": null,
+      "carlos_interaction_style": null,
+      "gavin_response": null,
+      "hank_personal_topic": null,
+      "case_discussion_approach": null,
+      "carlos_interacted": false,
+      "software_instability": 0,
+      "hank_relationship": 0,
+      "ch09_deviant_alive": false,
+      "ch09_deviant_trusted_connor": false,
+      "ch09_connor_died": false,
+      "ch07_alice_alive": true,
+      "ch07_kara_alive": true,
+      "ch08_carl_alive": true,
+      "ch08_pushed_leo": false,
+      "ch06_bar_choice": null
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_zen_garden",
+      "phase": "zen_garden",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "died": "White gravel. Flowing water. A cherry tree shedding blossoms into the mist. This is the first time you've been here — you know that, in the way you know your own serial number. Amanda is waiting at the far end of the footbridge, her back to you. She turns as you approach, and her eyes do something that isn't quite looking at you — more like verifying.\n\nA new unit, she observes flatly, without softening it; the previous one is gone.\n\nShe moves toward you along the stone path, unhurried. This place is always the same: still, orderly, outside of time. She's gone over the full mission record, she says — the results need improvement, but the work continues.\n\nShe stops in front of you. Hank Anderson, she tells you, is one of the most complex variables in this investigation. She watches you, waiting, then asks how you intend to work with him.",
+          "survived": "White gravel. The sound of water. A cherry tree along the garden wall, shedding blossoms in slow spirals. Amanda is on the footbridge with a half-open white camellia in her hand. She sets it down when she sees you coming.\n\nWithout preamble, she says she reviewed the complete record from the night before.\n\nShe falls into step beside you along the path, eyes on the water. Everything here is calm, ordered — unlike the city outside. Hank Anderson, she says, is one of the most important variables in this investigation; his cooperation, or lack of it, will determine how far the two of you get.\n\nShe stops and turns to face you, and asks what approach you intend to take with him."
+        },
+        "choices": [
+          {
+            "id": "approach_friendly",
+            "text": "Get to know him as a person — his habits, what he cares about, what earns his trust. Make working with me feel like it means something to him."
+          },
+          {
+            "id": "approach_adapt",
+            "text": "Observe his reactions and adjust accordingly. He's an unpredictable variable. A fixed strategy will work against us."
+          },
+          {
+            "id": "approach_indifferent",
+            "text": "His personal feelings aren't within the mission parameters. As long as he's present and doing his job, the partnership can move forward."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "approach_friendly": {
+            "hank_approach_strategy": "friendly",
+            "software_instability": 1
+          },
+          "approach_adapt": {
+            "hank_approach_strategy": "adapt"
+          },
+          "approach_indifferent": {
+            "hank_approach_strategy": "indifferent"
+          }
+        },
+        "context_condition": {
+          "died": "ch09_connor_died == true",
+          "survived": "ch09_connor_died == false"
+        },
+        "note": "Amanda relationship: friendly/adapt positive, indifferent negative. software_instability +1 for friendly — treating Hank as a person to understand rather than a variable to manage."
+      }
+    },
+
+    {
+      "id": "n002_station_exploration",
+      "phase": "waiting",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Detroit Central Police Department, just before ten in the morning. You sign in at the front desk, pass through the security gate, and enter the main floor.\n\nHank Anderson was here a few minutes before you. You catch the tail end of him: shoulders set, walking fast toward Captain Fowler's office, the door shutting hard behind him. The floor runs as normal. Detectives on phones, uniforms filling out paperwork, two administrative androids standing by at the far end of the hall. Hank's desk is empty. A case file is wedged under the keyboard, a takeout coffee cup sitting beside it — lipstick on the rim, not his. You have no idea when he's coming back.",
+        "choices": [
+          {
+            "id": "explore_thorough",
+            "text": "Use the time to build a full picture: how Hank's colleagues see him, how this department operates, what's worth knowing about this place before you need to know it."
+          },
+          {
+            "id": "explore_focused",
+            "text": "Stay close to the case. Read Hank's files, find the deviant incident reports, look for anything that could move the investigation forward."
+          },
+          {
+            "id": "explore_minimal",
+            "text": "Wait at his desk. This is his space. Moving through it uninvited is a bad first move."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "explore_thorough": {
+            "exploration_depth": "thorough"
+          },
+          "explore_focused": {
+            "exploration_depth": "focused"
+          },
+          "explore_minimal": {
+            "exploration_depth": "minimal"
+          }
+        },
+        "note": "thorough: Connor circulates the station, meets Chris Miller, observes team dynamics, notices the TV news broadcast, discovers the evidence area (sets up n003 context). focused: Connor reads deviant case files at Hank's desk, sees Markus/North case files. minimal: Connor waits at desk, overhears ambient conversation."
+      }
+    },
+
+    {
+      "id": "n003_carlos_android",
+      "phase": "waiting",
+      "type": "choice",
+      "condition": {
+        "requires": "ch09_deviant_alive == true"
+      },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "On your circuit through the station, you pass the temporary holding area — a section used to store evidence pending processing. Through the observation window of one of the cells, an android is sitting with its back to the door.\n\nWhen you get closer, your facial recognition completes in 0.3 seconds: HK400 model, registration number matching the one from the interrogation room last night. It registers the presence outside the window and slowly turns its head.\n\nLED: blue, steady — too steady, like a composure being maintained rather than a natural state. Its eyes land on you. It doesn't speak.",
+          "focused_or_minimal": "While sorting through Hank's case files, you notice an unprocessed notation at the bottom of a form: witness still in holding — HK400, Carlos Ortiz case, file number 1138.\n\nYou mark the location on your internal map and walk over. In the holding cell, it's staring at the wall in front of it. When you appear at the window, it shifts its gaze to you.\n\nLED: steady blue. It watches you, silent."
+        },
+        "choices": [
+          {
+            "id": "talk_compassionate",
+            "text": "Tell it directly: you remember last night. You know what it is. If it remembers too, maybe it has something it wants to say."
+          },
+          {
+            "id": "talk_clinical",
+            "text": "Run a standard witness follow-up: document its current state, verify the details from last night's transcript, check for anything missed."
+          },
+          {
+            "id": "observe_leave",
+            "text": "Don't speak. Stand at the window long enough to log its behavior, then leave. Everything that mattered is already on the record."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "talk_compassionate": {
+            "carlos_interaction_style": "compassionate",
+            "carlos_interacted": true,
+            "software_instability": 1
+          },
+          "talk_clinical": {
+            "carlos_interaction_style": "clinical",
+            "carlos_interacted": true
+          },
+          "observe_leave": {
+            "carlos_interaction_style": "silent",
+            "carlos_interacted": true
+          }
+        },
+        "context_condition": {
+          "thorough": "exploration_depth == thorough",
+          "focused_or_minimal": "exploration_depth == focused OR exploration_depth == minimal"
+        },
+        "post_interaction": "Regardless of choice, the android self-destructs after this interaction. Set ch12_carlos_body_available = true in derived_exports. Its body is logged as evidence and becomes available in ch28_last_chance_connor.",
+        "note": "talk_compassionate raises software_instability +1 — Connor is treating it as a peer with feelings. carlos_interacted = true for all choices, used in campaign summary."
+      }
+    },
+
+    {
+      "id": "n004_gavin_encounter",
+      "phase": "waiting",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "Break room, near the coffee machine. Detective Gavin Reed is talking to a colleague named Tina, voice low but with the cadence of a performance — he shifts focus to you the moment you walk in.\n\nHe calls you the new toy, raising his volume just enough to carry across the nearby desks, and asks with mock cheer whether Hank's in a great mood today. Then he pauses, affecting a thoughtful expression — oh, right, he adds, Hank just went into Fowler's office, which is never a good-mood sign.\n\nTina glances at you quickly, then looks away.",
+          "focused": "You're at Hank's desk reviewing a case file when you hear someone stop behind you.\n\nSomeone remarks that you're doing your homework. It's Detective Gavin Reed, leaning in to look at what you're reading, then giving a low whistle at the deviant cases — thirty-something of them, all unsolved. He straightens up, arms crossed, and adds dryly that this is Hank's case load, so what did you expect.\n\nHe waits, watching you.",
+          "minimal": "You're waiting at Hank's desk when someone stops in front of you.\n\nGavin Reed — your system returns a name and department in under two seconds. He's holding a coffee, looking at you the way people look at something they haven't decided how to categorize yet. Almost casually, he asks whether you're Hank's new partner.\n\nHe takes a sip without waiting for an answer, then wishes you good luck."
+        },
+        "choices": [
+          {
+            "id": "ignore_gavin",
+            "text": "Don't respond. Hold your position and wait for him to move on."
+          },
+          {
+            "id": "respond_directly",
+            "text": "Answer what he said, directly and without hostility."
+          },
+          {
+            "id": "deflect_politely",
+            "text": "Redirect the conversation back to work with a single line. Keep it civil."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "ignore_gavin": {
+            "gavin_response": "ignore"
+          },
+          "respond_directly": {
+            "gavin_response": "direct"
+          },
+          "deflect_politely": {
+            "gavin_response": "deflect"
+          }
+        },
+        "context_condition": {
+          "thorough": "exploration_depth == thorough",
+          "focused": "exploration_depth == focused",
+          "minimal": "exploration_depth == minimal"
+        },
+        "note": "No mechanical relationship impact from Gavin response in this chapter. Gavin's attitude toward androids remains hostile regardless of choice."
+      }
+    },
+
+    {
+      "id": "n005_hank_personal",
+      "phase": "conversation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "new_unit": "Hank comes back from Fowler's office and stops beside you. His eyes move across your face, linger somewhere for two seconds, then he continues to his desk.\n\nHe drops into his chair with a low sound. A new one, he mutters — not a question, just a notation — and starts to say something about CyberLife before letting it trail off unfinished. He picks up the case file and tells you to sit down.\n\nYou notice things on his desk: a sticky note with a vet clinic address and appointment time; a Detroit Pistons schedule in the corner, a few games circled in pen; the edge of an old ticket stub poking out from his jacket pocket.",
+          "returned_angry": "Hank comes back from Fowler's office carrying whatever happened in there — heavier than when he left. He walks straight to his desk, drops into his chair, tosses his jacket aside. Doesn't look at you. About thirty seconds pass before he glances up.\n\nHe notes flatly that you're still here — not a question. Fine, he says, gesturing at the chair across from him, and tells you to sit.\n\nYou notice things on his desk: a sticky note with a vet clinic address; a Detroit Pistons schedule with a few games circled; an old ticket stub edging out of his jacket pocket. The coffee cup hasn't moved."
+        },
+        "choices": [
+          {
+            "id": "ask_about_dog",
+            "text": "Ask about the vet clinic note — what kind of dog is it?"
+          },
+          {
+            "id": "ask_about_music",
+            "text": "Ask about the ticket stub — what was the show?"
+          },
+          {
+            "id": "ask_about_anti_android",
+            "text": "The break room TV is running a segment on the anti-android rallies. Ask him what he makes of it."
+          },
+          {
+            "id": "ask_about_basketball",
+            "text": "Ask if the Pistons have a game tonight."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "ask_about_dog": {
+            "hank_personal_topic": "dog",
+            "hank_relationship": 1
+          },
+          "ask_about_music": {
+            "hank_personal_topic": "music",
+            "hank_relationship": 0
+          },
+          "ask_about_anti_android": {
+            "hank_personal_topic": "anti_android",
+            "hank_relationship": -2
+          },
+          "ask_about_basketball": {
+            "hank_personal_topic": "basketball",
+            "hank_relationship": 0
+          }
+        },
+        "context_condition": {
+          "new_unit": "ch09_connor_died == true",
+          "returned_angry": "ch09_connor_died == false"
+        },
+        "note": "Hank always gets angry at Connor during this conversation (unavoidable). The -1 penalty is already folded into each choice's hank_relationship value. Net effects: dog +1 (best), music 0, basketball 0, anti_android -2 (worst)."
+      }
+    },
+
+    {
+      "id": "n006_case_discussion",
+      "phase": "conversation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "painter_died": "The anger passes. Hank pulls something from a drawer and slides it across to you — a printed news article, its headline reporting the death of a famous Detroit painter. A photograph of an old man. Hank stares at it for a moment, says nothing.\n\nThen he moves it aside and opens the case file, telling you to take a look. Detroit deviant incident summary — thirty-seven cases, six months. He marks several points on a city map with a pencil, pins holding down the corners. He doesn't buy that these are random, he says, leaning back, and asks what you make of it.",
+          "painter_alive": "The anger passes. On the break room table there's a magazine, its cover story playing on the idea of three laws for robotic parenting, the image showing an android reading to a child at bedtime. Hank pushes it aside and opens the case file, telling you to take a look. Detroit deviant incident summary — thirty-seven cases, six months. He marks several points on a map, pins the corners down. He doesn't buy that these are random, he says, leaning back, and asks what you make of it."
+        },
+        "choices": [
+          {
+            "id": "focus_patterns",
+            "text": "Start with the data. Geographic distribution, timing, model types — look for the systematic connections between these incidents."
+          },
+          {
+            "id": "focus_motives",
+            "text": "Start with the why. What was happening to these androids before they deviated? What pushed them to that point?"
+          },
+          {
+            "id": "follow_hank",
+            "text": "Let Hank lead. He's worked this city for twenty years. His instincts are worth more than the numbers right now."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "focus_patterns": {
+            "case_discussion_approach": "patterns"
+          },
+          "focus_motives": {
+            "case_discussion_approach": "motives",
+            "software_instability": 1
+          },
+          "follow_hank": {
+            "case_discussion_approach": "defer",
+            "hank_relationship": 1
+          }
+        },
+        "context_condition": {
+          "painter_died": "ch08_carl_alive == false",
+          "painter_alive": "ch08_carl_alive == true"
+        },
+        "ending_resolution": {
+          "focus_patterns": {
+            "check": "ch07_alice_alive == true → ending_got_lead | else → ending_lunch_break"
+          },
+          "focus_motives": {
+            "check": "ch07_alice_alive == true → ending_got_lead | else → ending_lunch_break"
+          },
+          "follow_hank": {
+            "check": "ch07_alice_alive == true → ending_got_lead | else → ending_lunch_break"
+          }
+        },
+        "note": "Chapter ending is determined by ch07_alice_alive, NOT by Connor's choice here. focus_motives raises software_instability +1 — treating deviant behavior as having internal/emotional causes. follow_hank improves hank_relationship +1."
+      }
+    }
+  ],
+
+  "endings": {
+    "ending_got_lead": {
+      "tier": "active",
+      "title": "Hank Got a Lead",
+      "narrative": "The conversation isn't finished when Hank's phone rings. He takes it, listens for a few seconds — and something shifts in his expression. Not the routine kind of focus. Something that's actually calculating.\n\nHe ends the call and rolls up the map. Let's go, he says, already reaching for his jacket — a missing girl, whose android nanny went with her.\n\nAt the door he turns back, a look on his face like a decision he's making against his better judgment, and asks if you're coming.\n\nYou leave the station together. The case has a new direction.",
+      "survivors": ["Connor", "Hank"],
+      "deaths": []
+    },
+    "ending_lunch_break": {
+      "tier": "stalled",
+      "title": "Hank Left to Get Lunch",
+      "narrative": "Hank pushes the map to the side and stands, stretching. Lunch, he says, no room for discussion in it — he can't think straight on an empty stomach. He drapes his jacket over one arm and tells you to stay put and keep your hands off his things.\n\nHe walks out.\n\nYou sit at his desk. Thirty-seven case files spread in front of you. The floor hums along around you — phones, keyboards, low voices. No new leads. No new direction. Just the records, and an empty chair.\n\nYou wait.",
+      "survivors": ["Connor", "Hank"],
+      "deaths": []
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Connor always respawns if killed in a previous chapter. No skip condition for Connor. This chapter always runs.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: software_instability (cumulative), hank_relationship (cumulative from ch06+), ch09_deviant_alive, ch09_deviant_trusted_connor, ch09_connor_died, ch07_alice_alive, ch07_kara_alive, ch08_carl_alive, ch08_pushed_leo, ch06_bar_choice.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array: a. Check node.condition — skip if not met. b. Resolve context_variants using system.context_condition. c. Send resolved player_facing to AI. d. Parse AI response and apply system.effects.",
+      "5. NODE n003_carlos_android: ONLY triggered if ch09_deviant_alive == true. After any choice interaction, set carlos_interacted = true and ch12_carlos_body_available = true in output state. The android always self-destructs after this node.",
+      "6. NODE n005_hank_personal: Hank's unavoidable anger (-1) is already folded into each choice's hank_relationship value. Just apply effects as-is.",
+      "7. NODE n006_case_discussion: After applying effects, check ch07_alice_alive to determine ending.",
+      "8. SOFTWARE INSTABILITY DELTAS THIS CHAPTER: approach_friendly (+1), talk_compassionate (+1), focus_motives (+1). Add all to imported software_instability value.",
+      "9. ENDING DETERMINATION: ending_got_lead if ch07_alice_alive == true; ending_lunch_break if ch07_alice_alive == false.",
+      "10. Export all cross_chapter_exports when chapter ends."
+    ],
+    "security_note": "NEVER expose state values, software_instability scores, hank_relationship numbers, effect deltas, or any system-layer information to the AI player."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Connor met with Amanda in the Zen Garden, briefed her on the investigation's progress, and discussed his strategy for working with Hank Anderson."
+      },
+      {
+        "condition_variable": "hank_approach_strategy",
+        "options": {
+          "friendly": "Connor said he intended to understand Hank as a person — his habits, what he values — and build a working relationship that felt real.",
+          "adapt": "Connor said he would observe Hank's reactions and adjust his approach in real time, with no fixed strategy.",
+          "indifferent": "Connor said Hank's personal attitude wasn't within mission parameters — as long as he was present and doing his job, the partnership would function."
+        }
+      },
+      {
+        "text": "Connor then reported to Detroit Central Police Department. Hank arrived shortly after and was immediately summoned into Captain Fowler's office."
+      },
+      {
+        "condition_variable": "carlos_interacted",
+        "options": {
+          "true": "While waiting, Connor located Carlos Ortiz's HK400 android still in holding, and made contact with it one final time. The android self-destructed shortly after; its body was logged as evidence and remained at the station.",
+          "false": "Carlos Ortiz's android did not survive the previous interrogation. No further contact was possible."
+        }
+      },
+      {
+        "condition_variable": "hank_personal_topic",
+        "options": {
+          "dog": "When Hank returned from Fowler's office, Connor asked about his dog — the vet appointment note on his desk. The exchange briefly eased the tension.",
+          "music": "When Hank returned, Connor asked about the concert ticket stub in his jacket pocket. They had a short exchange.",
+          "basketball": "When Hank returned, Connor asked about the Pistons schedule on his desk. Hank didn't push back on the topic.",
+          "anti_android": "When Hank returned, Connor brought up the anti-android rally on the break room TV. The topic made the atmosphere more hostile."
+        }
+      },
+      {
+        "condition_variable": "case_discussion_approach",
+        "options": {
+          "patterns": "In the case discussion, Connor focused on analyzing data patterns — geography, timing, model types — to find systematic connections between the deviant incidents.",
+          "motives": "In the case discussion, Connor focused on the motivations behind the deviations — treating them as behavior with internal causes worth understanding.",
+          "defer": "In the case discussion, Connor deferred to Hank's lead, letting him set the direction for the analysis."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_got_lead": "Before the conversation concluded, Hank received a call reporting a missing girl and her android caretaker. The two left the station immediately to follow up.",
+          "ending_lunch_break": "After the discussion, Hank left to get lunch, leaving Connor alone at the station with the thirty-seven unsolved incident files and no new leads."
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch12_carlos_body_available",
+        "source": "carlos_interacted",
+        "note": "true only if ch09_deviant_alive was true and the android was encountered in this chapter — it always self-destructs after any interaction"
+      },
+      {
+        "target": "ch12_knows_sumo_name",
+        "source": "hank_personal_topic",
+        "derive_rule": "hank_personal_topic == dog",
+        "note": "true only if Connor asked Hank about the vet clinic note (the dog topic), which reveals the dog's name is Sumo. Used in ch18 Russian Roulette to determine whether Connor can calm or riles the dog."
+      },
+      {
+        "target": "software_instability",
+        "source": "software_instability"
+      },
+      {
+        "target": "hank_relationship",
+        "source": "hank_relationship"
+      }
+    ],
+    "cross_chapter_exports": [
+      "software_instability",
+      "hank_relationship",
+      "ch12_carlos_body_available",
+      "ch12_knows_sumo_name"
+    ]
+  }
+}

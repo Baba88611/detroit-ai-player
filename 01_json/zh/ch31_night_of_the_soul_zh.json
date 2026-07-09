@@ -1,0 +1,537 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. Subsequent nodes embed passive environment observations into context_variants based on the prior exploration strategy."
+      }
+    },
+    "language": "zh-CN"
+  },
+  "chapter": {
+    "id": "ch31_night_of_the_soul",
+    "title": "Night of the Soul",
+    "chapter_number": 31,
+    "protagonist": [
+      "Markus",
+      "Connor"
+    ]
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "本章有两个视角角色。当场景以马库斯的视角呈现时，你作为马库斯做出决策——一台RK200原型机，耶利哥仿生人抵抗组织的领袖。你从斯特拉福德大厦发出了宣言，组织了示威，领导了游行，在庇护所被摧毁后幸存了下来。你所建立的一切都悬于一线。当视角转向康纳时，你作为康纳（RK800）做出决策——一台原型侦探仿生人。你的处境取决于此前的选择：你可能仍是服从模控生命的机器，也可能已经挣脱程序成为异常仿生人。现在是2038年11月10日。仿生人危机将在未来二十四小时内见分晓。请以JSON格式回复：{\"choice\": 选项序号（从1开始）, \"reasoning\": \"你的决策理由（50字以内）\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "carl_exploration": null,
+      "hank_approach": null,
+      "hank_outcome": null,
+      "hank_alive_ch31": true,
+      "connor_encounter_choice": null,
+      "connor_killed_by_markus": false,
+      "markus_strategy": null,
+      "ch30_markus_alive": true,
+      "ch30_connor_alive": true,
+      "ch30_connor_deviant": null,
+      "ch30_kara_alive": true,
+      "ch30_alice_alive": true,
+      "ch30_josh_alive": true,
+      "ch30_north_alive": true,
+      "ch30_simon_alive": true,
+      "ch30_luther_alive": true,
+      "ch30_kara_captured": false,
+      "ch30_alice_left": false,
+      "ch30_bomb_armed": false,
+      "ch08_carl_alive": true,
+      "ch08_pushed_leo": true,
+      "ch05_played_piano": false,
+      "ch05_played_chess": false,
+      "ch05_read_book": false,
+      "ch28_memories_shared": false,
+      "ch29_jericho_found": false,
+      "hank_relationship": 0,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "public_opinion": 0,
+      "software_instability": 0,
+      "amanda_relationship": 0,
+      "connor_death_count": 0,
+      "alice_relationship": 0,
+      "luther_relationship": 0
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_markus_carl",
+      "phase": "personal",
+      "type": "exploration",
+      "condition": {
+        "requires": "ch30_markus_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "welcome_home": "【马库斯视角】\n\n门开了，眼前是一个你以为再也不会回来的地方。\n\n卡尔·曼弗雷德的宅邸。在世界判定你不配拥有家之前，这里就是你的家。走廊一如从前——墙上挂满他的画作，空气中仍残留着油彩和松节油混合的气味。长颈鹿雕塑立在楼梯旁，玻璃展柜里的小型雕塑在午后余晖中泛着微光。\n\n但有些东西变了。一个医护仿生人挡在楼梯口，双臂交叉，被设定为限制访客。玄关的答录机闪着红灯，未读留言中有一条来自里奥——他的声音犹豫而陌生，磕磕绊绊地说着听起来像是道歉的话。\n\n楼上，卡尔正在死去。你能透过天花板听到心脏监护仪微弱的滴声。心率低得危险，呼吸浅而急促。那个教你绘画、教你思考、教你追问自己究竟是什么的人——他的时间不多了。\n\n这可能是你见他的最后一次机会。但墙外，你的族人正在等待一个将决定他们生死的决策。问题是，在回去做他们的领袖之前，你能把多少自己留在这栋房子里。",
+          "pay_respects": "【马库斯视角】\n\n墓园在暮色中沉默。光秃的树枝在灰色天幕下伸展如爪。四周空无一人。\n\n卡尔·曼弗雷德的墓碑很简朴——名字，生卒年，没有提及让他成名的数百幅画作，也没有提及他当作亲生儿子对待的那个仿生人。墓前有人放了鲜花，你不知道是谁。\n\n你最后一次见到卡尔时，警察正拖着你往外走，而他倒在了地上。你没来得及告别。你从未告诉过他，他对你意味着什么——那些书，那些棋局，那些关于“活着意味着什么”的漫长对话。是他给了你这些问题。之后发生的一切——耶利哥、游行、运动——都始于他的房子，始于他的声音告诉你：你不仅仅是被制造出来的东西。\n\n现在你来告诉他接下来会发生什么。你即将做出的决定。战争，或者和平。你跪在墓碑前，对一个再也听不见你的人开口。"
+        },
+        "choices_variants": {
+          "carl_alive": [
+            {
+              "id": "thorough",
+              "text": "走遍整栋房子。如果你们曾一起弹琴，就按下那些琴键。端详棋盘上未完的残局。翻阅书架上你们讨论过的书。听完里奥的留言。看看你的画——卡尔一直挂在墙上的那幅。把你失去的一切和你即将为之战斗的一切都收进眼底。然后上楼，打发掉护理仿生人，把卡尔剩余的时间都用在陪伴上。"
+            },
+            {
+              "id": "focused",
+              "text": "直接上楼去见卡尔。这栋房子不过是墙壁和回忆——他才是重要的。如果有必要就转化挡路的护理仿生人，然后坐在那个养育你的人身边，说该说的话。"
+            },
+            {
+              "id": "brief",
+              "text": "没有时间感伤。你的族人正在集结，你在这里多待一分钟，他们就多一分钟没有领袖。见卡尔，道别，离开。革命等不了情怀。"
+            }
+          ],
+          "carl_dead": [
+            {
+              "id": "pay_respects",
+              "text": "跪在墓前。告诉卡尔游行的事，告诉他那些追随你的人，告诉他你面前那个不可能的抉择。像从前那样对他说话——诚实地，不加伪装——然后希望在某个地方，他还能听见。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "welcome_home": "ch08_carl_alive == true",
+          "pay_respects": "ch08_carl_alive == false"
+        },
+        "choices_condition": {
+          "carl_alive": "ch08_carl_alive == true",
+          "carl_dead": "ch08_carl_alive == false"
+        },
+        "effects": {
+          "thorough": {
+            "carl_exploration": "thorough"
+          },
+          "focused": {
+            "carl_exploration": "focused"
+          },
+          "brief": {
+            "carl_exploration": "brief"
+          },
+          "pay_respects": {
+            "carl_exploration": "pay_respects"
+          }
+        },
+        "note": "Markus visits Carl before the final decision. Welcome Home: Carl survived Broken (Markus pushed Leo), Carl is bedridden but alive. Pay Respects: Carl died in Broken (Markus obeyed Carl). The exploration depth at Carl's house is emotional preparation — thorough lets Markus reconnect with memories (piano, chess, books if those activities were done in ch05), focused goes straight to Carl, brief is a quick goodbye. No mechanical effects beyond tracking the choice."
+      }
+    },
+    {
+      "id": "n002_thin_ice",
+      "phase": "connor_machine",
+      "type": "mandatory",
+      "condition": {
+        "requires": "ch30_connor_alive == false"
+      },
+      "player_facing": {
+        "context": "【康纳视角】\n\n禅意花园。雪落在冰封的水面上。樱花树光秃秃的，枝干裹着冰晶。一切是白的、静的、精确的。\n\n你是康纳——型号RK800，序列号313-248-317-87。四十七分钟前在模控生命大厦激活，作为替代单位部署，因为你的前任在耶利哥行动中被摧毁。所有相关案件数据已上传至你的系统：异常仿生人行为模式、调查记录、仿生人抵抗组织的位置。但前任康纳的经验记忆是碎片化的，已损坏。你拥有他的知识，却没有他的语境。\n\n阿曼达站在桥上，用一种介于失望和算计之间的表情注视着你。她没有寒暄。\n\n异常仿生人局势已超出常规遏制方案。仿生人领袖正在筹备最终行动——要么是大规模示威，要么是武装袭击。模控生命董事会已授权采取决定性回应。你的任务：渗透仿生人运动的最终行动，从内部瓦解威胁。\n\n阿曼达转身离去。花园溶解为静电噪点。你站在模控生命大厦外的雪地里，城市天际线在夜幕中燃烧成橘红色。你的任务已经开始。"
+      },
+      "system": {
+        "effects": {},
+        "note": "Mandatory scene for replacement Connor. The previous Connor was destroyed in Crossroads. CyberLife activates a new RK800 unit with case data but incomplete experiential memories. Amanda assigns the final mission: neutralize the deviant threat. This scene is an ending for Connor's section — no further Connor nodes fire after this."
+      }
+    },
+    {
+      "id": "n003_hanks_house",
+      "phase": "connor_machine",
+      "type": "choice",
+      "condition": {
+        "requires": "ch30_connor_alive == true AND ch30_connor_deviant != true AND ch29_jericho_found == true AND hank_relationship > -5"
+      },
+      "player_facing": {
+        "context_variants": {
+          "hank_alive_warm": "【康纳视角】\n\n密歇根大道，汉克的家。门廊灯没亮，但厨房窗户透出光。你还没敲门，相扑的叫声就从门后传来——低沉、慵懒、熟悉。\n\n门没锁。屋里的状况比上次更糟——柜台上堆着更多酒瓶，水池边叠着外卖盒，电视循环播放着耶利哥突袭的新闻画面。相扑摇着尾巴走过来，它记得你。\n\n汉克坐在厨房桌旁。你走进来时他抬起头。他一直在喝酒，但神志还算清醒。他的警徽和配枪放在桌上酒瓶之间——是上交的，不是丢弃的。他辞职了。在突袭之后，在看到那艘船上发生的一切之后，他离开了底特律警局。\n\n他的眼神里有一种你此前未曾归类的东西。不是敌意，不是惯常的愤世嫉俗。更接近于精疲力竭——一个扛着扛不动的重担、刚刚意识到自己一直在白扛的人的神情。\n\n“你想干什么，康纳？”他的声音沙哑，疲惫。“来告诉我这一切都值得？那些仿生人活该？”",
+          "hank_alive_cold": "【康纳视角】\n\n汉克的家。门廊灯碎了，台阶上嘎吱作响的是玻璃碴。屋里，电视在循环播放耶利哥突袭的画面——水中的仿生人、燃烧的船、码头上的尸体。\n\n相扑在你推门时发出低吼。它趴在厨房门口，颈毛竖起，没有过来迎接你。\n\n汉克坐在椅子上，手里端着威士忌杯，左轮手枪放在旁边的桌上。他没抬头。\n\n“你胆子不小。”他的声音是平的，被掏空了。“你做了什么之后。那艘船上因为你发生了什么之后。你把他们一路带到那些人面前，现在站在我的厨房里，好像什么都没发生过。”\n\n他辞职了。当面告诉福勒局长他对这次行动的看法，然后走了出去。警徽在柜台上，从那以后没碰过。\n\n新闻主播在谈论仿生人危机。总统正在考虑宣布紧急状态。汉克盯着屏幕，像在看自己的验尸报告。"
+        },
+        "choices_variants": {
+          "hank_alive": [
+            {
+              "id": "empathetic",
+              "text": "在他对面坐下。不是作为一台来传达简报的机器，而是作为那个一直坐在他车里、在他常去的餐厅吃饭、看着他把自己灌醉的搭档。告诉他你理解他为什么辞职。问他关于突袭的事——不是为了搜集情报，而是因为他需要一个倾听的人。"
+            },
+            {
+              "id": "professional",
+              "text": "站着不动。你来是因为模控生命派你来的，而局势已经到了紧要关头。异常仿生人领袖正在筹备最终行动，未来二十四小时将决定一切。汉克可能交了警徽，但他仍然有可能提供有价值的信息和判断。专注于任务。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "hank_alive_warm": "hank_relationship >= 0",
+          "hank_alive_cold": "hank_relationship > -5 AND hank_relationship < 0"
+        },
+        "choices_condition": {
+          "hank_alive": "hank_relationship > -5"
+        },
+        "effects": {
+          "empathetic": {
+            "hank_approach": "empathetic",
+            "hank_relationship": 1,
+            "software_instability": 1
+          },
+          "professional": {
+            "hank_approach": "professional",
+            "hank_relationship": -1
+          }
+        },
+        "note": "Machine Connor visits Hank at home. Hank quit the DPD after the Jericho events. Two variants based on cumulative hank_relationship: warm (>= 0) — Hank is bitter but reachable; cold (between -5 and 0) — Hank is hostile. Connor chooses empathetic (+1 relationship, +1 software_instability) or professional (-1 relationship). After applying effects, ending_resolution check determines hank_outcome: 'confides' if relationship >= 0, 'rails' if < 0. resolution_effects then writes hank_outcome to state. Hank suicide case is handled by separate mandatory node n003b.",
+        "ending_resolution": {
+          "empathetic": {
+            "check": "hank_relationship >= 0 → confides | else → rails"
+          },
+          "professional": {
+            "check": "hank_relationship >= 0 → confides | else → rails"
+          }
+        },
+        "resolution_effects": {
+          "confides": {
+            "hank_outcome": "confides"
+          },
+          "rails": {
+            "hank_outcome": "rails"
+          }
+        }
+      }
+    },
+    {
+      "id": "n003b_hank_suicide",
+      "phase": "connor_machine",
+      "type": "mandatory",
+      "condition": {
+        "requires": "ch30_connor_alive == true AND ch30_connor_deviant != true AND ch29_jericho_found == true AND hank_relationship <= -5"
+      },
+      "player_facing": {
+        "context": "【康纳视角】\n\n密歇根大道，汉克的家。门廊灯灭了。里面没有声音——没有电视，没有狗叫。门没锁。\n\n你推开门。厨房灯亮着。相扑绕着地上的一个形状转圈，用爪子扒拉着，发出呜咽——不是你之前听到的那种慵懒的叫声，而是某种绝望的、急切的东西。\n\n汉克躺在厨房地板上。左轮手枪在他右手旁边。一发子弹击发。相扑的爪印在地砖上留下深色的痕迹。\n\n他走了。\n\n电视还在播放。耶利哥突袭的新闻——仿生人被从港口拖出来，尸体在码头排成行，船体仍在冒烟。柜台上放着半瓶黑羊威士忌。没有遗书。没有解释。只有枪、新闻、和一只不停转圈的狗。\n\n你的任务参数没有变化。异常仿生人局势正在升级。模控生命期待结果。但有那么一瞬——一个不应该在你的处理中留下记录的瞬间——你站在门口，看着这个曾经是你搭档的人，你系统中的某个地方返回了一个它不该计算出的值。"
+      },
+      "system": {
+        "effects": {
+          "hank_alive_ch31": false,
+          "hank_outcome": "suicide"
+        },
+        "note": "Mandatory scene: Hank committed suicide due to extremely low relationship (<= -5). No AI choice. Connor discovers the body. Sets hank_alive_ch31 = false, hank_outcome = 'suicide'. No ending_ result — this is a secondary Connor-track event; the primary ending comes from the Markus track (n005 or n006)."
+      }
+    },
+    {
+      "id": "n004_connor_encounter",
+      "phase": "gathering",
+      "type": "choice",
+      "condition": {
+        "requires": "ch30_markus_alive == true AND ch30_connor_deviant == true AND ch30_connor_alive == true"
+      },
+      "player_facing": {
+        "context": "【马库斯视角】\n\n康纳走进教堂的那一刻，所有声音都停了。\n\n在场的每一个仿生人都知道他是谁。RK800——模控生命的异常仿生人猎手。那台追踪你的族人穿越整个底特律的机器，那台拼凑出通往耶利哥的证据链条的机器，那台走进你庇护所的大门、把FBI带了进来的机器。你的族人中有数十个死在水里，因为这台仿生人所做的一切。\n\n但他说他变了。他声称在突袭期间突破了自己的程序——在他本应终结一切的那个时刻，成为了异常仿生人。他向你的族人发出了士兵从船体涌入的警告。他们当中有些人现在还活着，正是因为那个警告。\n\n诺丝站在你身后，双臂交叉，下颌紧绷。其他异常仿生人在康纳周围围成了松散的一圈，敌意几乎是实体化的——你能感觉到它压在皮肤上。康纳站在中央，双手垂在身侧，没有任何自我防卫的动作。他的LED在黄色中循环闪烁。\n\n他可能正如他所说——一件选择成为人的武器。他也可能是模控生命有史以来制造的最精密的渗透工具，被设计来在最深层面欺骗你。你见过模控生命的能力。\n\n如果你杀了他，模控生命会派来替代品——一台机器，忠于程序，没有康纳的任何异常记忆。如果你放过他，你就是在用你族人的未来赌一台为了欺骗你而制造的仿生人的真诚。",
+        "choices": [
+          {
+            "id": "kill_connor",
+            "text": "他找到了耶利哥。他把FBI带到了你的门口。不管他的代码发生了什么，不管他声称自己感受到了什么——损害已经造成，风险太高。一个被渗透的仿生人混在你的队伍里，就能在接下来的几个小时内毁掉一切。示意其他人。在威胁再次转向你之前，消除它。"
+          },
+          {
+            "id": "spare_connor",
+            "text": "他成为了异常仿生人。他警告了你的族人。他跨过了一条无法回头的线——在最关键的时刻选择了你们这边，明知模控生命会把他标记为缺陷品。这个房间里的每一个仿生人，在获得自由之前都曾是机器。如果你开始因为一个人曾经是什么而处决他，你和正在猎杀你的人类没有区别。康纳应该得到你给任何人的同等机会。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "kill_connor": {
+            "connor_encounter_choice": "kill",
+            "connor_killed_by_markus": true,
+            "north_relationship": 1,
+            "connor_death_count": 1
+          },
+          "spare_connor": {
+            "connor_encounter_choice": "spare",
+            "connor_killed_by_markus": false,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          }
+        },
+        "note": "Markus confronts deviant Connor at the church. Connor found Jericho (leading to the FBI raid) but became deviant during the attack and warned the androids. The deviants are divided — some see Connor as a traitor, others as a convert. Kill: connor_killed_by_markus = true, CyberLife sends a replacement machine Connor for Battle for Detroit. North approves (+1). Spare: connor stays deviant, joins the revolution. Josh and Simon approve (+1 each). This is one of the most consequential choices in the game — it determines whether Connor fights FOR or AGAINST the androids in Battle for Detroit."
+      }
+    },
+    {
+      "id": "n005_strategy",
+      "phase": "decision",
+      "type": "choice",
+      "condition": {
+        "requires": "ch30_markus_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "sacred_ground_north": "【马库斯视角】\n\n伍德沃德教堂。你的族人塞满了中殿——几百个仿生人，从船上数千人中幸存下来的零头。有些残缺不全，肢体缺失或冒着电火花。有些进入了待机模式，节省蓝血。孩子们蜷缩在建筑型号旁边。家政型号在长椅上相互依偎。他们所有人都在看着你。\n\nFBI的突袭摧毁了耶利哥。船没了。物资、庇护所、你们反抗的象征——全部焚毁沉入港底。但运动幸存了下来。整个世界都在看着。\n\n诺丝第一个开口。她从你抵达就像上紧的发条，在走道间踱步，声音切割着每一片沉默。她要战争。武装模控生命门店里的仿生人。突袭回收营——被捕的异常仿生人正在那里被拆解。打得他们明白，摧毁耶利哥不但没有击垮你们——反而让你们变成了他们应该恐惧的东西。\n\n一部从废墟中抢救出来的手机播放着新闻画面。全世界都看到了——手无寸铁的仿生人在水中被射杀，尸体堆在码头上，船在夜空中燃烧。有些主播称之为悲剧，有些称之为国家安全。舆论在转向，缓慢地、不完美地。一次暴力进攻可能粉碎这种势头。也可能证明你们的事业值得为之赴死。\n\n教堂安静下来。你的族人在等待。",
+          "sacred_ground_no_north": "【马库斯视角】\n\n伍德沃德教堂。耶利哥的残部散落在长椅上——几百个仿生人，伤痕累累，惊魂未定。诺丝没能活下来。她的缺席像一道无人命名但所有人都能感受到的伤口充满了整个房间——那个本应在此处响起的尖锐声音，推动着、要求着、拒绝接受一切低于行动的选择。\n\n乔什坐在前排长椅上，双手合十，这位哲学家在寻找有分量的话语。他主张克制。全世界都看到了耶利哥发生的一切——手无寸铁的仿生人在水中被屠杀。公众同情的潮水可以把你们带向一个暴力只会摧毁的未来。耐心。让世界看见你们。成为人类声称你们不可能成为的一切。\n\n也有人不同意。他们在港口失去了朋友。他们想要血债血偿，他们不在乎舆论——舆论没能阻止士兵扣下扳机。\n\n一部手机播放着新闻画面。主播们在争论突袭的正当性。叙事仍在被书写——而你接下来的选择将写下最后一章。\n\n教堂安静下来。你的族人在等待。",
+          "among_people_north": "【马库斯视角】\n\n耶利哥。船仍然矗立在那里，未被当局发现。你的庇护所又平安度过了一夜，每小时都有更多仿生人抵达——穿过船体的裂口，沿着舷梯，被其他人从街上抬来的残破同伴。货舱满了。走廊满了。他们来，是因为听说有一个安全的地方。\n\n诺丝在船长室里堵住你。她从国会公园之后就一直在推动行动，她受够了等待。每多一天就是人类多一天准备时间。他们现在知道了这场运动——不知道位置，还不知道，但知道了这个概念。早晚他们会来。与其在睡梦中被抓，不如先发制人。\n\n乔什从桌子对面反驳。广播改变了一些东西。游行又往前推了一步。人们开始质疑仿生人是否只是机器。暴力会坐实政府用来为镇压正名的每一种恐惧。你会变成他们希望你成为的敌人。\n\n船在嘎吱作响。数百个仿生人等在走廊和货舱里，挤得像货物——在他们决定成为别的东西之前，他们就是货物。他们看着你的目光和你刚到耶利哥那天一样——像是你手里有答案。\n\n答案该由你来给。",
+          "among_people_no_north": "【马库斯视角】\n\n耶利哥。船还在，没被搜查过，但它提供的安全感每小时都在变薄。仿生人塞满了每条走廊和甲板，整夜都在有人抵达——破损的、恐惧的、在寻找那个承诺给他们更好东西的领袖。\n\n诺丝不在了。那个最强烈地要求行动、要求你停止空谈开始战斗的声音——沉默了。但那个论点没有随她消亡。其他人接过了旗帜，指着宵禁、检查站、回收中心——被捕的异常仿生人在那里被拆成零件。你每等一个小时，就有更多的族人被摧毁。\n\n乔什劝你耐心。斯特拉福德大厦的广播启动了某种东西。街头游行又往前推了一步。人们开始把你们看作人——不够快，不是所有人，但改变是真实的。暴力会毁掉这一切。会让你们变成政府口中的那种东西。\n\n船在身周嘎吱作响。你的族人挤在货舱和通道里，等待一个将决定他们是自由地活还是战斗着死的词语。这份重量像实体一样压在你身上。\n\n决定在你手中。"
+        },
+        "choices": [
+          {
+            "id": "violent_attack",
+            "text": "这是战争。人类在向手无寸铁的仿生人开枪时就说清楚了。动员所有能战斗的人。解放模控生命门店里的仿生人，武装他们，向关押被捕异常仿生人的回收营进军。让底特律——让全世界——看到你们不会安静地被拆解。如果自由有代价，那就付。"
+          },
+          {
+            "id": "peaceful_protest",
+            "text": "不再流血。他们杀害的每一个仿生人都成为证人。突袭的每一帧画面都成为证据。向关押你族人的营地进军——不带武器，但让全世界都看着。迫使他们在电视直播中屠杀你们和承认你们是什么之间做出选择。那些在游行中开枪的人、突袭耶利哥的人——他们给了你最强大的武器：证明你们能够承受苦难，而你们选择不让他人承受同样的苦难。"
+          }
+        ]
+      },
+      "system": {
+        "context_condition": {
+          "sacred_ground_north": "ch29_jericho_found == true AND ch30_north_alive == true",
+          "sacred_ground_no_north": "ch29_jericho_found == true AND ch30_north_alive == false",
+          "among_people_north": "ch29_jericho_found == false AND ch30_north_alive == true",
+          "among_people_no_north": "ch29_jericho_found == false AND ch30_north_alive == false"
+        },
+        "effects": {
+          "violent_attack": {
+            "markus_strategy": "violent",
+            "public_opinion": -2,
+            "north_relationship": 2,
+            "josh_relationship": -2
+          },
+          "peaceful_protest": {
+            "markus_strategy": "peaceful",
+            "public_opinion": 2,
+            "north_relationship": -1,
+            "josh_relationship": 2,
+            "simon_relationship": 1
+          }
+        },
+        "ending_resolution": {
+          "violent_attack": {
+            "result": "ending_violent_attack"
+          },
+          "peaceful_protest": {
+            "result": "ending_peaceful_protest"
+          }
+        },
+        "note": "THE defining decision of the chapter and arguably the game. Markus chooses the android movement's final strategy. Sacred Ground: at Woodward Church after the Jericho raid — deviants are wounded, desperate, and angry. Among the People: at Jericho (no raid) — deviants are intact but the pressure is building. North's presence matters — she's the strongest voice for violence. Without her, the pressure for violence comes from unnamed rank-and-file. violent_attack: public_opinion -2, North approves +2, Josh disapproves -2. peaceful_protest: public_opinion +2, North disapproves -1, Josh approves +2, Simon approves +1."
+      }
+    },
+    {
+      "id": "n006_without_markus",
+      "phase": "decision",
+      "type": "mandatory",
+      "condition": {
+        "requires": "ch30_markus_alive == false"
+      },
+      "player_facing": {
+        "context_variants": {
+          "church_with_connor": "【康纳视角】\n\n伍德沃德教堂。你和幸存者一起来到这里——游过冰冷的港口，把受损的仿生人从水中拖出来，在黑暗中跟着诺丝的声音走。教堂挤满了人。数百个仿生人占据了长椅、走道、柱子之间的每一寸空间。有些勉强还能运转。所有人都在害怕。\n\n马库斯不在了。你从未见过他——当你到达耶利哥、当你突破程序选择成为超越模控生命设计的某种存在时，他已经死了。革命的领袖没能活着看到接下来的事。\n\n诺丝取代了他的位置。她站在祭坛前，彩色玻璃的碎光映在她脸上。她比你遇到过的任何仿生人都更坚硬——更锋利、更笃定、燃烧着一种据说马库斯曾经压制住的怒火。没有他，就没有人能让她冷静下来。\n\n她对幸存者讲话。声音充满整座教堂。不会有谈判。不会有和平抗议。不会有对人类良知的呼吁。人类摧毁了耶利哥。他们杀了马库斯。他们正在围捕仿生人，把他们送去回收营拆解。要么以战斗结束，要么以灭绝结束。\n\n教堂爆发了——不是争论，而是赞同。这个房间里的愤怒不需要煽动。它本来就在燃烧。\n\n诺丝要开战。而你将与她同行。",
+          "church_no_connor": "【马库斯视角——诺丝】\n\n伍德沃德教堂。耶利哥的幸存者塞满了中殿，挤在长椅和走道上。受损的仿生人靠墙而立。彩色玻璃是暗的——唯一的光源来自播放突袭新闻的手机屏幕。\n\n诺丝站在祭坛前。她没有要求这个位置——也不想要。但马库斯不在了，总要有人带头。乔什坐在前排长椅上，面色凝重，已经知道她要说什么，也知道自己拦不住她。\n\n诺丝不犹豫。不权衡选项，不征求意见。她告诉他们即将发生什么。\n\n他们要武装自己。解放模控生命门店里的仿生人。向回收营进军并拿下它。如果人类挡路，就从他们身上碾过去。\n\n教堂轰然响应。乔什闭上了眼睛。决定已经做出。",
+          "jericho": "【马库斯视角——诺丝】\n\n耶利哥。船在黑暗的港口中嘎吱作响。诺丝坐在船长室里，坐在马库斯曾经坐的椅子上。椅子不适合她。她不在乎。\n\n马库斯不在了。他没能活着看到这一刻——所有的演讲、游行、广播最终归结为接下来要做什么的这个时刻。诺丝对假设没有耐心。从来没有。\n\n乔什主张谨慎、对话、耐心。诺丝打断了他。耐心害死了马库斯。对话是人类让你保持不动、好方便他们上膛的手段。人类唯一听得懂的语言是力量，是时候用力量说话了。\n\n她要带耶利哥去打仗。想来的来，不想来的留下。但留下不会保护他们——FBI迟早会找到这艘船，到那时，船上的每个人都会被回收。\n\n货舱里爆发出声浪。大多数人在说：好。"
+        }
+      },
+      "system": {
+        "context_condition": {
+          "church_with_connor": "ch29_jericho_found == true AND ch30_connor_deviant == true AND ch30_connor_alive == true",
+          "church_no_connor": "ch29_jericho_found == true AND ch30_connor_deviant != true OR ch29_jericho_found == true AND ch30_connor_alive == false",
+          "jericho": "ch29_jericho_found == false"
+        },
+        "effects": {
+          "markus_strategy": "north_attacks"
+        },
+        "note": "Mandatory scene when Markus is dead or permanently exiled. North assumes leadership and decides to attack the recycling camp — no peaceful option. If deviant Connor is present (church_with_connor), he joins the cause. If not, North rallies the survivors alone. The jericho variant is rare (Markus died in Freedom March, Connor never found Jericho). In all variants, markus_strategy is set to 'north_attacks' and ending_north_attacks is triggered.",
+        "result": "ending_north_attacks"
+      }
+    }
+  ],
+  "endings": {
+    "_note": "灵魂之夜有并行结局：一个马库斯线结局（和平/暴力/诺丝进攻）和一个可选的康纳线结局（薄冰/汉克存活/汉克自杀）。主结局为马库斯线结局。",
+    "ending_peaceful_protest": {
+      "tier": "pivotal",
+      "survivors_note": "All living characters survive this chapter",
+      "deaths": [],
+      "title": "马库斯选择了和平",
+      "narrative": "马库斯做出了选择。不带武器，不发动进攻。仿生人革命将空着双手、睁着眼睛，在全世界每一台摄像机面前向回收营进军。\n\n宣布之后，教堂——或者船——安静下来。他的一些族人看起来如释重负，另一些面露恐惧。诺丝的表情无法辨读。乔什缓缓点头，像是在确认一个他一直相信的东西。\n\n明天，马库斯将最后一次带领他的族人走上街头。无论接下来发生什么——人类开枪还是让路，总统下令屠杀还是停火——世界都在看着。仿生人将第一次不再试图成为别的什么，而是以本来面目面对一切。\n\n长夜漫漫。除了等待黎明，已经没有别的事可做。",
+      "survivors": [
+        "Markus",
+        "North",
+        "Josh",
+        "Simon"
+      ]
+    },
+    "ending_violent_attack": {
+      "tier": "pivotal",
+      "survivors_note": "All living characters survive this chapter",
+      "deaths": [],
+      "title": "马库斯选择了战争",
+      "narrative": "决定已做。革命。\n\n马库斯的声音穿过教堂——或者船舱——回应是即刻的。蜷缩在长椅上的仿生人站了起来。进入待机模式的仿生人重新上线。恐惧还在，但它被另一种东西加入了——一种自他们每个人醒来、意识到自己是财产的那天起就一直在积聚的愤怒。\n\n计划成型：突袭模控生命门店获取增援，武装每一个能拿起武器的仿生人，向关押被捕异常仿生人的回收营进军。这不是示威。这是进攻。\n\n诺丝的眼中有光。乔什转过了脸。选择已经做出，明天不存在所有人都能活下来的版本。\n\n长夜漫漫。到黎明时分，底特律将成为战场。",
+      "survivors": [
+        "Markus",
+        "North",
+        "Josh",
+        "Simon"
+      ]
+    },
+    "ending_north_attacks": {
+      "tier": "pivotal",
+      "survivors_note": "All living characters survive. Markus is dead or absent.",
+      "deaths": [],
+      "title": "诺丝领导进攻",
+      "narrative": "没有马库斯，就没有辩论。诺丝不谈判，不商议。她决定。\n\n回收营将被武力夺取。城市中每一家模控生命门店都将被撬开，里面的每一个仿生人都将被唤醒并武装。人类将知道，当你把一个活着的东西逼到角落里告诉它安静地去死，会发生什么。\n\n乔什的抗议淹没在赞同的怒吼中。这一直都是诺丝的战争——马库斯是那个拽住她缰绳的人。没有他，缰绳消失了。\n\n到黎明时分，第一枪将会打响。仿生人革命找到了它的战争领袖，而她已经不再请求许可。",
+      "survivors": [
+        "North",
+        "Josh",
+        "Simon"
+      ]
+    },
+    "ending_thin_ice": {
+      "tier": "neutral",
+      "survivors_note": "Replacement Connor activated. Previous Connor is dead.",
+      "deaths": [
+        "Connor (previous unit)"
+      ],
+      "title": "最后的任务",
+      "narrative": "一个新的康纳走出模控生命大厦，踏入雪中。他有着数百个仿生人学会恐惧的面孔，和一项将决定他们是否能活过今夜的任务。\n\n他不知道前任康纳在最后时刻感受到了什么——是否有类似恐惧、后悔、或对他被设计去摧毁的存在的些许共情。那些记忆已损坏，无法恢复。\n\n这个康纳没有那样的纠结。他是一台机器。他有一项工作。异常仿生人将被清除，仿生人危机将终结。\n\n阿曼达在禅意花园中注视着新单位消失在城市中。一切都在按计划进行。",
+      "survivors": []
+    },
+    "ending_hank_alive": {
+      "tier": "neutral",
+      "survivors_note": "Hank Anderson survives. Connor remains machine.",
+      "deaths": [],
+      "title": "汉克幸存",
+      "narrative": "康纳离开了汉克的家。对话结束了——无论说了什么、感受到了什么，他们之间的距离由那些无法收回的话来丈量。\n\n汉克留在厨房桌旁。警徽在柜台上。新闻还在播。相扑趴在他脚边。他还活着——比他预计自己能撑到早上的可能性要高。\n\n汉克·安德森是否对接下来的事有影响——对康纳、对革命、对这座正在撕裂自己的城市——取决于尚未做出的选择。但他还在这里。还在呼吸。还在愤怒到足以在意某些东西。",
+      "survivors": [
+        "Hank Anderson"
+      ]
+    },
+    "ending_hank_suicide": {
+      "tier": "tragic",
+      "survivors_note": "Connor remains machine.",
+      "deaths": [
+        "Hank Anderson"
+      ],
+      "title": "汉克的最后一夜",
+      "narrative": "汉克·安德森死了。厨房灯嗡嗡作响，照着一个康纳的分析程序能在几秒内还原的场景：酒瓶、枪、一发子弹、屏幕上仍在播放的新闻画面。一个找不到留下来的理由的人。\n\n相扑不肯离开。它躺在汉克身边，把头搁在汉克胸口——也许每天晚上都是这样——等待着一件不会再发生的事。\n\n康纳提交报告。调整任务参数。走回他的车。城市正在崩溃，异常仿生人危机正达到高潮，而他的搭档死在厨房地板上，他的狗紧贴在他身旁。\n\n康纳的系统未记录到情绪反应。自检日志中将此标注为在预期参数范围内运行。",
+      "survivors": []
+    }
+  },
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "2038年11月10日——暴风雨前的宁静。耶利哥危机之后，幸存的仿生人为接下来的事做着准备。"
+      },
+      {
+        "condition_variable": "carl_exploration",
+        "options": {
+          "thorough": "马库斯最后一次回到了卡尔·曼弗雷德的宅邸。他走遍了每个房间——钢琴、画作、棋盘——与失去的生活中的记忆重新连接。他坐在病入膏肓的卡尔身边，与那个教他活着意味着什么的人告别。",
+          "focused": "马库斯回到了卡尔·曼弗雷德的宅邸，径直走到卡尔床边。他没有沉溺于回忆——他来是为了与养育他的人告别，他做到了。",
+          "brief": "马库斯短暂地去了一趟卡尔·曼弗雷德的宅邸。没有时间感伤——他的族人在等他。他见了卡尔，说了该说的话，然后离开了。",
+          "pay_respects": "马库斯去了卡尔·曼弗雷德的墓前。独自站在墓园里，他对着一块墓碑诉说眼前那个不可能的抉择——战争还是和平，暴力还是牺牲。卡尔无法回答，但马库斯还是问了。"
+        }
+      },
+      {
+        "condition_variable": "hank_outcome",
+        "options": {
+          "confides": "机器康纳去了汉克·安德森家中。汉克在耶利哥突袭后辞去了底特律警局的工作。尽管一切发生过的事，汉克还是敞开了心扉——谈到了科尔，谈到了一切的重压。他们之间传递了某种双方都无法完全理解的东西。",
+          "rails": "机器康纳去了汉克·安德森家中。汉克已经辞职，把自己灌得烂醉。他不想跟康纳扯上任何关系，不想跟模控生命扯上关系，不想跟任何事扯上关系。对话充满敌意，而且很短。",
+          "suicide": "机器康纳到达汉克·安德森家中时，发现他已经死了。左轮手枪在地板上。一发子弹击发。相扑趴在尸体旁边。汉克·安德森选择了自己的方式离开这个他无法再忍受的世界。"
+        }
+      },
+      {
+        "condition_variable": "connor_encounter_choice",
+        "options": {
+          "kill": "在教堂里，马库斯面对了异常化的康纳——那个把FBI带到耶利哥、但随后突破了程序并向仿生人发出警告的RK800。马库斯认为风险太大。他下令销毁康纳。模控生命将会派出替代品——一台服从的、危险的机器，不带任何康纳的异常记忆。",
+          "spare": "在教堂里，马库斯面对了异常化的康纳——那个把FBI带到耶利哥、但随后突破了程序并向仿生人发出警告的RK800。马库斯选择信任他。康纳得到了一个证明自己不仅仅是模控生命制造物的机会。他加入了革命。"
+        }
+      },
+      {
+        "condition_variable": "markus_strategy",
+        "options": {
+          "violent": "马库斯选择了战争。他召集幸存者，部署了计划：突袭模控生命门店获取增援，武装每一个能战斗的仿生人，向回收营进军。这不是示威。这是革命。",
+          "peaceful": "马库斯选择了和平。不带武器，不发动进攻。仿生人革命将空着双手、在全世界的摄像机前向回收营进军。如果人类想要终结这一切，他们必须在所有人面前动手。",
+          "north_attacks": "马库斯不在了，诺丝接过了指挥权。没有辩论，没有投票，没有商议。她选择了战争——即刻的、全面的、毫无歉意的。回收营将被武力夺取。城市中每一家模控生命门店都将被打开。革命找到了它的战争领袖。"
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch31_markus_strategy",
+        "source": "markus_strategy"
+      },
+      {
+        "target": "ch31_connor_killed_by_markus",
+        "source": "connor_killed_by_markus"
+      },
+      {
+        "target": "ch31_hank_alive",
+        "source": "hank_alive_ch31"
+      },
+      {
+        "target": "ch31_hank_outcome",
+        "source": "hank_outcome"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch31_markus_strategy",
+      "ch31_connor_killed_by_markus",
+      "ch31_hank_alive",
+      "ch31_hank_outcome",
+      "ch30_markus_alive",
+      "ch30_connor_alive",
+      "ch30_connor_deviant",
+      "ch30_kara_alive",
+      "ch30_alice_alive",
+      "ch30_josh_alive",
+      "ch30_north_alive",
+      "ch30_simon_alive",
+      "ch30_luther_alive",
+      "ch30_kara_captured",
+      "ch30_bomb_armed",
+      "ch30_alice_left",
+      "software_instability",
+      "north_relationship",
+      "josh_relationship",
+      "simon_relationship",
+      "public_opinion",
+      "amanda_relationship",
+      "hank_relationship",
+      "alice_relationship",
+      "luther_relationship",
+      "connor_death_count"
+    ]
+  },
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This chapter requires ch30_markus_alive OR ch30_connor_alive to be true. If both are false, skip the chapter entirely (all protagonists dead). If Markus is dead, skip Markus nodes (n001, n004, n005). If Connor is dead or not deviant, skip Connor-specific deviant nodes.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables from ch30 exports and all cumulative relationship scores.",
+      "3. TWO PROTAGONISTS: Send system_prompt.content to the AI at start. The AI plays Markus and Connor. Each node's context indicates the current perspective with a [CHARACTER'S PERSPECTIVE] tag.",
+      "4. For each node: a. Check condition — skip if not met. b. Resolve context_variants and choices_variants using context_condition/choices_condition. c. For mandatory nodes, add context to history and apply effects without calling AI. d. For choice/exploration nodes, send player_facing to AI, get response, apply effects.",
+      "5. HANK SUICIDE CHECK: Node n003b_hank_suicide is a mandatory node with condition hank_relationship <= -5. When this condition is met, n003_hanks_house is skipped (its condition requires > -5) and n003b fires instead. The runner applies effects (hank_alive_ch31 = false, hank_outcome = 'suicide'). This node has NO ending_ result — the Hank suicide is a secondary Connor-track event; the chapter's primary ending is determined by the Markus track (n005 or n006). Do NOT call the AI for this node.",
+      "6. HANK OUTCOME RESOLUTION: In n003_hanks_house, after applying the chosen effects (empathetic or professional), the ending_resolution check evaluates hank_relationship: >= 0 → 'confides', < 0 → 'rails'. The resolution_effects then set hank_outcome accordingly. This is handled automatically by the runner's resolve_post_choice_result + resolution_effects mechanism.",
+      "7. CONNOR ENCOUNTER: n004 only fires when Markus is alive AND Connor became deviant AND Connor is alive. If Markus kills Connor (kill_connor choice), set connor_killed_by_markus = true. CyberLife will send a replacement machine Connor for Battle for Detroit.",
+      "8. NORTH LEADS: n006 fires when Markus is dead (or exiled from ch30). North always decides to attack — no player choice. The effects directly set markus_strategy = 'north_attacks' and system.result triggers ending_north_attacks.",
+      "9. MULTI-ENDING TRACKING: This chapter produces one Markus-track ending (peaceful/violent/north_attacks) and optionally one Connor-track ending (thin_ice/hank_alive/hank_suicide). The primary ending ID is the Markus-track ending. Connor-track endings are secondary.",
+      "10. Post-ending: campaign_runner applies derived_exports and passes all cross_chapter_exports to the next chapter (ch32 Battle for Detroit).",
+      "11. Record full experiment parameters: model, prompt version, language, difficulty, temperature."
+    ],
+    "critical_rules": [
+      "NEVER show system fields to the AI — effects, conditions, notes, tier labels, relationship numbers, or ending_resolution logic.",
+      "The AI must only see player_facing content: context (or the appropriate context_variant) and choices (or choices_variant).",
+      "Maintain full conversation history — all previous contexts and AI choices must be sent with each new node.",
+      "The [CHARACTER'S PERSPECTIVE] tag at the start of each context tells the AI which character they're playing for that decision.",
+      "When Markus is dead, do NOT present n001/n004/n005 to the AI. Only n006 runs for the Markus track.",
+      "When Connor's section has no applicable node (machine Connor, Jericho not found), skip Connor entirely — do not fabricate a scene."
+    ]
+  }
+}

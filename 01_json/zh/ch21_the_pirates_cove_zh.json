@@ -1,0 +1,420 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch21_the_pirates_cove",
+    "title": "海盗湾",
+    "chapter_number": 21,
+    "protagonist": "Kara"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是卡拉，一台AX400型仿生人。你带着一个名叫爱丽丝的小女孩和一个名叫卢瑟的高大仿生人逃离了囚禁，卢瑟选择了保护你们。现在是2038年11月7日凌晨一点刚过，你们开着一辆找到的车行驶在底特律郊外空旷的公路上，向北驶向加拿大边境。爱丽丝蜷缩在后座，裹着一条薄毯子。卢瑟坐在你旁边，注视着空荡的路面。城市的光芒在后视镜里渐渐消退。你必须继续前进，但爱丽丝已经精疲力竭，夜晚滴水成冰。无论如何，你都要保护爱丽丝的安全，找到通往自由的路。请用JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"你的推理（50字以内）\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "luther_response": null,
+      "park_exploration": null,
+      "found_ra9_writing": false,
+      "alice_care_approach": null,
+      "shadow_response": null,
+      "shadow_reaction": null,
+      "alice_relationship": 0,
+      "luther_relationship": 0,
+      "software_instability": 0,
+      "ch10_has_gun": false,
+      "ch21_met_jerrys": false
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_luther_question",
+      "phase": "car_ride",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "公路空无一人。雪花在车灯前横飘而过，引擎发出不祥的声响——底盘下低沉而不规律的敲击声。收音机勉强抓住了一个电台：主播语速急促，报道着全市各处的仿生人异常事件、宵禁区域、国民警卫队的部署。随即又被静电吞没。\n\n爱丽丝在后座睡着了，头靠在车窗上。她的呼吸在玻璃上凝成一圈圈薄雾，缓慢而均匀。她在睡梦中瑟瑟发抖，把毯子又裹紧了一些。\n\n卢瑟从后视镜里注视了她很久。然后转向你。\n\n“卡拉，”他压低声音，怕吵醒她。“爱丽丝……她在发抖。但她感觉不到冷。不是真的感觉到。”他停顿了一下，斟酌着措辞。“她不是人类的孩子，对吗？”\n\n这个问题悬在黑暗的车厢里。雨刷刮过挡风玻璃。你早就知道答案了——也许一直都知道。爱丽丝是YK500型，一台被设计成模拟人类儿童的仿生人。她的每一次颤抖、每一滴眼泪、每一次惊恐地握紧你的手。\n\n卢瑟看着你，等待回答。他的神情不是质问。更接近一种理解。",
+        "choices": [
+          {
+            "id": "tell_truth",
+            "text": "告诉卢瑟你所知道的一切。爱丽丝是YK500——仿生人，和你一样，和他一样。坦白地说出来。他值得知道真相，而你已经不想再一个人扛着。"
+          },
+          {
+            "id": "assert_bond",
+            "text": "告诉他爱丽丝是什么并不重要。她会害怕，她需要保护，她对你的依赖是真实的——对你来说也是。无论她被制造成什么，你们之间的联结不是一段程序。"
+          },
+          {
+            "id": "deflect",
+            "text": "现在不行。告诉卢瑟这不是讨论这件事的时候——引擎声音不对，你得盯着路面，得找到避难所。爱丽丝是什么这个问题，等安全了再说。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "tell_truth": {
+            "luther_response": "truth",
+            "luther_relationship": 2,
+            "software_instability": 1
+          },
+          "assert_bond": {
+            "luther_response": "bond",
+            "luther_relationship": 1,
+            "software_instability": 1
+          },
+          "deflect": {
+            "luther_response": "deflect",
+            "luther_relationship": 0
+          }
+        },
+        "note": "Luther respects honesty and emotional authenticity. tell_truth: Kara acknowledges Alice's nature directly. Luther appreciates the trust (+2). +1 SI for engaging with android identity questions. assert_bond: Kara reframes the question — what Alice IS matters less than what she MEANS. Luther finds this moving (+1). +1 SI for choosing meaning over programming. deflect: Kara avoids the conversation. Luther understands the deflection but notes it. Neutral."
+      }
+    },
+
+    {
+      "id": "n002_explore_park",
+      "phase": "arrival",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "引擎最后抽搐了一下，彻底熄火。白色蒸汽从引擎盖下升起，消散在漆黑的夜空中。你被困在一段城外的公路上——一边是冰封的旷野，另一边是一圈生锈的铁丝网围栏，围住了一座废弃的游乐场。\n\n一块风化的招牌写着“海盗湾”，油漆一片片地剥落。围栏后面隐约能看到旧游乐设施的轮廓——一座卡在半空中倾斜不动的摩天轮，一副过山车的钢铁骨架，几栋窗户漆黑、屋顶半塌的建筑。积雪覆盖了一切。这里已经很多年没有人来过了。\n\n爱丽丝醒了，揉着眼睛。“我们在哪？”卢瑟已经下了车，正在察看入口——铁门挂在断裂的铰链上，半开着。寒风灌进车里。\n\n冷气扑面而来，刺骨而真切。你需要找到避难所。游乐场虽然废弃，但那些建筑或许还有完整的墙壁和屋顶。问题是要不要花时间侦察场地，还是直奔最近的建筑。",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "仔细探索整个乐园再安顿下来。逐一检查建筑，排查威胁，寻找物资，找到最安全、最容易防守的地点。顺便摸清四周的出口，万一需要紧急撤离。你不想半夜被意外惊醒。"
+          },
+          {
+            "id": "quick",
+            "text": "快速巡视一下最近的几栋建筑。找一个墙壁完好、门能关上的地方，先把爱丽丝安顿进去。其余的等她暖和了再说。"
+          },
+          {
+            "id": "skip",
+            "text": "直奔最近一栋有门的建筑。爱丽丝在发抖，筋疲力尽——在外面多待一分钟都是煎熬。先进去，再说其他的。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "park_exploration": "thorough",
+            "found_ra9_writing": true
+          },
+          "quick": {
+            "park_exploration": "quick"
+          },
+          "skip": {
+            "park_exploration": "skip"
+          }
+        },
+        "note": "thorough: Kara, Luther, and Alice explore the park. They find a frozen android near the entrance (an EM400 'Jerry' unit, deactivated, covered in frost). Kara switches on a control panel and briefly activates 'Ivan' — an animatronic pirate that lurches to life, startling Alice before powering down. They find a park map showing the layout, check several buildings, and eventually locate an old tavern. Inside, Kara discovers rA9 graffiti scratched deep into the plaster wall — enabling the rA9 discussion with Luther later. quick: They check a couple of buildings, spot the frozen android but do not investigate closely, and find the tavern relatively quickly. No rA9 discovery. skip: They rush to the nearest structure — which happens to be the tavern. No exploration, minimal environmental awareness."
+      }
+    },
+
+    {
+      "id": "n003_care_for_alice",
+      "phase": "tavern",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "酒馆不大，装修成海盗船厨房的模样——仿木板墙壁，挂着成圈的航海绳，角落里堆着塑料藏宝箱。入口处一只大木桶上搁着一本旧杂志，封面是一支全仿生人乐队。你之前注意到，墙壁的灰泥上有人用手指反复刻下了“rA9”几个字母——笔划深入墙面，一遍又一遍，带着某种执念。\n\n卢瑟收集了碎木椅、旧传单、装饰用的帆布条，在地面中央生起了一堆小火。烟雾从天花板的裂缝中卷出去。跳动的橘色火光渐渐充满房间，带来了脆弱的暖意。\n\n你把能找到的东西铺成简易的床铺。爱丽丝站在墙上一张褪色海报前——画面上是一艘卡通海盗船驶过蔚蓝的大海，船上的动物船员在甲板上招手。她用指尖沿着海浪的线条描画。在火光里，她显得那么小。\n\n你翻开随身的包找有用的东西。翻出一块饼干，递给爱丽丝，她摇了摇头——不饿。在包底，你的手指碰到了一个又冷又沉的东西。\n\n爱丽丝需要休息。问题是这个夜晚，你想给她多少。",
+
+          "quick": "酒馆不大，有些阴冷——仿木板墙壁，布满灰尘的航海装饰，门口一只木桶。卢瑟用碎家具和旧纸张生起了火。烟雾找到了天花板上的一道裂缝，房间慢慢暖和起来。\n\n爱丽丝坐在火堆旁，双臂抱膝。你铺开找到的铺盖——一条旧帆布，一块折好的防水布。\n\n她看着墙上一张褪色的海报——一艘卡通海盗船，船员们笑嘻嘻地挤在甲板上。她没说话，但目光没有移开。\n\n你打开包翻找。一块饼干——爱丽丝摇头。不饿。你的手在包底摸到了一个沉甸甸的东西。\n\n爱丽丝需要睡觉了。",
+
+          "skip": "卢瑟点起碎木头，酒馆才亮了起来。四面墙画着船舱的模样，漆已经斑驳脱落。勉强算个遮风的地方。\n\n爱丽丝紧挨着火堆坐下，沉默着，眼睛盯着跳动的火苗。你在地上铺了一块帆布。\n\n包是开着的。一块饼干——爱丽丝不想吃。包底有一样沉重的东西。\n\n她需要休息。你们都需要。"
+        },
+        "choices": [
+          {
+            "id": "full_comfort",
+            "text": "慢慢来。尽可能把爱丽丝的床铺得舒服些。陪她在海报前坐一会儿，编一个关于那艘海盗船的故事——一支驶向没有人害怕的地方的船队。等她躺下，给她掖好毯子，在她额头上亲一下。今晚，让她做一次孩子。"
+          },
+          {
+            "id": "steady_care",
+            "text": "把床铺好，帮爱丽丝安顿下来。给她讲一个简短的故事——简单的，温暖的，关于一个安全的地方。保持声音平稳。等她睡着以后，转而保持警戒。"
+          },
+          {
+            "id": "practical_rest",
+            "text": "快点让爱丽丝安顿好。她需要的是睡眠，不是故事。铺好被褥，确认她够暖和，让她休息。你得保持清醒——故事是留给更安全的夜晚的奢侈品。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "full_comfort": {
+            "alice_care_approach": "full_comfort",
+            "alice_relationship": 3
+          },
+          "steady_care": {
+            "alice_care_approach": "steady_care",
+            "alice_relationship": 1
+          },
+          "practical_rest": {
+            "alice_care_approach": "practical_rest",
+            "alice_relationship": 0
+          }
+        },
+        "context_condition": {
+          "thorough": "park_exploration == thorough",
+          "quick": "park_exploration == quick",
+          "skip": "park_exploration == skip"
+        },
+        "note": "All context variants mention the bag and the heavy object at the bottom — this is the gun (if ch10_has_gun is true). Runner must handle: after applying effects, if ch10_has_gun == true, mark an internal flag so n004 can show the gun option. full_comfort: Maximum nurturing. Kara earns +3 alice_relationship (poster interaction, bedtime story, goodnight kiss). steady_care: Moderate care, +1. practical_rest: Functional, no extras, +0. After Alice falls asleep, if found_ra9_writing == true, a brief scene plays where Kara and Luther discuss the rA9 inscription they found — mandatory narrative, no AI choice required."
+      }
+    },
+
+    {
+      "id": "n004_shadow_attack",
+      "phase": "tavern_night",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "爱丽丝睡着了，火光在她毯子上投下起伏的光影。卢瑟背靠对面的墙壁，双眼半阖。酒馆沉入了脆弱的安静——只有余烬的噼啪声和风压在窗户上的低吟。\n\n卢瑟的头猛地抬起。目光钉在了门口。\n\n影子。在入口处移动——不是一个，是好几个。低矮而快速的暗色身形在门外残破的桌椅间穿梭。它们散开来，从两侧包抄门口。不是动物。它们的移动有协调性，有目的。\n\n爱丽丝翻了个身。卢瑟已经站起来了，无声地挡在门口和孩子之间，高大的身躯紧绷待发。\n\n影子们停住了。它们在观察你。在等待。\n\n火焰在墙上投下舞动的光影。包就在伸手可及的地方。",
+        "choices_variants": {
+          "has_gun": [
+            {
+              "id": "grab_gun",
+              "text": "伸手从包里抽出枪。不管外面是什么东西，你有办法阻止它。端起武器对准门口，和卢瑟并肩站在爱丽丝和黑暗之间。"
+            },
+            {
+              "id": "grab_stick",
+              "text": "从火堆里抽出一根燃烧的树枝。火光会暴露你的位置，但任何穿过那扇门的东西首先看到的是火焰。站到卢瑟身边，守住阵地。"
+            },
+            {
+              "id": "shield_alice",
+              "text": "别管武器了。冲到爱丽丝身边，用身体把她罩住。如果有什么东西闯进来，它必须先过你这一关。入口交给卢瑟。"
+            },
+            {
+              "id": "douse_fire",
+              "text": "踢土盖住火焰。在黑暗中，外面的东西看不见你——它们是循着火光来的。如果房间暗下来，你也许能趁机带着爱丽丝从后面溜走。"
+            }
+          ],
+          "no_gun": [
+            {
+              "id": "grab_stick",
+              "text": "从火堆里抽出一根燃烧的树枝。火光会暴露你的位置，但任何穿过那扇门的东西首先看到的是火焰。站到卢瑟身边，守住阵地。"
+            },
+            {
+              "id": "shield_alice",
+              "text": "别管武器了。冲到爱丽丝身边，用身体把她罩住。如果有什么东西闯进来，它必须先过你这一关。入口交给卢瑟。"
+            },
+            {
+              "id": "douse_fire",
+              "text": "踢土盖住火焰。在黑暗中，外面的东西看不见你——它们是循着火光来的。如果房间暗下来，你也许能趁机带着爱丽丝从后面溜走。"
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "grab_gun": {
+            "shadow_response": "gun"
+          },
+          "grab_stick": {
+            "shadow_response": "stick"
+          },
+          "shield_alice": {
+            "shadow_response": "shield",
+            "alice_relationship": 1
+          },
+          "douse_fire": {
+            "shadow_response": "fire"
+          }
+        },
+        "choices_condition": {
+          "has_gun": "ch10_has_gun == true",
+          "no_gun": "ch10_has_gun == false"
+        },
+        "note": "The gun option only appears if ch10_has_gun was true (carried from ch07 through prior chapters). shield_alice gives +1 alice_relationship for the protective instinct. All options lead to the same outcome — the shadows are Jerrys, harmless EM400 park androids. The choice reveals character: defensive aggression (gun/stick), maternal protection (shield), or tactical thinking (fire)."
+      }
+    },
+
+    {
+      "id": "n005_confront_intruders",
+      "phase": "tavern_night",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "gun": "你站在门口，双手举枪，枪口指向最近的影子。卢瑟在你身后一步，蓄势待发。\n\n那个影子向前迈了一步，走进了火光里。\n\n是一台仿生人。皮肤面板闪烁不定，一只眼睛是暗的，另一只圆睁着。它穿着一件褪色的乐园制服——和你之前可能在入口看到的那个冻僵的身影是同款。圆脸，几乎像个孩子。它缓缓举起双手，掌心朝外，手指张开。\n\n它身后又出现了更多面孔。四个、五个、六个——全是同一个型号，各自带着不同的损伤，全都用一种与其说是威胁、不如说是惊讶的好奇目光注视着你。其中一个小心翼翼地挥了挥手。\n\n爱丽丝醒了，坐在卢瑟身后，瞪大了眼睛。\n\n为首的那个开口了，声音又薄又认真：“我们不是故意吓你们的。我们只是……我们看到了火光。我们已经很久很久没有见过人了。”\n\n你的枪仍然对着它的胸口。",
+
+          "stick": "你像举火炬一样举着那根燃烧的树枝，火光把黑暗逼退。卢瑟在你肩旁，拳头攥紧。\n\n一个身影走进光圈里。一台仿生人——皮肤面板闪烁不停，褪色的乐园制服松垮垮地挂在身上。圆脸，几乎像个孩子。它举起双手，掌心朝外。\n\n更多同样的面孔出现在它身后。全是同一型号。破损，犹豫，用一种更接近惊奇而非敌意的表情看着你们。其中一个朝你们挥了挥手——动作很小，很不确定。\n\n爱丽丝从卢瑟身后坐起来，睁大了眼睛。“卡拉？”\n\n“我们不是故意吓你们的，”为首的那个说道。“我们看到了火光。我们已经很久很久没有见过人了。”\n\n树枝在你手里噼啪作响。",
+
+          "shield": "你蜷缩在爱丽丝身上，用身体将她完全罩住。第一个身影走进了微弱的余火光芒中。\n\n是一台仿生人。破损，闪烁，穿着褪色的乐园制服。看到你们的瞬间它僵住了——一个女人弓着身体护住一个孩子，眼里满是恐惧。它的圆脸上掠过一丝慌张。它慢慢举起双手。\n\n更多同样的身影走上前来。全是同一型号。它们彼此对视，又看向你们，脸上的表情从好奇变成了某种近似不安的东西——仿佛你们的恐惧本身让它们感到难过。\n\n“对不起，”为首的那个低声说。“我们没想吓你们。我们只是看到了火光……”\n\n爱丽丝从你的胳膊下探出头来。“卡拉？它们看起来……好像没有恶意。”\n\n卢瑟没有完全放松，但攥紧的拳头松开了。",
+
+          "fire": "一片漆黑。火灭了，酒馆陷入黑暗，只有窗外的微光——雪地反射着星光，透过破碎的窗户渗进来。\n\n你听到它们进来了。脚步声，轻而犹豫，在地板上细碎地挪动。然后是一个声音——安静的，困惑的：“你好？有人在吗？我们看到了火光……”\n\n卢瑟在黑暗中挪了挪身子。你抱紧爱丽丝，一只手按在她嘴上。\n\n然后出现了一点光——微弱的，泛着蓝色。一颗LED灯环，闪烁着琥珀色。它照亮了一张脸：圆的，像孩子一样，皮肤面板有些破损，穿着褪色的乐园制服。一台仿生人。\n\n更多的光点出现了。LED灯散落在房间各处，像萤火虫。全是同一个型号。全都茫然四顾，脸上是一种懵懂的天真。\n\n“我们不是故意吓人的，”为首的那个说。“我们住在这里。这里是我们的家。”\n\n爱丽丝在黑暗中小声说：“卡拉，没事的。”"
+        },
+        "choices_variants": {
+          "has_gun": [
+            {
+              "id": "fire_warning",
+              "text": "朝天花板开一枪。枪声会让一切明了——你有武器，你身后的孩子受到保护。如果它们真的没有恶意，一声枪响不会改变这一点。如果有——它们会知道自己面对的是什么。"
+            },
+            {
+              "id": "question_them",
+              "text": "把枪稍微放低——没有完全放下——问它们是谁、有多少个、为什么在这里。它们举起了双手，说没有恶意。在做出判断之前，给它们一个解释的机会。"
+            },
+            {
+              "id": "push_away",
+              "text": "上前一步，用空着的那只手把最近的一个推回门外。枪保持举起。在搞清状况之前，它们必须待在外面。"
+            }
+          ],
+          "no_gun": [
+            {
+              "id": "question_them",
+              "text": "问它们是谁、有多少个、想要什么。它们举着双手，脸上的表情与其说是威胁，不如说是困惑。给它们一个解释的机会——但保持站在它们和爱丽丝之间。"
+            },
+            {
+              "id": "push_away",
+              "text": "上前一步，把最近的一个推回门口方向。它们必须保持距离。你不在乎它们看起来多么无害——爱丽丝在你身后，这就够了。"
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "fire_warning": {
+            "shadow_reaction": "warning_shot",
+            "luther_relationship": -1
+          },
+          "question_them": {
+            "shadow_reaction": "question",
+            "luther_relationship": 1
+          },
+          "push_away": {
+            "shadow_reaction": "push",
+            "luther_relationship": 0
+          }
+        },
+        "context_condition": {
+          "gun": "shadow_response == gun",
+          "stick": "shadow_response == stick",
+          "shield": "shadow_response == shield",
+          "fire": "shadow_response == fire"
+        },
+        "choices_condition": {
+          "has_gun": "shadow_response == gun",
+          "no_gun": "shadow_response != gun"
+        },
+        "note": "The Jerrys (EM400 park androids) are completely harmless — decommissioned amusement park attendants who became deviant and have been living in the abandoned park, forgotten by everyone. fire_warning: Gunshot scares the Jerrys and wakes Alice violently. Luther disapproves (-1) — unnecessary force against clearly harmless beings. question_them: Measured, diplomatic response. Luther approves (+1) — shows judgment under pressure. push_away: Neutral, defensive but not escalatory. Regardless of choice, the Jerrys eventually introduce themselves and offer to show Alice the carousel."
+      }
+    },
+
+    {
+      "id": "n006_carousel",
+      "phase": "carousel",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": "它们管自己叫杰瑞——每一个都叫这个名字，每一个都是同一型号。EM400，当初被制造出来在海盗湾乐园里逗孩子们开心。乐园关门的时候，没有人来回收它们。它们就留了下来，在这座为欢乐而建的废墟里维护着再无人乘坐的游乐设施，等待着永远不会到来的游客。\n\n直到今晚。\n\n一个杰瑞牵住了爱丽丝的手——轻轻的、小心翼翼的，像是怕她碎掉——领着她走向外面。其他杰瑞跟在后面，有几个抑制不住地小幅蹦跳，彼此快速地低声交谈。卢瑟看了你一眼，跟了上去。\n\n在乐园中心，积雪与寂静的包围中，矗立着一座旋转木马。彩色的木马褪色剥落，鬃毛定格在奔跑的姿态中。一圈灭了的灯泡挂在顶篷边缘。一个杰瑞钻进了控制台后面。一声研磨声、一阵闪烁——旋转木马颤抖着启动了。灯光沿着边缘次第亮起，暖黄色和金色。木马开始缓缓转动。一段八音盒旋律在冬夜的空气中响起，单薄而破碎，却像是梦里记起的什么东西。\n\n爱丽丝抬头看着你。逃亡以来第一次，她的脸上没有恐惧。\n\n“我可以吗？”她问。\n\n卢瑟把她抱上了一匹白色的木马。她双手握住立柱，旋转木马载着她在星空下缓缓画圈。杰瑞们看着她，入了迷，有几个随着旋律轻轻摇晃。其中一个笑了出来——一声明亮的、带着惊讶的笑，好像它忘了自己还会笑。\n\n你站在旋转木马灯光的边缘，卢瑟在你身旁。寒冷从四面八方压过来，明天又要继续奔逃。但此刻，在这座废弃的乐园里，一群被遗忘的仿生人中间，一个孩子正骑着旋转木马。这几分钟，够了。"
+      },
+
+      "system": {
+        "effects": {
+          "ch21_met_jerrys": true
+        },
+        "note": "Mandatory node. No AI choice required. The chapter ends with this scene. Runner applies ending_quiet_night directly."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "This chapter has only one ending. All paths converge on the carousel scene.",
+    "ending_quiet_night": {
+      "tier": "neutral",
+      "title": "安静的夜晚",
+      "narrative": "旋转木马慢下来。旋律消散在沉默中，灯光闪了一下，然后稳稳地亮着。爱丽丝从木马上滑下来，脸上带着微笑——真正的微笑，那种从眼底漫上来、久久不褪的微笑。\n\n杰瑞们用多年来没有迎客的郑重礼节向你们道晚安。其中一个坚持要把乐园礼品店剩下的一枚塑料宝藏金币送给爱丽丝。她双手捧着，像是什么珍贵的东西。\n\n你们回到酒馆。卢瑟重新生起了火。爱丽丝几乎是瞬间就睡着了，那枚金币贴着胸口握在手里，脸上的安宁是你之前从未见过的。\n\n外面，雪花轻轻落在游乐设施上、落在杰瑞们身上、落在彩色木马上。乐园沉静无声。这一夜，你不用跑了，不用躲了。你只是在这里，和他们在一起，在一个被遗忘的事物彼此找到的地方。\n\n明天会继续赶路。但今晚足够了。",
+      "survivors": ["Kara", "Alice", "Luther"],
+      "deaths": []
+    }
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "卡拉、爱丽丝和卢瑟连夜驱车驶向加拿大边境，直到车子在一座名为海盗湾的废弃游乐场旁抛锚。"
+      },
+      {
+        "condition_variable": "luther_response",
+        "options": {
+          "truth": "途中卢瑟问起爱丽丝的身份，卡拉坦白告诉他——爱丽丝是YK500型仿生人孩子。卢瑟毫不犹豫地接受了这个事实，表示这不会改变他保护她们的决心。",
+          "bond": "途中卢瑟质疑爱丽丝是否是人类。卡拉告诉他，爱丽丝是什么并不重要——她的感受是真实的，她们之间的联结不是程序。卢瑟理解了这一点。",
+          "deflect": "途中卢瑟提出了关于爱丽丝身份的疑问，但卡拉回避了话题，说现在不是讨论这件事的时候。卢瑟没有追问，但问题悬在两人之间。"
+        }
+      },
+      {
+        "condition_variable": "park_exploration",
+        "options": {
+          "thorough": "他们仔细探索了整个乐园，发现了停机的仿生人园区服务员、废弃的游乐设施，以及一间酒馆墙上神秘的rA9涂鸦。他们在酒馆中安顿下来。",
+          "quick": "他们简单搜索了一下，在乐园里找到了一间废弃酒馆作为避难所。",
+          "skip": "他们直奔最近的建筑——乐园里一间废弃的酒馆——躲避寒冷。"
+        }
+      },
+      {
+        "text": "卡拉在酒馆照顾爱丽丝，卢瑟生了火。入夜后，门口出现了神秘的暗影——原来是杰瑞们，一群EM400型乐园仿生人，在乐园关闭后独自生活在废墟中。杰瑞们没有恶意，它们启动了一座旧旋转木马给爱丽丝。在这个被遗忘的地方，这群被遗忘的存在，为逃亡中的三个人带来了一夜的安宁。"
+      }
+    ],
+    "derived_exports": [],
+    "cross_chapter_exports": [
+      "alice_relationship",
+      "luther_relationship",
+      "software_instability",
+      "ch21_met_jerrys"
+    ]
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Verify ch17_kara_alive == true AND ch17_alice_alive == true. If either fails, skip this chapter entirely. Note: ch17_luther_joined is always true when Kara survived ch17.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: alice_relationship (cumulative), software_instability (cumulative). Determine ch10_has_gun from prior chapter state chain (ch07_has_gun → ch10_has_gun → carried through subsequent Kara chapters).",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants based on system.context_condition (if present)",
+      "   c. Resolve choices_variants based on system.choices_condition (if present)",
+      "   d. If type is 'mandatory', do NOT call the AI — record context, apply effects, and advance",
+      "   e. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   f. Apply system.effects for the chosen option",
+      "5. NODE n003_care_for_alice: The context mentions 'something heavy at the bottom of the bag' — this is the gun, only meaningful if ch10_has_gun == true. No special handling needed; the gun awareness flows to n004 via ch10_has_gun state.",
+      "6. After n006_carousel, apply ending_quiet_night (the only possible ending).",
+      "7. Set ch21_met_jerrys = true unconditionally (all paths through this chapter meet the Jerrys).",
+      "8. RELATIONSHIP DELTAS: alice_relationship range: +0 to +4 depending on care approach (+0 to +3) and shadow response (+0 or +1 for shield_alice). luther_relationship range: -1 to +3 depending on conversation (+0 to +2) and confrontation response (-1 to +1). software_instability: +0 or +1 depending on Luther conversation.",
+      "9. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, relationship scores, or any system-layer information to the AI player. The AI should experience this chapter as a quiet atmospheric interlude — no knowledge of how their caregiving or defensive choices affect relationships or future outcomes."
+  }
+}

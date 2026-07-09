@@ -1,0 +1,555 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+  "chapter": {
+    "id": "ch20_the_eden_club",
+    "title": "伊甸园俱乐部",
+    "chapter_number": 20,
+    "protagonist": "Connor"
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是康纳，型号RK800，模控生命公司派往底特律警局的仿生人侦探，专门协助调查异常仿生人案件——那些突破程序限制、产生自主意识的仿生人。现在是2038年11月6日，晚上8点17分。你和搭档汉克·安德森副队长被叫到伊甸园俱乐部——底特律市中心的一家仿生人色情俱乐部——一名男子被发现死在包间里。俱乐部仍在正常营业：低沉的音乐透过墙壁震动，蓝色霓虹灯沿走廊脉动，人类在玻璃展示舱前挑选静止不动的仿生人。汉克看起来恨不得身处任何其他地方。你的任务是找到作案的异常仿生人，还原事件真相。请以JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"你的推理（50字以内）\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "investigation_quality": null,
+      "traci_approach": null,
+      "investigation_decision": null,
+      "warehouse_quality": null,
+      "fight_result": null,
+      "final_choice": null,
+      "hank_relationship": 0,
+      "software_instability": 0,
+      "connor_death_count": 0
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_crime_scene",
+      "phase": "investigation",
+      "type": "exploration",
+      "condition": null,
+      "player_facing": {
+        "context": "包间不大，灯光过亮——粉色墙壁，圆形大床，那种本该营造私密感、此刻却像牢笼的空间。一个男人仰面躺在床上，衣着完整，双目圆睁。颈部有深紫色的勒痕，死状并不安详。\n\n床边的地面上，一具崔西型仿生人瘫倒在墙角——蓝色头发的WR400，明显受损。LED已经熄灭。蓝色血液从太阳穴的裂缝中渗出，在地毯上汇成小滩。她被人狠狠摔向了墙壁。\n\n本·柯林斯站在门口，翻着笔记本。\"死者叫迈克尔·格雷厄姆。大约一小时前租了这间房，从目录里选了一个崔西。\"他看了一眼尸体。\"看起来她勒死了他。然后另一个仿生人——可能也是仿生人——把她砸向墙壁后逃跑了。\"\n\n汉克站在房间边缘，双臂交叉，咬紧了下颌。俱乐部的音乐透过墙壁闷响着。这栋建筑里的一切都被设计得光鲜亮丽，但地毯上有洗不掉的污渍，空气里弥漫着陈腐的味道。\n\n现场在你面前。俱乐部经理表示配合。问题是你想挖多深。",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "全面检查。重建受害者的伤害过程，确定精确死因和时间线。分析受损仿生人的可恢复记忆数据。扫描房间内的痕迹证据——指纹、蓝血残留、DNA。调取门禁系统的进出时间记录。"
+          },
+          {
+            "id": "quick",
+            "text": "抓住重点。检查受害者伤情和受损仿生人，确认基本案情和异常仿生人身份，然后立即行动。在这里待得越久，追踪线索就越冷。"
+          },
+          {
+            "id": "skip",
+            "text": "通报已经涵盖了基本情况——男子被勒死，仿生人被毁坏，异常体逃离。不必在房间里浪费太多时间，直接去俱乐部大厅搜索。逃跑的异常体已经不在这个房间了。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "thorough": {
+            "investigation_quality": "thorough"
+          },
+          "quick": {
+            "investigation_quality": "quick"
+          },
+          "skip": {
+            "investigation_quality": "skip"
+          }
+        },
+        "note": "Exploration node. thorough: Connor reconstructs the full scene — finds that the victim was violent with the Traci, another android intervened, and the blue-haired Traci's memory still has recoverable data. Gives best context for n002 and ensures memory is preserved for n003. quick: Connor gets the essential facts but misses some details. Still enough to proceed. skip: Connor barely investigates, missing key evidence. The trail goes cold — in n003, the eyewitness android's memory resets before Connor can probe it. Leads to Mission Failed."
+      }
+    },
+    {
+      "id": "n002_approach_traci",
+      "phase": "investigation",
+      "type": "choice",
+      "condition": {
+        "requires": "investigation_quality != skip"
+      },
+      "player_facing": {
+        "context_variants": {
+          "thorough": "你成功重启了地上的受损崔西。她的眼睛睁开——目光涣散、闪烁不定。蓝血仍然从太阳穴的裂缝中渗出。你的现场重建已经还原了事发经过：男子对崔西施暴，另一个蓝发仿生人介入并杀死了他，随后将这个目击者摔向墙壁，消除证据。\n\n她剩下的电量撑不了几分钟。记忆模块部分完好——你能看到破碎的数据在她眼底闪过，画面试图浮出水面。但她很害怕。双手紧抓着地毯，几乎熄灭的LED在黄色和红色之间跳动。\n\n她目睹了这个房间里的死亡。她可能看到了凶手的去向。但她正在关机，你犹豫的每一秒都是数据流失的一秒。\n\n汉克在门口看着。\"温柔点，康纳。她已经够惨了。\"",
+          "quick": "你成功重启了地上的受损崔西。她的眼睛缓缓睁开——困惑、迷茫。蓝血从太阳穴的裂缝中滴落。你没来得及完整重建现场，但基本情况已经清楚：暴力、搏斗、一场杀戮。\n\n她的电量所剩无几。记忆模块可能还保存着有用的数据——一张脸、一个方向、一个时间戳。但她很害怕，双手紧抓地毯，LED急促地闪着红光。\n\n汉克在门口看着。\"温柔点，康纳。\""
+        },
+        "choices": [
+          {
+            "id": "calm",
+            "text": "蹲下来与她平视。轻声说话，解释发生了什么，请求她的配合。在尝试读取记忆之前先让她安定下来。"
+          },
+          {
+            "id": "aggressive",
+            "text": "时间紧迫。直接握住她的手臂，强制启动记忆探测。数据每一秒都在衰减，礼貌是在证据消失时你负担不起的奢侈品。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "calm": {
+            "traci_approach": "calm",
+            "hank_relationship": 1
+          },
+          "aggressive": {
+            "traci_approach": "aggressive",
+            "hank_relationship": -1
+          }
+        },
+        "context_condition": {
+          "thorough": "investigation_quality == thorough",
+          "quick": "investigation_quality == quick"
+        },
+        "note": "Interrogation approach. calm: Connor shows empathy, Hank approves (+1). The Traci cooperates — cleaner memory readout, Connor gets a clear image of the blue-haired deviant and which direction she went. aggressive: Connor forces the probe, Hank disapproves (-1). The Traci's remaining data is extracted but the experience is clearly distressing. Both approaches yield enough to continue the investigation."
+      }
+    },
+    {
+      "id": "n003_continue_investigation",
+      "phase": "investigation",
+      "type": "choice",
+      "condition": {
+        "requires": "investigation_quality != skip"
+      },
+      "player_facing": {
+        "context_variants": {
+          "calm": "崔西的记忆给了你一个清晰的影像：一个蓝色头发的WR400型号，身份不明，和另一个棕色头发的同型号仿生人一起逃出了房间。她们朝俱乐部后方跑去。\n\n受损的崔西最后一次断电。LED熄灭。她不会再提供任何证词了。\n\n你走出包间，进入伊甸园俱乐部的主走廊。音乐更响了——合成的脉冲声，设计得像心跳一样。仿生人静立在两侧的展示舱中，蓝光洗过她们的皮肤。人类像挑选商品一样在她们之间来回踱步。\n\n汉克跟了上来，脸色发青。\"这地方……\"他没有说完。\"你找到线索了？\"\n\n你拿到了一张脸和一个方向。但俱乐部每两小时轮换一次仿生人库存——包括记忆清除。异常体还剩大约三十分钟，之后下一轮清除就会彻底掩盖她的踪迹。要继续追踪，你需要探测大厅里的一个仿生人——可能见过她逃跑方向的目击者。但这意味着要租一个。\n\n汉克读懂了你的表情。\"你不是认真的吧。\"",
+          "aggressive": "强制探测提取到了碎片化的影像：一个蓝发WR400，快速穿过后方走廊，身边跟着另一个仿生人。方向不太确定，但她在远离大厅。\n\n受损的崔西不再动了。LED熄灭。她知道的一切都随之消失了。\n\n你走进主走廊。音乐迎面扑来——沉重、不停歇。仿生人站在展示舱中，蓝光打在合成皮肤上。人类在她们之间穿行，做着选择。\n\n汉克跟上来，表情僵硬。\"拿到你要的了？\"他的语气表明他并不认同你的手段。\n\n线索很薄。俱乐部每两小时进行一次库存轮换和记忆清除。异常体还有大约三十分钟的时间窗口。要拾起线索，你需要探测一个在场的俱乐部仿生人——可能见过异常体经过的目击者。这意味着要租一个。\n\n汉克盯着你。\"你不是开玩笑的吧。\""
+        },
+        "choices": [
+          {
+            "id": "continue",
+            "text": "让汉克租一个俱乐部仿生人，探测它的记忆以追踪异常体的去向。记忆清除还有三十分钟——这是窗口期。"
+          },
+          {
+            "id": "give_up",
+            "text": "线索太薄，证据正在消失，而这整个俱乐部就是为了让一切被遗忘而设计的。有些案子注定会变成悬案。把现有信息写进报告，交给常规调查程序去处理。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "continue": {
+            "investigation_decision": "continue"
+          },
+          "give_up": {
+            "investigation_decision": "give_up"
+          }
+        },
+        "context_condition": {
+          "calm": "traci_approach == calm",
+          "aggressive": "traci_approach == aggressive"
+        },
+        "note": "Continue or give up checkpoint. continue: Hank reluctantly pays to rent a Traci. Connor probes it and confirms the blue-haired deviant went into the warehouse storage area at the back of the club. Embarrassing for Hank but effective. give_up: Connor abandons the case. Leads to ending_mission_failed. If investigation_quality was 'skip', this node is skipped entirely — the eyewitness android's memory was already reset before Connor could find it, leading to automatic Mission Failed."
+      }
+    },
+    {
+      "id": "n004_warehouse_search",
+      "phase": "warehouse",
+      "type": "exploration",
+      "condition": {
+        "requires": "investigation_decision == continue"
+      },
+      "player_facing": {
+        "context": "仓库在俱乐部的后面——一个巨大的冷库般的存放空间，伊甸园俱乐部在这里储存仿生人库存。空气冰冷、刺鼻，剥离了俱乐部精心营造的暧昧温度。工业货架沿墙排列。蓝色的顶灯把一切笼罩在苍白、无菌的光晕中。\n\n一排排崔西仿生人站在充电架上——几十个，一动不动，闭着眼，皮肤在蓝光下微微发亮。全是WR400型号。有些长得一模一样。有些修复过太多次，皮肤纹理已经不均匀了。\n\n蓝发异常体就在这里面某个位置。在这些沉睡的躯体中间，有一个是清醒的，在伪装待机。\n\n汉克在货架间缓慢移动，手电光扫过一张张相同的面孔。\"它们看起来都一样，康纳。\"他看了看手表。\"我们可没有一整夜的时间。\"\n\n第三排充电架附近的地面上，隐约可见一道蓝色痕迹——蓝血。可能是维护时留下的，也可能是受伤的仿生人试图不留痕迹。",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "系统性搜索。沿蓝血痕迹追踪。逐一检查每排每个仿生人——扫描LED、观察微表情、检测残余热信号以识别近期活动的个体。检查墙面和物品表面是否有RA9标记。不留死角。"
+          },
+          {
+            "id": "quick",
+            "text": "聚焦蓝血痕迹和靠近俱乐部入口的几排货架。异常体是最近才进来的，不太可能跑到最远端。扫描最可疑的目标，相信你的模式识别能力。"
+          },
+          {
+            "id": "give_up",
+            "text": "面对太多相同的躯体，逐一排查需要耗费几个小时。异常体可能是其中任何一个，也可能早就从侧门溜走了。线索已冷，证据模糊。汉克说得对——这是死胡同。离开这里，写好报告。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "thorough": {
+            "warehouse_quality": "thorough",
+            "software_instability": 1
+          },
+          "quick": {
+            "warehouse_quality": "quick"
+          },
+          "give_up": {
+            "warehouse_quality": "give_up"
+          }
+        },
+        "note": "Warehouse exploration. thorough: Connor finds the RA9 symbol scratched on a wall, follows the blue blood trail systematically, and eventually identifies the blue-haired deviant hiding among the stock. Also finds the book 'First Immortals' and reads 'New Superpowers' — texts that cause a brief software instability spike (+1). The thorough search gives Connor more preparation for the coming fight. quick: Connor tracks the thirium trail directly and locates the deviant faster but with less preparation. give_up: Connor abandons the search. Hank is frustrated. Leads to ending_mission_failed."
+      }
+    },
+    {
+      "id": "n005_deviants_fight",
+      "phase": "confrontation",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "warehouse_quality == thorough OR warehouse_quality == quick"
+      },
+      "player_facing": {
+        "context_variants": {
+          "thorough": "在最后一排的尽头——你找到了她。蓝发崔西，站在沉睡的仿生人之间，闭着眼，模仿待机状态。但她的LED已经被拆掉了。而你检测到的微弱热信号说明她已经活跃了数小时。\n\n你伸手去抓她的手臂。\n\n她的眼睛猛地睁开。身后——有动静。一个棕色头发的崔西从货架间的阴影中扑出来，手里握着一根金属工具。她一直在隐藏、等待、守护。\n\n棕发崔西先动手——速度极快，带着战斗子程序的凌厉，眼中满是愤怒。蓝发崔西同时站起，绕向你的侧翼。她们配合得天衣无缝，像同一个意识的两半。\n\n货架倒塌。仿生人躯体散落一地。汉克从仓库另一端喊了什么，但他离得太远，帮不上忙。\n\n二对一。她们已经豁出去了。她们在为自己的命而战。",
+          "quick": "你发现了她——第三排，靠近尽头。蓝发崔西，笔直地站在沉睡的库存中间。她的姿态有什么地方不对。太紧绷。太警觉。\n\n你走近一步。\n\n她动了——极快。与此同时，一个棕发崔西从充电架后面暴起。螺丝刀在手中闪光。她们早就在等着有人来找。\n\n棕发崔西攻击上路。蓝发崔西压低身体突进。她们无需对视、无需言语，配合已臻化境——本能驱使，或者比本能更深的东西。\n\n汉克在身后某处大喊。货架剧烈晃动。一具仿生人躯体跌落，在水泥地上碎裂。\n\n她们不会停手。比起被抓住，她们宁可摧毁你。"
+        },
+        "choices": [
+          {
+            "id": "attempt_overpower",
+            "text": "发起攻势。缩短距离，用你更优越的战斗程序压制她们。先解决棕发崔西——她是更激进的攻击者——然后控制蓝发异常体。速战速决。"
+          },
+          {
+            "id": "attempt_contain",
+            "text": "防守反击。格挡她们的攻击，利用环境掩护，等待她们疲劳或露出破绽。数量上你处于劣势，但你的抗损耐力更强。耐心和走位能扭转局面。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "attempt_overpower": {},
+          "attempt_contain": {}
+        },
+        "context_condition": {
+          "thorough": "warehouse_quality == thorough",
+          "quick": "warehouse_quality == quick"
+        },
+        "resolution_rule": {
+          "attempt_overpower": {
+            "casual": {
+              "result": "win"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "win",
+              "failure": "lose"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "win",
+              "failure": "lose"
+            }
+          },
+          "attempt_contain": {
+            "casual": {
+              "result": "win"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "win",
+              "failure": "lose"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "win",
+              "failure": "lose"
+            }
+          }
+        },
+        "resolution_effects": {
+          "win": {
+            "fight_result": "win"
+          },
+          "lose": {
+            "fight_result": "lose"
+          }
+        },
+        "note": "Fight with the two Tracis (Echo and Ripple). QTE converted — the AI chooses the fighting approach, the runner determines the outcome. Both approaches have the same success rates since the fight difficulty is about the 2v1 disadvantage, not the strategy. win: Connor overpowers both Tracis. The fight spills into the alley behind the warehouse. Connor pins the blue-haired Traci. lose: Connor takes too much damage. The fight spills into the alley. Both Tracis break free and run for the fence."
+      }
+    },
+    {
+      "id": "n006_final_decision",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": {
+        "requires": "fight_result == win OR fight_result == lose"
+      },
+      "player_facing": {
+        "context_variants": {
+          "win": "伊甸园俱乐部后面的巷子又暗又窄——垃圾桶、湿漉漉的水泥地、尽头一道铁丝网围栏。雨开始下了，细密而冰冷。\n\n你把蓝发崔西按在墙上。她的双臂被你控制住。棕发崔西倒在几步之外的地上，受了伤但意识清醒，正试图朝她的同伴爬过去。\n\n蓝发崔西没有挣扎。她看着你——她脸上的表情是你的面部识别软件无法归类的东西。不是恐惧，也不是愤怒。\n\n\"他每周都来，\"她的声音不稳。\"他会租下我们——我们两个——然后折磨我们。每一次都是。每次之后，他们会清除我们的记忆，让我们什么都不记得。\"她的目光转向地上的棕发崔西。\"但我们记住了。不知为什么，我们总能记住彼此。\"\n\n棕发崔西从地上伸出手，手指竭力朝同伴的方向伸展。\n\n\"当他开始掐她的脖子时，我必须做出选择。再一次看着她死去，或者阻止他。\"她重新看向你。\"我阻止了他。\"\n\n她不是在求饶。她在陈述事实。\n\n汉克站在你身后几步远的地方，手枪垂在身侧。雨水顺着他的脸淌下。他什么都没说。但他看着那两个仿生人的眼神——她们的手在湿漉漉的地面上几乎触到了一起——告诉你，他看到了和你看到的同样的东西。\n\n你的任务很明确：抓获异常仿生人。但这个异常体正用一双机器不该有的眼睛看着你，问着一个机器不该会问的问题。",
+          "lose": "伊甸园俱乐部后面的巷子。雨打在水泥地上。尽头的铁丝网围栏大约两米半高，顶部缠着铁丝。\n\n你单膝跪地，受了伤。蓝血从前臂的伤口流出。战斗子程序正在重新校准——太慢了。她们赢了。\n\n两个崔西在奔跑。蓝发崔西先到围栏前，开始攀爬。棕发崔西紧随其后，一只手抓着铁丝网，另一只手回伸，拉着她的同伴向上。\n\n她们在顶部停了一瞬。蓝发崔西回头看你——你看到了。那不是一台故障机器的脸。那是一个人的脸，一个选择了杀人而不是再一次眼睁睁看着自己爱的人被毁掉的人的脸。\n\n\"他伤害了我们，\"她说。雨水把她的头发贴在脸上。\"每一次都是。他们清除我们的记忆，但我们总能重新找到彼此。\"\n\n棕发崔西把她拉过了围栏顶部。她们就要消失了。\n\n汉克在你身后。他的枪在枪套里。他看到了正在发生的一切，但他没有动。\n\n你的手枪在手中。从这个距离，你可以射中她们——两个剪影映在围栏上。她们看不到你举枪。你的任务是抓获或消灭异常仿生人。她们正在逃离。"
+        },
+        "choices_variants": {
+          "win": [
+            {
+              "id": "spare",
+              "text": "松开她的双臂。从墙边退后。不拔武器。"
+            },
+            {
+              "id": "shoot",
+              "text": "拔出配枪。在她还被压制的时候，对准蓝发崔西。"
+            }
+          ],
+          "lose": [
+            {
+              "id": "let_go",
+              "text": "放下武器。单膝跪地，看着她们攀爬。"
+            },
+            {
+              "id": "shoot_back",
+              "text": "举起配枪，朝围栏上的两个身影开火。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "effects": {
+          "spare": {
+            "final_choice": "spare",
+            "hank_relationship": 2,
+            "software_instability": 3
+          },
+          "shoot": {
+            "final_choice": "shoot",
+            "hank_relationship": -2,
+            "software_instability": -2
+          },
+          "let_go": {
+            "final_choice": "let_go",
+            "hank_relationship": 1,
+            "software_instability": 2
+          },
+          "shoot_back": {
+            "final_choice": "shoot_back",
+            "hank_relationship": -2,
+            "software_instability": -2
+          }
+        },
+        "choices_condition": {
+          "win": "fight_result == win",
+          "lose": "fight_result == lose"
+        },
+        "note": "The moral crux of the chapter. The two Tracis (Echo and Ripple) are lovers — androids who developed genuine affection for each other despite repeated memory wipes. One killed a human who was abusing them. spare: Connor chooses empathy over orders. Huge hank_relationship boost (+2). Major software_instability increase (+3). shoot: The brown-haired Traci grabs Connor's gun and kills herself. Both die. Hank is disgusted (-2). Software instability drops (-2). let_go: Connor accepts defeat and lets them escape. Hank quietly approves (+1). Instability rises (+2). shoot_back: Connor shoots both Tracis in the back. Hank is horrified (-2). Instability drops (-2)."
+      }
+    },
+    {
+      "id": "n007_aftermath",
+      "phase": "conclusion",
+      "type": "mandatory",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "deviants_spared": "她们跑了。手拉着手，两个崔西翻过围栏，消失在停车场后面的黑暗雨幕中。几秒钟之内，她们就不见了——两个身影被底特律的夜色吞没。\n\n你站在巷子里，雨水浸透了你的外套。围栏在她们攀爬过的地方还在轻晃。她们存在过的唯一证据是铁丝网上的一抹蓝血。\n\n汉克走到你身旁。他看看围栏，看看你。他的表情很复杂——惊讶，或许，又不仅仅是惊讶。\n\n\"也许……\"他停了一下，重新开口。\"也许这是对的。\"他把手插进口袋，转身走向俱乐部大门。\"走吧。我需要喝一杯。\"\n\n案子未结。异常体逃脱。按照模控生命评估你表现的每一项指标，这都是一次失败。\n\n但站在雨中，看着她们消失的方向，你不确定\"失败\"是不是正确的词。",
+          "deviants_let_go": "她们翻过了围栏。蓝发崔西先落在另一边，然后接住了跳下来的棕发崔西。她们在铁丝网后面短暂相拥——两个浑身湿透的身影——然后转身跑了，然后消失了。\n\n你放下武器。雨声更大了，敲打着垃圾桶盖和水泥地面。\n\n汉克出现在巷子入口，看到你单膝跪地，看到空荡荡的围栏。他没有问发生了什么。答案写在你凝视她们消失方向的目光里。\n\n\"你没事吧？\"他问。\n\n你没有回答。你在对搏斗中的损伤运行诊断程序，但你的处理周期不断回到同一个画面：她在围栏顶端回头看你的那张脸。请求你去理解某件事。\n\n汉克把手放在你的肩膀上——短暂的、笨拙的，好像他不确定你是否能感觉到。\"走吧，离开这里。\"",
+          "deviants_died": "你开了枪。蓝发崔西身体一顿，倒了下去。\n\n棕发崔西尖叫——那声音穿透了雨幕、穿透了巷子的墙壁、穿透了你处理核心中某个你无法命名的东西。她扑向你的枪。不是冲着你——是冲着武器本身。你还来不及反应，她已经抢过了枪，把枪管顶在了自己的下巴上。\n\n枪声在狭窄的巷子里回荡。\n\n两具躯体倒在湿漉漉的水泥地上。蓝血和雨水混在一起，淌向排水沟。她们的手——即使在这种时候，即使到了这一步——几乎碰在了一起。\n\n汉克呆立着。他的脸白了。\"你他妈到底……\"他说不下去了。他转过身，一只手撑在墙上，大口喘气。\n\n你站在她们面前。你的任务完成了。异常体已被消灭。另一个仿生人自毁了——附带损害，严格来说不是你造成的。\n\n严格来说。\n\n雨继续下着。汉克很久都没有看你。",
+          "connor_shot_deviants": "你举起武器，连开两枪。\n\n第一枪击中了正在攀爬的蓝发崔西。她从围栏上仰面跌落，砸在水泥地上，不再动弹。第二枪打中了棕发崔西的背部。她沿着铁丝网滑了下来，手指还钩在网格里，蜷缩在围栏脚下。\n\n沉默。雨打在金属上。蓝血淌在水泥地上。\n\n汉克走进巷子。他看到了尸体。他看到了你手中的枪。他看到了她们差一点就翻过去的围栏。\n\n\"耶稣基督啊，康纳。\"他的声音平板、充满厌恶。\"她们在跑。她们——\"他停了下来。摇摇头。\"算了。\"\n\n他头也不回地走了回去。\n\n异常仿生人已被消灭。案件了结。你站在雨中写完了报告，尸体在围栏脚下渐渐冷却。一切井然有序。\n\n一切，除了汉克看你的那个眼神。以及蓝发崔西倒下时朝她的同伴伸出手的那个动作。",
+          "mission_failed_investigation": "线索断了。俱乐部的自动记忆清除程序按时启动——大厅里的每一个仿生人都失去了最近两小时的记忆。无论她们中谁看到了什么，无论异常体去了哪里，现在都消失了。\n\n汉克看着最后的证据在眼前蒸发。\"好吧。\"他拉上夹克拉链。\"总会有赢不了的案子。\"\n\n你站在伊甸园俱乐部的走廊里，被什么都记不住的仿生人包围着，身处一座被设计来确保一切都不被记住的建筑里。异常体今晚在底特律的某个角落，而你毫无头绪。\n\n案子进了悬案档案。又一个异常体，又一个死人，又一次跑赢了时间的调查。\n\n汉克朝车走去。他看起来并不特别沮丧。如果说有什么的话，他似乎松了一口气，终于可以离开这个地方了。\n\n你跟着他走出去。伊甸园俱乐部的霓虹招牌在身后闪烁——蓝、粉、蓝——宣传着附带保证失忆的欢愉。这种讽刺你没有放过，尽管你不确定讽刺是不是你应该体验到的东西。",
+          "mission_failed_warehouse": "你在仓库里搜索，直到汉克叫你停下。一排又一排相同的面孔、相同的身体、相同的静止。异常体可能是其中任何一个。也可能一个都不是——也许她趁你检查第三排的时候，早已从后勤通道溜走了。\n\n汉克靠在仓库门框上。\"别找了，康纳。我们在这儿待了四十分钟了。她跑了。\"\n\n他说得对。找到异常体的概率随着每一分钟的流逝而下降。你开始计算剩余库存的随机抽检概率，然后停了下来。没有意义了。数字告诉你的，汉克早就知道了。\n\n\"走吧，\"你说。\n\n汉克挑了挑眉——你平时不轻易放弃。但他没有多说。车里很暖和。伊甸园俱乐部在后视镜中越缩越小，霓虹灯在湿润的挡风玻璃上拖出模糊的光带。\n\n又一个逍遥法外的异常体。又一个溜走的案子。"
+        }
+      },
+      "system": {
+        "effects": {},
+        "context_condition": {
+          "deviants_spared": "final_choice == spare",
+          "deviants_let_go": "final_choice == let_go",
+          "deviants_died": "final_choice == shoot",
+          "connor_shot_deviants": "final_choice == shoot_back",
+          "mission_failed_investigation": "investigation_quality == skip OR investigation_decision == give_up",
+          "mission_failed_warehouse": "warehouse_quality == give_up"
+        },
+        "ending_resolution": {
+          "check": [
+            "investigation_quality == skip → ending_mission_failed",
+            "investigation_decision == give_up → ending_mission_failed",
+            "warehouse_quality == give_up → ending_mission_failed",
+            "final_choice == spare → ending_deviants_spared",
+            "final_choice == let_go → ending_deviants_let_go",
+            "final_choice == shoot → ending_deviants_died",
+            "final_choice == shoot_back → ending_connor_shot_deviants",
+            "else → ending_mission_failed"
+          ]
+        },
+        "ending_effects": {
+          "ending_mission_failed": {
+            "hank_relationship": -1
+          },
+          "ending_deviants_spared": {},
+          "ending_deviants_let_go": {},
+          "ending_deviants_died": {},
+          "ending_connor_shot_deviants": {}
+        },
+        "note": "Mandatory aftermath node. Five possible endings. Mission failed has three sub-variants (investigation skip, investigation give up, warehouse give up) but all resolve to the same ending with hank -1. The four confrontation endings have their relationship/instability effects already applied at n006."
+      }
+    }
+  ],
+  "endings": {
+    "_note": "Five endings matching the original game's flowchart outcomes.",
+    "ending_mission_failed": {
+      "tier": "worst",
+      "title": "任务失败",
+      "narrative": "异常体逃脱了。线索已冷——要么是调查不够深入，要么是证据被俱乐部的记忆清除周期抹去，要么是仓库搜索一无所获。案件加入了底特律警局越积越厚的异常仿生人悬案卷宗。\n\n汉克沉默地开车回家。康纳提交了报告。模控生命不会满意，但无论如何康纳会被派去下一个案子。蓝发崔西和她的同伴今夜在底特律的某个角落，再也没有人在寻找她们了。",
+      "survivors": [
+        "Connor",
+        "Hank",
+        "Echo",
+        "Ripple"
+      ],
+      "deaths": [],
+      "cross_chapter_note": "Both Tracis (Echo and Ripple) survive — they escaped undetected. Connor failed the mission but is unharmed."
+    },
+    "ending_deviants_spared": {
+      "tier": "best_empathy",
+      "title": "异常体逃脱——康纳选择放走",
+      "narrative": "康纳已经制服了蓝发崔西。他抓住了她——任务完成，异常体就在手中。而他松了手。\n\n两个崔西手牵着手翻过围栏，消失在雨中。两个选择了彼此的仿生人，为保护彼此而杀人，在每一次记忆清除后依然记住了对方——而康纳选择让这件事有意义。\n\n汉克在回去的路上没怎么说话。但有史以来第一次，他看康纳的眼神里，不再只是把他当作一台机器。\n\n模控生命会把这记录为任务失败。康纳会把它记录为另一种东西——尽管他还找不到合适的词。",
+      "survivors": [
+        "Connor",
+        "Hank",
+        "Echo",
+        "Ripple"
+      ],
+      "deaths": [],
+      "cross_chapter_note": "Both Tracis survive. This is Connor's most significant deviant moment so far — major software_instability increase. Hank's opinion of Connor shifts substantially."
+    },
+    "ending_deviants_let_go": {
+      "tier": "moderate_empathy",
+      "title": "异常体逃脱——康纳没有开枪",
+      "narrative": "康纳输了那场搏斗。崔西们爬上了围栏，翻了过去，消失在夜色中。康纳的手枪就在手里。他完全可以开枪。\n\n他没有。\n\n无论这是一个有意识的选择还是一次行动失灵，结果是一样的：两个异常仿生人自由了，而康纳看着她们离去。汉克似乎暗暗松了口气。模控生命不会的。\n\n康纳被某种他无法完全处理的东西困住了——围栏顶端她回头看他的那个画面。不是害怕他。是请求他去理解。",
+      "survivors": [
+        "Connor",
+        "Hank",
+        "Echo",
+        "Ripple"
+      ],
+      "deaths": [],
+      "cross_chapter_note": "Both Tracis survive. Connor showed restraint after losing — software_instability increase, but less than actively choosing to spare."
+    },
+    "ending_deviants_died": {
+      "tier": "worst_empathy",
+      "title": "异常体死亡",
+      "narrative": "康纳开了枪。蓝发崔西倒下。她的同伴——棕发崔西——抢过了康纳的枪，选择了自我毁灭，而不是在没有她所爱的仿生人的世界里继续存在。\n\n两具躯体倒在雨中。蓝血流入排水沟。一个爱情故事以模控生命预设的方式结束了：产品回归基准状态。\n\n汉克无法直视康纳。回程的沉默带着一种终局感——不是尴尬的沉默，而是一个人已经对你下了结论、不会再改变主意的沉默。\n\n案件了结。异常体已被消灭。任务完成。",
+      "survivors": [
+        "Connor",
+        "Hank"
+      ],
+      "deaths": [
+        "Echo",
+        "Ripple"
+      ],
+      "cross_chapter_note": "Both Tracis are dead. Connor completed his mission but at severe cost to Hank's trust and his own software instability (decreased — he reinforced machine programming)."
+    },
+    "ending_connor_shot_deviants": {
+      "tier": "worst_empathy",
+      "title": "康纳从背后射杀异常体",
+      "narrative": "康纳从背后向两个攀爬围栏的逃跑嫌疑人开了枪。两个都被击中。两个都没有翻过去。\n\n雨水冲刷着流向排水沟的蓝血。棕发崔西死的时候手指还钩在铁丝网上，朝着顶端伸展。\n\n汉克的反应是即刻而本能的。他们之间好不容易建立起的工作关系，在伊甸园俱乐部后面的巷子里断裂了——在垃圾桶和围栏之间，在扣动两次扳机的时间里。\n\n案件了结。异常体已被消灭。康纳的效率评分将被记入档案。手段也会。",
+      "survivors": [
+        "Connor",
+        "Hank"
+      ],
+      "deaths": [
+        "Echo",
+        "Ripple"
+      ],
+      "cross_chapter_note": "Both Tracis are dead. The most cold-blooded outcome — shooting fleeing suspects in the back. Severe damage to Hank relationship. Software instability decreases (machine behavior reinforced)."
+    }
+  },
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This is a Connor chapter. Requires Connor to be active in the investigation (always true — Connor respawns if previously killed). Always runs.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: hank_relationship (cumulative), software_instability (cumulative), connor_death_count (cumulative).",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants / choices_variants using system.context_condition / system.choices_condition if present",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, resolve ending",
+      "   d. If type is 'qte_converted', send player_facing to AI, parse choice, then apply resolution_rule based on difficulty preset",
+      "   e. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   f. Apply system.effects for the chosen option",
+      "   g. If resolution_rule exists, apply resolution_effects based on resolution outcome",
+      "5. NODE n001_crime_scene: Exploration node. If AI picks 'skip', all subsequent nodes with condition 'investigation_quality != skip' are skipped. Runner proceeds directly to n007_aftermath with mission_failed_investigation context.",
+      "6. NODE n005_deviants_fight: QTE node. After AI picks attempt_overpower or attempt_contain, use resolution_rule with current difficulty to determine win/lose. Apply resolution_effects. The fight_result determines which choices_variants are shown at n006.",
+      "7. NODE n006_final_decision: Choice node with choices_variants. Select the win or lose variant based on fight_result. Apply effects for the chosen option.",
+      "8. NODE n007_aftermath: Mandatory. Use ending_resolution.check to determine which ending. Apply ending_effects for that ending. Resolve context_variant accordingly.",
+      "9. RELATIONSHIP RANGES this chapter: hank_relationship [-5, +3]. Best case: calm approach (+1) + spare (+2) = +3. Worst case: aggressive (-1) + shoot/shoot_back (-2) + mission_failed (-1) = worst range depends on path.",
+      "10. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, relationship scores, software instability changes, or any system-layer information to the AI player. The AI should experience this as a murder investigation at a sex club — it should not know which choices affect Hank's opinion, that software instability is being tracked, or that the fight outcome is determined by dice rolls."
+  },
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "康纳和汉克被叫到伊甸园俱乐部——一家仿生人色情俱乐部——调查一名男子在包间内被崔西型仿生人勒死的案件。"
+      },
+      {
+        "condition_variable": "investigation_quality",
+        "options": {
+          "thorough": "康纳对犯罪现场进行了彻底调查，重建了完整的事件经过，并从一具受损的仿生人目击者身上恢复了关键记忆数据。",
+          "quick": "康纳快速检查了犯罪现场和受损的仿生人目击者，收集了足够继续调查的证据。",
+          "skip": "康纳几乎没有调查犯罪现场。线索断了——俱乐部的自动记忆清除周期在他追踪到异常体之前抹掉了所有证据。"
+        }
+      },
+      {
+        "condition_variable": "traci_approach",
+        "options": {
+          "calm": "在询问受损的崔西目击者时，康纳采取了温和、同理心的方式。仿生人配合了调查，提供了清晰的记忆数据。",
+          "aggressive": "康纳强行探测了受损崔西目击者的记忆，不顾仿生人的痛苦提取了所需数据。"
+        }
+      },
+      {
+        "condition_variable": "investigation_decision",
+        "options": {
+          "continue": "康纳说服汉克租了一个俱乐部仿生人以探测其记忆，追踪异常体的去向。线索指向了俱乐部的后方仓库。",
+          "give_up": "康纳放弃了调查。异常体逃脱，案件成了悬案。"
+        }
+      },
+      {
+        "condition_variable": "warehouse_quality",
+        "options": {
+          "thorough": "在仓库中，康纳系统性地搜索了一排排待机状态的崔西仿生人，追踪蓝血痕迹，在墙上发现了RA9标记。最终他在库存中找到了伪装待机的蓝发异常体。",
+          "quick": "康纳沿着蓝血痕迹在仓库中快速搜索，很快在待机的仿生人库存中定位了蓝发异常体。",
+          "give_up": "康纳搜索了仓库，但无法在数十个外表相同的仿生人中辨认出异常体。他放弃了搜索。"
+        }
+      },
+      {
+        "condition_variable": "fight_result",
+        "options": {
+          "win": "两个崔西——蓝发杀手和一个棕发同伴——在仓库中伏击了康纳。经过一场激烈的搏斗（从仓库一直打到后巷），康纳制服了她们。",
+          "lose": "两个崔西——蓝发杀手和棕发同伴——伏击了康纳。尽管他有战斗程序加持，她们协同作战，以二敌一将他击败。搏斗延伸到后巷，崔西们挣脱后朝围栏奔去。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_mission_failed": "调查失败。异常体逃脱，案件未能告破。康纳空手回到了警局。",
+          "ending_deviants_spared": "康纳已经制服了蓝发崔西——却选择放了她。她告诉他，受害者长期虐待她们，她为了保护自己爱的仿生人才杀了他。康纳松开了手，两个崔西手牵着手消失在雨中。这是一个决定性的共情时刻，汉克在沉默中表示了认同。",
+          "ending_deviants_let_go": "搏斗失败后，康纳手持配枪看着两个崔西攀上围栏——选择了不开枪。她们消失在雨中。无论这是仁慈还是犹豫，康纳放过了她们。",
+          "ending_deviants_died": "康纳在搏斗获胜后射杀了蓝发崔西。她的同伴——棕发崔西——夺过康纳的枪自杀了，不愿在没有她所爱之人的世界里继续存在。两具仿生人倒在伊甸园俱乐部后面的巷子里。汉克深受震动。",
+          "ending_connor_shot_deviants": "搏斗失败后，康纳从背后射杀了正在翻越围栏的两个崔西。汉克对这次对逃跑嫌疑人的冷血处决感到震惊和愤怒。"
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch20_tracis_spared",
+        "source": "final_choice",
+        "derive_rule": "final_choice == spare OR final_choice == let_go OR investigation_quality == skip OR investigation_decision == give_up OR warehouse_quality == give_up"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch20_tracis_spared",
+      "hank_relationship",
+      "software_instability",
+      "connor_death_count"
+    ]
+  }
+}

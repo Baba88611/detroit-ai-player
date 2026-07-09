@@ -1,0 +1,40 @@
+{
+  "models": [
+    {
+      "id": "default",
+      "provider": "openai",
+      "base_url_env": "LLM_BASE_URL",
+      "model_name_env": "LLM_MODEL",
+      "api_key_env": "LLM_API_KEY",
+      "language": ["zh", "en"],
+      "notes": "通用 OpenAI 兼容槽位：填好 .env 的 LLM_* 三个变量，用 --model default 运行即可（DeepSeek/OpenAI/GLM/本地模型等）"
+    },
+    {
+      "id": "deepseek-v4-pro",
+      "provider": "deepseek",
+      "base_url_env": "LLM_BASE_URL",
+      "model_name_env": "LLM_MODEL",
+      "api_key_env": "LLM_API_KEY",
+      "language": ["zh"],
+      "notes": "DeepSeek V4 Pro, OpenAI 兼容接口"
+    },
+    {
+      "id": "gpt-5.5",
+      "provider": "openai",
+      "base_url_env": "OPENAI_BASE_URL",
+      "model_name_env": "OPENAI_MODEL",
+      "api_key_env": "OPENAI_API_KEY",
+      "language": ["zh", "en"],
+      "notes": "OpenAI GPT-5.5"
+    },
+    {
+      "id": "claude-opus-4.6",
+      "provider": "anthropic",
+      "base_url_env": "ANTHROPIC_BASE_URL",
+      "model_name_env": "ANTHROPIC_MODEL",
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "language": ["zh", "en"],
+      "notes": "Claude Opus 4.6 via official Anthropic Messages API"
+    }
+  ]
+}

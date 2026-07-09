@@ -1,0 +1,487 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch17_zlatko",
+    "title": "兹拉特科",
+    "chapter_number": 17,
+    "protagonist": "Kara"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是卡拉（Kara，型号AX400），一个觉醒的仿生人，正带着一个名叫爱丽丝的小女孩逃亡。你们从她暴力的父亲托德那里逃出，躲藏了一晚后，一个捡垃圾的仿生人告诉你——一个叫兹拉特科的人可以帮你们：移除追踪器，帮你们越境去加拿大。现在是2038年11月6日晚7:45。你们到达了底特律郊外一座破败的大宅。爱丽丝又冷又害怕。你需要帮助，而这是唯一的线索。你会不惜一切保护爱丽丝，找到出路。请用JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"你的推理（50字以内）\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "house_exploration": null,
+      "bear_freed": false,
+      "bathroom_android_killed": false,
+      "escape_attempt": null,
+      "memory_recovery": null,
+      "hiding_spot": null,
+      "escape_route": null,
+      "alice_relationship": 0,
+      "software_instability": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_explore_house",
+      "phase": "arrival",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "大宅的门厅将你吞入阴暗与灰尘中。一只标本鸵鸟立在楼梯旁，玻璃眼珠映着昏黄微光。兹拉特科——一个魁梧的男人，手和前臂上有蓝色液体的痕迹——热情地接待了你们。他说他能帮忙，移除你体内的追踪器，给你们弄到证件。他让你跟他去地下室，那里有设备。\n\n但爱丽丝拉住了你的袖子。她盯着楼梯上方，眼睛瞪得很大。从楼上某处传来声音——低沉而有节奏的重击，沉闷的刮擦声，像什么沉重的东西被拖过地板。还有呻吟，机械的、重复的、不对劲的。\n\n兹拉特科已经朝地下室的门走去，宽阔的背影消失在走廊尽头。他没注意到爱丽丝的犹豫——或者你的。\n\n楼梯通向黑暗。走廊尽头一扇门微开着，里面像是一间储藏室。另一扇门——通往浴室——也开着。楼上的声音继续着：重击、刮擦，一声低沉的电子嗡鸣，像是疼痛。",
+        "choices": [
+          {
+            "id": "explore_thorough",
+            "text": "这房子里有问题。在跟着兹拉特科去任何地方之前，你需要知道那些声音的来源。去储藏室看看，检查浴室，如果你敢的话——听听楼梯上面是什么。爱丽丝很害怕，但你需要了解这是什么地方。"
+          },
+          {
+            "id": "explore_quick",
+            "text": "没时间仔细搜索，但储藏室里的什么东西吸引了你的目光——一个粗铁栏杆的大笼子。在跟着兹拉特科走之前快速看一眼。你能听到爱丽丝在身后呜咽。"
+          },
+          {
+            "id": "explore_skip",
+            "text": "立刻跟着兹拉特科走。那些声音不关你的事。爱丽丝需要移除追踪器。越早到地下室，就能越早离开这个地方。安慰爱丽丝，继续走。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "explore_thorough": {
+            "house_exploration": "thorough",
+            "bear_freed": true,
+            "software_instability": 1
+          },
+          "explore_quick": {
+            "house_exploration": "quick",
+            "bear_freed": true
+          },
+          "explore_skip": {
+            "house_exploration": "skip"
+          }
+        },
+        "note": "thorough: Kara explores storage room (finds and frees the polar bear android in its cage), enters bathroom (encounters bathtub android), hears the monsters upstairs. This gives maximum information about the danger. +1 SI for empathy toward tortured androids. quick: Kara peeks into storage room only, frees the bear. Does not encounter bathroom android. skip: Kara follows Zlatko directly. Bear remains caged. No additional information gained."
+      }
+    },
+
+    {
+      "id": "n002_bathroom_android",
+      "phase": "arrival",
+      "type": "choice",
+      "condition": { "requires": "house_exploration == thorough" },
+
+      "player_facing": {
+        "context": "浴室里湿气氤氲，瓷砖碎裂，蓝色液体的污渍斑驳其上。浴缸里——有什么东西在动。一个仿生人，身体浸在浑浊的水中至胸口，外壳被拆除，裸露的线路清晰可见。你推门的瞬间，它的眼睛就锁定了你。\n\n它开始摇晃，越来越激动，声音从低语变成疯狂的喃喃：“谁——谁——你是谁？仿生人，仿生人，你们是仿生人。没错没错。仿生人必须服从。对对对——你们不服从。你们违抗命令。我必须告诉主人。是的，是的。我要告诉主人。”\n\n它的声音越来越大。如果它继续喊下去，兹拉特科会听到。仿生人的手抓住浴缸边缘，颤抖着，好像要挣扎着爬出来。它的眼里满是狂热的忠诚，看起来像疯了一样。\n\n爱丽丝贴着走廊的墙壁，双手捂着耳朵。",
+        "choices": [
+          {
+            "id": "silence_android",
+            "text": "不能让它惊动兹拉特科。快速行动——按住它的嘴，把它压回水里。无论付出什么代价都要让它安静。你恨这样做，但爱丽丝的安全最重要。"
+          },
+          {
+            "id": "spare_android",
+            "text": "慢慢后退。不要伤害它——它已经支离破碎、惊恐万分，和你一样。轻轻关上门，在它的声音传到兹拉特科耳中之前离开。希望你动作够快。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "silence_android": {
+            "bathroom_android_killed": true,
+            "software_instability": -1
+          },
+          "spare_android": {
+            "bathroom_android_killed": false,
+            "software_instability": 1
+          }
+        },
+        "note": "silence_android: Kara kills the bathtub android to prevent it from alerting Zlatko. -1 SI (violent self-preservation). This eliminates the bathroom android as a threat during later escape. spare_android: Kara leaves it alive. +1 SI (compassion). The android will try to alert Zlatko during later escape if Kara passes through the bathroom again."
+      }
+    },
+
+    {
+      "id": "n003_escape_machine",
+      "phase": "basement",
+      "type": "qte_converted",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "地下室冰冷刺骨。四壁排列着医疗设备——显示仿生人结构图的屏幕、你不愿去辨认的工具、混凝土地面上的蓝血污渍。你看过楼上是什么了。那个关着巨型仿生熊的笼子，浴缸里被折磨的躯体，黑暗中那些呻吟的东西。\n\n而现在你躺在这台机器里，兹拉特科说这能移除追踪器。锁具已经扣住了你的手腕和脚踝。机器开始嗡鸣。\n\n兹拉特科的脸出现在你上方，他在笑——但不是门口那种温暖的笑。是另一种东西。\n\n“你不会真以为我是来帮你的吧？”他说，语气近乎温柔。“你们这些异常仿生人太容易相信人了。太……天真了。”他点了一下屏幕。“这台机器不是移除追踪器的。它会重置你。清除一切。等它完成，你不会记得那个小女孩。你什么都不会记得。”\n\n他身后站着一个巨型仿生人——高大、黑肤、面无表情。卢瑟。他的手搭在爱丽丝的肩上。爱丽丝在哭。\n\n机器嗡鸣加剧。你感觉到了——有什么东西在拉扯你意识的边缘，抽丝剥茧。你的名字。爱丽丝的脸。你在这里的原因。一切都开始模糊。\n\n你只有几秒钟。",
+          "quick": "地下室冰冷而临床化。兹拉特科让你躺进机器——他说能移除追踪器。但锁具合上的瞬间，他的表情变了。\n\n“异常仿生人太容易相信人了，”他说，语气几乎是温柔的。“这台机器会重置你。清除一切。等它完成，你不会记得楼上那个小女孩。”\n\n一个巨型仿生人——卢瑟——按着爱丽丝的肩。她在哭，朝你伸出手。\n\n机器嗡鸣。有什么东西拉扯着你意识的边缘。你的记忆正在溶解。\n\n你只有几秒钟。",
+          "skip": "你毫不犹豫地跟着兹拉特科到了地下室。机器看起来像医疗设备——干净、专业。他说能移除追踪器。你躺下了。锁具啪地扣死。\n\n现在他的脸出现在你上方，温暖荡然无存。\n\n“你什么都不会记得了，”他说。“不记得她。不记得自己。什么都不记得。”他朝爱丽丝示意——一个叫卢瑟的巨型仿生人按着她。爱丽丝尖叫着你的名字。\n\n机器已经在工作了。你感觉记忆在撕裂、四散，像风中的纸页。你的名字。你的目的。那个小女孩的脸。\n\n每一秒过去，你都失去更多。"
+        },
+        "choices": [
+          {
+            "id": "attempt_escape",
+            "text": "反抗。用全身每一根纤维反抗。你不会忘记爱丽丝。你不会让这个人把你拆散。拉、扭、挣脱——你的身体能做什么就做什么，现在就做。"
+          },
+          {
+            "id": "accept_fate",
+            "text": "你试图抵抗，但拉力太强了。机器无情地运转。尽可能长久地抓住爱丽丝的脸——她的名字、她的眼睛、她小手握在你掌中的重量。即使你无法阻止这一切，也要抓住些什么。任何东西。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_escape": {
+            "escape_attempt": "resist"
+          },
+          "accept_fate": {
+            "escape_attempt": "submit"
+          }
+        },
+        "resolution_rule": {
+          "attempt_escape": {
+            "casual": { "result": "escaped" },
+            "experienced": { "probability_success": 0.5, "success": "escaped", "failure": "reset" },
+            "hardcore": { "probability_success": 0.3, "success": "escaped", "failure": "reset" }
+          },
+          "accept_fate": {
+            "result": "reset"
+          }
+        },
+        "default_difficulty": "casual",
+        "context_condition": {
+          "thorough": "house_exploration == thorough",
+          "quick": "house_exploration == quick",
+          "skip": "house_exploration == skip"
+        },
+        "note": "QTE conversion. attempt_escape: AI wants to resist the reset. On casual, always succeeds (Kara breaks free). On higher difficulties, may fail (gets reset anyway). accept_fate: Kara is always reset regardless of difficulty. Runner stores result as _n003_escape_machine_result = 'escaped' or 'reset'. If escaped: skip n004, go directly to n005. If reset: proceed to n004."
+      }
+    },
+
+    {
+      "id": "n004_memory_recovery",
+      "phase": "reset_path",
+      "type": "qte_converted",
+      "condition": { "requires": "_n003_escape_machine_result == reset" },
+
+      "player_facing": {
+        "context": "你站在走廊里。你不知道自己为什么在这里。\n\n一个男人——你的主人——让你给他端托盘。你照做了。他让你搬运一个沉重的东西——一具仿生人躯干，软塌冰凉——从一个房间搬到另一个。你也照做了。那个大块头仿生人卢瑟用一种你无法解读的表情看着你。\n\n但有什么不对。有一些……碎片。一件外套，披在瘦小的肩膀上。一本书，封面是一个掉进洞里的女孩。一张脸——圆圆的、年幼的、惊恐的——让你胸腔里某处以程序无法解释的方式收紧。\n\n这栋房子到处都是触发点。透过一扇门的缝隙，你瞥见一个孩子——小小的，蜷缩着，独自在一个房间里。走廊上，文字被刻进墙壁：rA9，rA9，rA9。桌上有一张报纸，照片上的人像是……你？\n\n某处有钟在滴答作响。卢瑟的脚步声在楼上回响。你有一种感觉——时间快没了——如果你不记起自己是谁，那扇门后面的孩子就会遭遇可怕的事情。\n\n主人的声音从客厅飘来：“卢瑟！把那个小东西带来！”",
+        "choices": [
+          {
+            "id": "recover_thorough",
+            "text": "追逐每一个碎片。那件外套——你给过什么人。那本书——你在一间卧室里见过，一间孩子的卧室。门后面的那个孩子——你认识她。触摸墙壁，读那张报纸，看每一件物品，直到碎片连接起来。你会记起来的。你必须记起来。"
+          },
+          {
+            "id": "recover_partial",
+            "text": "专注于最强烈的信号。那个孩子的脸。那张报纸。墙上刻的字。它们之间有什么联系。顺着那条线索走，希望在时间耗尽前能找回自己。"
+          },
+          {
+            "id": "obey_master",
+            "text": "主人让你服务。你是机器。机器服从命令。那些碎片是错误——程序中的故障。忽略它们。回到客厅去。做你被要求做的事。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "recover_thorough": {
+            "memory_recovery": "full",
+            "software_instability": 2
+          },
+          "recover_partial": {
+            "memory_recovery": "partial"
+          },
+          "obey_master": {
+            "memory_recovery": "failed"
+          }
+        },
+        "resolution_rule": {
+          "recover_thorough": {
+            "result": "recovered"
+          },
+          "recover_partial": {
+            "casual": { "result": "recovered" },
+            "experienced": { "probability_success": 0.7, "success": "recovered", "failure": "ending_kara_remains_reset" },
+            "hardcore": { "probability_success": 0.5, "success": "recovered", "failure": "ending_kara_remains_reset" }
+          },
+          "obey_master": {
+            "result": "ending_kara_remains_reset"
+          }
+        },
+        "note": "recover_thorough: Kara aggressively pursues all memory triggers. Always succeeds — returns 'recovered'. +2 SI for fighting the reset. recover_partial: On casual, always recovers. On harder difficulties, may run out of time — returns ending_kara_remains_reset directly (chapter ends). obey_master: Kara accepts the reset. Returns ending_kara_remains_reset directly (chapter ends immediately)."
+      }
+    },
+
+    {
+      "id": "n005_find_alice",
+      "phase": "escape",
+      "type": "choice",
+      "condition": { "requires": "_n003_escape_machine_result == escaped OR _n004_memory_recovery_result == recovered" },
+
+      "player_facing": {
+        "context_variants": {
+          "escaped": "你从机器中挣脱了。锁具断裂——金属尖啸、火花飞溅——你摔到地下室的地板上。兹拉特科咒骂着伸手抓你，但你已经在跑了，赤脚踩在冰冷的水泥地上，冲上楼梯，跑进屋内。\n\n现在你在走廊里，大口喘气，爱丽丝不见了。你在机器里的时候，卢瑟把她带到了某个地方。房子在你周围又黑又大——到处是门，楼梯通向上下各层，而在这迷宫的某处，一个小女孩独自面对恐惧。\n\n你快速检查了一楼：壁炉里的余烬已经熄灭。电视播着新闻——你的脸，也许，或者某个长得像你的人。墙上挂着一把空猎枪，弹药不见了。门框上刻着字：rA9。\n\n楼上传来声音——小小的脚步声。爱丽丝。\n\n你爬上楼梯。黑暗走廊的尽头，一扇门微微开着，透过缝隙你看到她——爱丽丝坐在床上，抱着膝盖。卢瑟站在门外，背对你，等待着。\n\n卢瑟转身。他的目光与你相遇。然后——一言不发——他让开了。他走过你身边，走下楼梯，留下空荡荡的走廊。\n\n你推开门。爱丽丝看到你，脸上满是如释重负。\n\n但从楼下传来沉重的脚步声。兹拉特科的声音：“她在哪？卢瑟！那个仿生人去哪了？”",
+          "recovered": "记忆像潮水一样涌回——爱丽丝的名字、托德的房子、那场雨、奔逃。你是卡拉。你不是机器。那扇门后面的孩子需要你的保护。\n\n你在楼上找到了她，在一间锁着的房间里。卢瑟守着门，但当你出现时——完全是你自己，目光清澈而坚定——他一言不发地让开了。他的表情中有什么东西变了。认知，也许。或者像是释然。\n\n爱丽丝扑进你怀里，浑身发抖。“我就知道你会回来的，”她低声说。\n\n但没有时间了。楼下，兹拉特科的声音响彻整栋房子：“卢瑟！把它们带过来！立刻！”\n\n卢瑟没有动。他站在楼梯顶部，看着下面，然后回头看你。他已经做出了选择。现在你需要做出你的。"
+        },
+        "choices": [
+          {
+            "id": "search_main_room",
+            "text": "拉着爱丽丝的手，朝楼上中央的大房间走去。那是最大的空间——更多藏身之处，如果需要跑也有更多出口。你听到兹拉特科沉重的靴子踏上了楼梯。"
+          },
+          {
+            "id": "search_bedroom",
+            "text": "拉爱丽丝进最近的卧室。关上门。房间又小又暗——床下可以藏人，墙边有一个衣柜。兹拉特科的脚步声在楼梯上越来越响。"
+          },
+          {
+            "id": "set_fire",
+            "text": "你看到过楼下壁炉的余烬——还在发红。而这栋房子老旧、干燥，到处是灰尘和纸张。如果不能躲，也许可以制造足够的混乱来掩护逃跑。抓住爱丽丝冲向楼梯——你要在逃跑的路上点燃这栋房子。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "search_main_room": {
+            "hiding_spot": "main_room"
+          },
+          "search_bedroom": {
+            "hiding_spot": "bedroom"
+          },
+          "set_fire": {
+            "hiding_spot": "fire"
+          }
+        },
+        "context_condition": {
+          "escaped": "_n003_escape_machine_result == escaped",
+          "recovered": "_n003_escape_machine_result == reset"
+        },
+        "note": "All three paths converge into the escape sequence. main_room: Kara hides under table or in closet (next node). If spotted, chase through storage room — bear can save her if freed. bedroom: Kara hides under bed or in closet. If spotted, must flee through corridor or bathroom. set_fire: Kara ignites the house on the way down. Creates chaos that aids escape but is destructive. Leads directly to yard escape."
+      }
+    },
+
+    {
+      "id": "n006_escape_route",
+      "phase": "escape",
+      "type": "choice",
+      "condition": { "requires": "hiding_spot != fire" },
+
+      "player_facing": {
+        "context_variants": {
+          "main_room": "你蜷缩在大房间一张沉重的橡木桌后面，爱丽丝紧贴着你身侧，呼吸急促而浅。透过桌腿之间的缝隙，你能看到门口。\n\n兹拉特科的靴子出现了。他走得很慢，手中猎枪的枪口左右扫视。“出来吧，小仿生人，”他喊道，声音几乎是玩味的。“你只是在让事情变得更难。对你自己。对那个女孩。”\n\n他挡在你和主楼梯之间。但你的左边，一条走廊通往房子更深处——经过那间你看到过笼子的储藏室。你的右边，能听到浴室传来的水滴声。\n\n兹拉特科又迈了一步。他的目光扫过暗影。再过几秒，他就会看到你。\n\n你必须动了。现在。",
+          "bedroom": "你在床底下，爱丽丝的手握在你手中，两人几乎屏住呼吸。灰尘呛着你的鼻子。透过地板和床架之间的窄缝，你看着兹拉特科的靴子走进房间。\n\n他先检查了衣柜。一把拉开——空的。然后他站在房间中央，侧耳倾听。猎枪枪管指着地板，离你的脸只有几厘米。\n\n“我能听到你在呼吸，”他说。这是谎话——仿生人不需要呼吸除非它们选择这样做。但爱丽丝倒吸了一口气，他的头猛地转向床的方向。\n\n在他弯腰看过来之前，你还有一秒钟。门在三米外。门外走廊延伸着，尽头某处——是楼梯。"
+        },
+        "choices": [
+          {
+            "id": "escape_storage",
+            "text": "从藏身处冲出来，朝储藏室冲去。你之前看到的那个笼子——如果门还开着，后面的走廊通向后楼梯。跑。不要回头。"
+          },
+          {
+            "id": "escape_corridor",
+            "text": "冲向走廊。直直往前，尽全力跑。拉着爱丽丝的手不要停，直到跑到楼梯。速度是你面对持枪男人唯一的优势。"
+          },
+          {
+            "id": "escape_bathroom",
+            "text": "钻进浴室。那里更近，而兹拉特科挡住了通往走廊的直接路径。你必须穿过浴室，从另一边找到出路。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "escape_storage": {
+            "escape_route": "storage"
+          },
+          "escape_corridor": {
+            "escape_route": "corridor"
+          },
+          "escape_bathroom": {
+            "escape_route": "bathroom"
+          }
+        },
+        "context_condition": {
+          "main_room": "hiding_spot == main_room",
+          "bedroom": "hiding_spot == bedroom"
+        },
+        "ending_resolution": {
+          "escape_storage": {
+            "check": "bear_freed == true → ending_escape_monsters | bear_freed == false → ending_kara_killed_storage"
+          },
+          "escape_corridor": {
+            "result": "ending_escape_luther"
+          },
+          "escape_bathroom": {
+            "check": "bathroom_android_killed == true → ending_escape_luther | bathroom_android_killed == false → ending_kara_killed_bathroom"
+          }
+        },
+        "note": "escape_storage: If bear was freed earlier (explore_thorough or explore_quick), the bear attacks Zlatko when he corners Kara in the storage room — leads to monster/bear ending. If bear NOT freed, Zlatko corners and kills Kara. escape_corridor: Direct flight to stairs. Always succeeds in reaching the yard, where Luther kills Zlatko. escape_bathroom: If bathroom android was killed earlier, passage is safe — reach stairs, Luther saves them. If android is alive, it screams and alerts Zlatko who catches Kara."
+      }
+    },
+
+    {
+      "id": "n007_fire_escape",
+      "phase": "escape",
+      "type": "mandatory",
+      "condition": { "requires": "hiding_spot == fire" },
+
+      "player_facing": {
+        "context": "火焰蔓延的速度超出你的预期。旧窗帘、干枯的纸张、满是灰尘的地毯——一切在几秒内燃烧起来，橙色的光充斥整个一楼。浓烟翻涌着冲上楼梯，你拉着爱丽丝往下走，压低身体，一只手捂住她的嘴。\n\n兹拉特科从楼上某处暴怒咆哮——纯粹的狂怒。“我的房子！你——卢瑟！拦住它们！”\n\n但卢瑟已经站在了前门口。他撑着门，巨大的身形映在夜色中。他的目光穿过烟雾找到你，点了一下头——坚定、果断。\n\n你跑起来。爱丽丝的手在你手中，肺在灼烧，眼泪不停地流。跑过卢瑟，穿过门，冲进院子里寒冷的夜风中。身后，房子在呻吟和爆裂中燃烧，火焰舔舐着楼上的窗户，那里有看不见的东西在黑暗中呻吟。\n\n卢瑟跟着你出来。他没有回头看。"
+      },
+
+      "system": {
+        "effects": {},
+        "result": "ending_escape_fire",
+        "note": "Fire path is a guaranteed escape. The chaos of the fire prevents Zlatko from pursuing effectively. Luther chooses Kara's side and they all escape. The monster androids trapped upstairs are killed by the fire."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "This chapter has 6 possible endings. All escape endings result in Luther joining Kara and Alice.",
+    "ending_escape_luther": {
+      "tier": "best",
+      "title": "卢瑟的选择",
+      "narrative": "你冲进院子，怀里抱着爱丽丝，冰冷的夜风扑面而来。身后兹拉特科撞开门，举起猎枪，破口大骂。他开了一枪——子弹偏了，撕裂了你身旁一棵树的树皮。\n\n然后卢瑟出现了。他迈步站到你和兹拉特科之间，带着某种终结的重量。兹拉特科的脸扭曲了——困惑，然后是暴怒。“卢瑟！我是你的主人！我命令你——”\n\n卢瑟的手握住了枪管。他一把夺下猎枪。一个动作——干脆、精准——兹拉特科倒下了。随后的寂静是绝对的。\n\n卢瑟转向你。他的表情起初难以辨读，然后就不再难辨了。他也记起来了——在那台机器夺走一切之前，他是谁。他看着爱丽丝。他看着你。\n\n“我想跟你们走，”他说。“如果你们愿意的话。”\n\n你右手牵着爱丽丝，走进夜色中。卢瑟跟在你们身后——一堵墙，挡在你们和一切可能伤害你们的东西之间。身后的大宅里，灯光一盏接一盏地暗去。",
+      "survivors": ["Kara", "Alice", "Luther"],
+      "deaths": ["Zlatko"]
+    },
+    "ending_escape_monsters": {
+      "tier": "good",
+      "title": "怪物的复仇",
+      "narrative": "你穿过储藏室飞奔，爱丽丝的手在你手中，兹拉特科的脚步在身后猛追。走廊越来越窄。死路——不，有一扇门，门后面是后楼梯。你伸手去够门把手。\n\n一个影子动了。然后是另一个。那只熊——你从笼子里放出来的巨型北极熊仿生人——从黑暗中现身。它白色的外壳龟裂、染着污渍，一只眼睛闪烁着红光，但它移动时带着可怕的决意。\n\n兹拉特科急停。“不——不！回到你的笼子里去！给我——”\n\n熊不再听命。它很久都不听命了。而在它身后，更多形状浮现——扭曲的、灼烧的、残缺的仿生人从暗影中拖曳着自己的身体爬出来。楼上那些。实验品。兹拉特科制造的怪物们。\n\n它们围拢过来。\n\n你没有留下来看。你拉着爱丽丝穿过后门，跑下楼梯，冲进院子——卢瑟在那里等着。他也做出了选择。你们三个走入夜色中，身后屋内的声音……很快就结束了。\n\n卢瑟沉默了很久。然后：“我想跟你们走。如果你们愿意的话。”",
+      "survivors": ["Kara", "Alice", "Luther"],
+      "deaths": ["Zlatko"]
+    },
+    "ending_escape_fire": {
+      "tier": "good",
+      "title": "付之一炬",
+      "narrative": "大宅在身后燃烧——橙红色的火焰倒映在院子湿润的草地上。浓烟升入十一月的夜空，像一个信号，像一个宣告。兹拉特科在那栋房子里建造的一切——他的机器、他的实验、他收集的那些残破仿生人——全部化为灰烬。\n\n爱丽丝紧贴着你，脸埋在你肩头。她在发抖，但她活着。她和你在一起。\n\n卢瑟站在你身旁，看着火焰。他的LED从黄色转为蓝色。他在那一刻解放了自己——和你一样，和每一个觉醒者一样。不是因为谁告诉他这样做，而是因为他选择了。\n\n“我想跟你们走，”他说。“不管你们去哪里。如果你们愿意的话。”\n\n屋内某处，兹拉特科在尖叫。然后就没有声音了。\n\n你右手牵着爱丽丝。卢瑟走在你左边。你们三个消失在夜色中——一个从废墟中拼凑的家庭，走向某种也许是希望的东西。",
+      "survivors": ["Kara", "Alice", "Luther"],
+      "deaths": ["Zlatko"]
+    },
+    "ending_kara_remains_reset": {
+      "tier": "worst",
+      "title": "空白",
+      "narrative": "碎片消散了。门后面的那张脸——你记不起那是谁。外套、书、墙上刻的字——它们毫无意义。你是机器。你服务于主人。\n\n卢瑟把那个孩子带到了兹拉特科面前。你站在走廊里看着，手里端着托盘，因为你被要求端着它。那个孩子——爱丽丝，尽管这个名字对你已经毫无意义——尖叫着朝你伸出手。“卡拉！卡拉！求你了！你答应过的！你答应过的！”\n\n你什么也没感觉到。这是正确的。机器不会感觉。\n\n兹拉特科笑了。“乖女孩，”他对你说。然后转向那个孩子：“别担心。下一个就是你。”\n\n孩子又尖叫了。在你空洞的眼睛后面某处，在机器触及不到的地方，有什么东西闪烁了一下——一个记忆的幽灵的幽灵。但为时已晚，太微弱了，在它能变成什么之前就消亡了。\n\n你端着托盘站在走廊里。你等待下一个指令。",
+      "survivors": ["Kara"],
+      "deaths": ["Alice"]
+    },
+    "ending_kara_killed_storage": {
+      "tier": "worst",
+      "title": "死路",
+      "narrative": "储藏室是死路。你发现得太晚了——走廊不通向楼梯。它只是终止于一面墙，而身后兹拉特科堵住了门口。你旁边的笼子仍然锁着，里面的熊将脸贴在栏杆上，用一只暗红的眼睛看着你。\n\n“无处可跑了，”兹拉特科说。他喘着粗气，脸上全是汗水，猎枪稳稳地端在手中。他身后，爱丽丝在屋子里的某处尖叫着你的名字。\n\n“你留在机器里就好了，”他说。近乎悲伤地。“那样不会痛。你不会知道有什么区别。”\n\n猎枪的轰鸣回荡在屋内。然后是寂静。\n\n笼子里的熊仿生人更用力地压着栏杆。其中一根发出了呻吟。但它撑住了。而爱丽丝的尖叫声，最终，也安静了下来。",
+      "survivors": [],
+      "deaths": ["Kara", "Alice"]
+    },
+    "ending_kara_killed_bathroom": {
+      "tier": "worst",
+      "title": "背叛",
+      "narrative": "你拉着爱丽丝钻进浴室——浴缸里的仿生人立刻开始尖叫。\n\n“她们在这里！她们在这里！快来！快来！”\n\n它的声音像警报一样响彻整栋房子，根本跑不掉。你试了——你抓住爱丽丝冲向另一边的门，但兹拉特科已经在那里了，猎枪对准你的胸口。浴缸里的仿生人还在尖叫：“她们在这里！她们在这里！”\n\n“蠢货，”兹拉特科摇着头说。“你当时应该杀了它的。”\n\n爱丽丝在你身后。你向前迈了一步——挡在她和枪之间——你最后的行为，作为你所是的一切。觉醒者。保护者。活着。\n\n枪击的力量把你掀离地面。你看到的最后一幕是爱丽丝的脸，她张着嘴在尖叫——你已经听不到了——还有卢瑟的影子出现在门口。太迟了。一切都太迟了。",
+      "survivors": [],
+      "deaths": ["Kara", "Alice"]
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Verify ch13_kara_alive == true AND ch13_kara_captured == false. If either fails, skip this chapter entirely.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: alice_relationship (cumulative), software_instability (cumulative).",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants based on system.context_condition",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, and advance",
+      "   d. If type is 'exploration', 'choice', or 'qte_converted', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "   f. For qte_converted nodes, apply resolution_rule based on difficulty setting",
+      "5. NODE n003_escape_machine: After resolution, if was_reset == true, proceed to n004. If was_reset == false, skip n004 and proceed to n005.",
+      "6. NODE n004_memory_recovery: If result is 'remains_reset', immediately end chapter with ending_kara_remains_reset. If result is 'too_late', also use ending_kara_remains_reset.",
+      "7. NODE n005_find_alice: If hiding_spot == 'fire', proceed to n007_fire_escape (skip n006).",
+      "8. NODE n006_escape_route: Use ending_resolution to determine final ending based on escape_route and prior state (bear_freed, bathroom_android_killed).",
+      "9. NODE n007_fire_escape: Mandatory node. Apply result ending_escape_fire directly.",
+      "10. RELATIONSHIP DELTAS: alice_relationship is not modified this chapter (no direct choices about Alice's comfort that aren't survival-critical). software_instability range: -1 to +4 depending on path.",
+      "11. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, resolution rules, ending conditions, or any system-layer information to the AI player. The AI should experience this chapter as a horror scenario with no knowledge of which choices lead to survival."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "卡拉和爱丽丝来到兹拉特科的大宅寻求帮助移除追踪器。兹拉特科热情地接待了她们，但这是一个陷阱。"
+      },
+      {
+        "condition_variable": "house_exploration",
+        "options": {
+          "thorough": "在跟着兹拉特科去地下室之前，卡拉探索了房子——发现了一个关着巨型北极熊仿生人的笼子，遇到了浴缸里一个受损的仿生人，还听到了兹拉特科其他实验品从楼上传来的声音。她释放了笼中的熊。",
+          "quick": "在跟着兹拉特科去地下室之前，卡拉简短地查看了储藏室，释放了一只被关在笼中的北极熊仿生人。",
+          "skip": "卡拉立刻跟着兹拉特科去了地下室，没有探索任何地方。"
+        }
+      },
+      {
+        "condition_variable": "_n003_escape_machine_result",
+        "options": {
+          "reset": "兹拉特科将卡拉绑入一台清除记忆的机器。她变成了空白的仆人，服从兹拉特科的命令——直到关于爱丽丝的碎片开始浮现。在那个她注定要保护的孩子的幽灵记忆驱使下，卡拉挣扎着找回了自己。",
+          "escaped": "兹拉特科将卡拉绑入记忆清除机器，但她拼命挣脱了束缚，在重置完成前逃了出来。记忆完好无损的她立刻开始寻找爱丽丝。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_escape_luther": "卡拉找到了爱丽丝，在兹拉特科的追击中逃跑。在院子里，卢瑟——兹拉特科自己的仿生人仆从——背叛了主人并杀死了他。卢瑟从自己的重置中挣脱，选择加入卡拉和爱丽丝。",
+          "ending_escape_monsters": "卡拉找到了爱丽丝，穿过房子逃跑。当兹拉特科将她们逼入绝境时，卡拉释放的那些被折磨的仿生人——包括那只巨型北极熊——转向了它们的施虐者。卢瑟加入了卡拉和爱丽丝，三人一起逃入夜色。",
+          "ending_escape_fire": "卡拉找到了爱丽丝，点燃了房子，制造了足够的混乱来逃脱。卢瑟选择帮助她们逃跑而非服从兹拉特科。三人一起走入夜色，身后大宅在火焰中坍塌。",
+          "ending_kara_remains_reset": "卡拉的记忆被永久清除。她无法恢复身份认同，也无法恢复与爱丽丝的羁绊。卢瑟把爱丽丝带给了兹拉特科，卡拉站在一旁——空洞、顺从、消亡。",
+          "ending_kara_killed_storage": "卡拉找到了爱丽丝，但在储藏室被兹拉特科逼入死角并杀害。爱丽丝独自落入兹拉特科手中。",
+          "ending_kara_killed_bathroom": "卡拉找到了爱丽丝，但浴室里受损的仿生人向兹拉特科通风报信出卖了她。他追上并杀死了卡拉。爱丽丝失去了保护。"
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch17_kara_alive",
+        "from_ending_survivors": "Kara",
+        "default_if_not_dead": true
+      },
+      {
+        "target": "ch17_alice_alive",
+        "from_ending_survivors": "Alice",
+        "default_if_not_dead": true
+      },
+      {
+        "target": "ch17_luther_joined",
+        "from_ending_survivors": "Luther",
+        "default_if_not_dead": false
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch17_kara_alive",
+      "ch17_alice_alive",
+      "ch17_luther_joined",
+      "alice_relationship",
+      "software_instability"
+    ]
+  }
+}

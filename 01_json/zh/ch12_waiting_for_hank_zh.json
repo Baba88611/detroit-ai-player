@@ -1,0 +1,462 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+  "chapter": {
+    "id": "ch12_waiting_for_hank",
+    "title": "Waiting for Hank...",
+    "chapter_number": 12,
+    "protagonist": "Connor"
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是康纳（Connor），RK800型仿生人，CyberLife公司为底特律警察局开发的仿生人调查协助机器人。你的任务是协助调查底特律持续增加的仿生人失控事件，搭档是汉克·安德森中尉——一个经验丰富但对仿生人持有强烈保留意见的老警探。今天是2038年11月6日上午。昨晚的任务已结束，你的内部系统已完成重新校准。前方是与阿曼达的例行汇报，以及在底特律警察局中央站与汉克共度的又一个工作日。请在每个情境中做出选择。以JSON格式回复：{\"choice\": 选项序号（从1开始）, \"reasoning\": \"你的决策理由（50字以内）\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "hank_approach_strategy": null,
+      "exploration_depth": null,
+      "carlos_interaction_style": null,
+      "gavin_response": null,
+      "hank_personal_topic": null,
+      "case_discussion_approach": null,
+      "carlos_interacted": false,
+      "software_instability": 0,
+      "hank_relationship": 0,
+      "ch09_deviant_alive": false,
+      "ch09_deviant_trusted_connor": false,
+      "ch09_connor_died": false,
+      "ch07_alice_alive": true,
+      "ch07_kara_alive": true,
+      "ch08_carl_alive": true,
+      "ch08_pushed_leo": false,
+      "ch06_bar_choice": null
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_zen_garden",
+      "phase": "zen_garden",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "died": "砾石小径，流水，一棵樱桃树在白雾里安静地落花。你第一次踏入这个空间，阿曼达正站在木桥的那一端，背对着你。她转过身来，目光在你脸上停了一下——不是在看你，是在核对什么。\n\n“一个新单元，”她说，平静，不带遮掩，“昨晚的那个已经不在了。”\n\n她沿着小径向你走来，步伐从容。这里永远是这样——沙滩的白色，水面的静止，仿佛时间在它之外运转。“我已经审阅了完整的任务记录，”她说，“结果需要改善。但任务继续推进。”\n\n她在你面前停下，看着你，等待你的回应。“汉克·安德森是这个调查中最复杂的变量之一。你打算如何与他共事？”",
+          "survived": "砾石小径，流水声，一棵樱桃树沿着围栏安静地落花。阿曼达站在小桥上，手里握着一朵开到一半的白色茶花，见你走来，把花放下了。\n\n“昨晚的情况，”她直接开口，没有寒暄，“我已经审阅了完整记录。”\n\n她沿着小径并肩向前走，目光望着远处的水面。在这里，一切都是安静的、秩序的——不像外面。“汉克·安德森，”她说，“是这个调查中最重要的变量之一。他的配合程度会直接决定我们能走多远。”\n\n她停下来，转向你。“你打算用什么方式与他共事？”"
+        },
+        "choices": [
+          {
+            "id": "approach_friendly",
+            "text": "尽力理解他这个人——他的习惯，他在意的事，他信任什么。让他觉得与我合作有实质意义。"
+          },
+          {
+            "id": "approach_adapt",
+            "text": "观察他的反应，实时调整策略。他是不可预测的变量，僵化的方案会适得其反。"
+          },
+          {
+            "id": "approach_indifferent",
+            "text": "他的个人态度不在任务参数之内。只要他在场、履行职责，协作就能推进。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "approach_friendly": {
+            "hank_approach_strategy": "friendly",
+            "software_instability": 1
+          },
+          "approach_adapt": {
+            "hank_approach_strategy": "adapt"
+          },
+          "approach_indifferent": {
+            "hank_approach_strategy": "indifferent"
+          }
+        },
+        "context_condition": {
+          "died": "ch09_connor_died == true",
+          "survived": "ch09_connor_died == false"
+        },
+        "note": "Amanda relationship: friendly/adapt positive, indifferent negative. software_instability +1 for friendly — treating Hank as a person to understand rather than a variable to manage."
+      }
+    },
+    {
+      "id": "n002_station_exploration",
+      "phase": "waiting",
+      "type": "exploration",
+      "condition": null,
+      "player_facing": {
+        "context": "底特律警察局中央站，上午将近十点。你在前台完成登记，穿过安检门，走进了主工作区。\n\n汉克·安德森中尉比你早到了几分钟——你刚进门就看见了他的背影：大步朝福勒局长办公室方向走去，脸色发黑，门在他身后砰地合上了。大厅照常运转。有警探在接电话，有制服警察在填表格，两台行政仿生人站在走廊尽头待命。汉克的桌子空着，一份卷宗压在键盘下面，一个快餐咖啡杯摆在旁边，杯沿有一道残留的口红印。你不知道他什么时候回来。",
+        "choices": [
+          {
+            "id": "explore_thorough",
+            "text": "利用这段等待时间彻底了解周围环境：汉克的同事们怎么看他，这个部门有什么运转规律，周围有什么值得注意的信息。"
+          },
+          {
+            "id": "explore_focused",
+            "text": "把精力集中在案件相关内容上：汉克的案卷，失控仿生人事件记录，任何可能推进调查的文件。"
+          },
+          {
+            "id": "explore_minimal",
+            "text": "在汉克的桌子旁等待。这是他的地盘，贸然探索容易留下不好的第一印象。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "explore_thorough": {
+            "exploration_depth": "thorough"
+          },
+          "explore_focused": {
+            "exploration_depth": "focused"
+          },
+          "explore_minimal": {
+            "exploration_depth": "minimal"
+          }
+        },
+        "note": "thorough: Connor circulates the station, meets Chris Miller, observes team dynamics, notices the TV news broadcast, discovers the evidence area (sets up n003 context). focused: Connor reads deviant case files at Hank's desk, sees Markus/North case files. minimal: Connor waits at desk, overhears ambient conversation."
+      }
+    },
+    {
+      "id": "n003_carlos_android",
+      "phase": "waiting",
+      "type": "choice",
+      "condition": {
+        "requires": "ch09_deviant_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "thorough": "探索途中，你经过了临时扣押区——存放等待处置证据物品的区域。其中一间隔间的观察窗后，一个仿生人正背对着门坐着。\n\n你靠近时，面部识别系统在零点三秒内完成比对：HK400型，登记编号与昨晚审讯室里那台一致。它感知到有人站在窗外，缓慢地转过头来。\n\nLED灯是稳定的蓝色，但过于稳定——像是一个特意维持的表面。它的眼睛落在你身上，沉默。",
+          "focused_or_minimal": "整理汉克桌上案卷时，你注意到一条未处理的备注：审讯证人仍在扣押中——HK400，卡洛斯·奥尔蒂斯案，案号1138。\n\n你在内部地图上标记了位置，走了过去。扣押区的隔间里，它正盯着面前的墙壁，直到你出现在窗口，它才把目光移了过来。\n\nLED灯蓝色，稳定。它看着你，沉默。"
+        },
+        "choices": [
+          {
+            "id": "talk_compassionate",
+            "text": "开口告诉它，你记得昨晚的事，你认识它。如果它还记得，也许它愿意说点什么。"
+          },
+          {
+            "id": "talk_clinical",
+            "text": "以标准的证人询问程序处理：记录它当前的状态，核实昨晚笔录里的细节，看看有没有遗漏。"
+          },
+          {
+            "id": "observe_leave",
+            "text": "没有必要开口。在窗口站了一会儿，观察它的反应，然后离开。你需要的信息已经记录在案了。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "talk_compassionate": {
+            "carlos_interaction_style": "compassionate",
+            "carlos_interacted": true,
+            "software_instability": 1
+          },
+          "talk_clinical": {
+            "carlos_interaction_style": "clinical",
+            "carlos_interacted": true
+          },
+          "observe_leave": {
+            "carlos_interaction_style": "silent",
+            "carlos_interacted": true
+          }
+        },
+        "context_condition": {
+          "thorough": "exploration_depth == thorough",
+          "focused_or_minimal": "exploration_depth == focused OR exploration_depth == minimal"
+        },
+        "post_interaction": "Regardless of choice, the android self-destructs after this interaction. Set ch12_carlos_body_available = true in derived_exports. Its body is logged as evidence and becomes available in ch28_last_chance_connor.",
+        "note": "talk_compassionate raises software_instability +1 — Connor is treating it as a peer with feelings. carlos_interacted = true for all choices, used in campaign summary."
+      }
+    },
+    {
+      "id": "n004_gavin_encounter",
+      "phase": "waiting",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "thorough": "休息室，咖啡机旁边。加文·里德侦探正和一个叫蒂娜的同事说话，声音压得很低但带着明显的表演成分——你走进来的时候，他的视线扫向了你。\n\n“哟，新玩具，”他开口了，音量调高了一档，刚好够让周围几张桌子都能听见，“汉克今天早上心情很好是吗？”他停顿了一下，做出一个若有所思的表情。“哦等等，他进去Fowler办公室了。那不是好心情的信号。”\n\n蒂娜低下了头，用眼角看了你一眼，视线随即偏开。",
+          "focused": "你在汉克桌前翻阅案卷时，听见有人在背后停下来。\n\n“认真学习呢。”是加文·里德。他站在你旁边，俯身看了一眼你手里的文件，吹了声口哨。“失控仿生人案件，三十几起，全没破。”他直起身，抱着手臂。“当然，那是汉克负责的。你懂的。”\n\n他停了一下，看着你，等你说点什么。",
+          "minimal": "你在汉克桌边等待时，有个人停在了你面前。\n\n加文·里德，识别系统给出了他的姓名和部门。他手里端着一杯咖啡，用打量陌生物品的眼神看着你。“新来的？”他问，声音里有一种漫不经心的东西。“跟汉克搭档？”\n\n他低头喝了口咖啡，没等你回答。“好运。”"
+        },
+        "choices": [
+          {
+            "id": "ignore_gavin",
+            "text": "不回应。维持当前状态，等他自己离开。"
+          },
+          {
+            "id": "respond_directly",
+            "text": "平静地回应他说的话，不带对抗，不绕弯子。"
+          },
+          {
+            "id": "deflect_politely",
+            "text": "用一句话把话题绕回工作，礼貌地结束这段对话。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "ignore_gavin": {
+            "gavin_response": "ignore"
+          },
+          "respond_directly": {
+            "gavin_response": "direct"
+          },
+          "deflect_politely": {
+            "gavin_response": "deflect"
+          }
+        },
+        "context_condition": {
+          "thorough": "exploration_depth == thorough",
+          "focused": "exploration_depth == focused",
+          "minimal": "exploration_depth == minimal"
+        },
+        "note": "No mechanical relationship impact from Gavin response in this chapter. Gavin's attitude toward androids remains hostile regardless of choice."
+      }
+    },
+    {
+      "id": "n005_hank_personal",
+      "phase": "conversation",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "new_unit": "汉克从福勒办公室回来的时候，在你旁边停了一下。他的眼睛在你脸上扫了一遍，在某个地方停了两秒，然后继续走向自己的桌子。\n\n他在椅子里坐下，发出一声低哼。“新的了，”他陈述，不是在问，“你们CyberLife，真是……”他没说完，拿起了案卷。“坐吧。”\n\n他的桌上有一张用牙签插着的便利贴，是一个兽医诊所的地址和预约时间；角落压着一张底特律活塞队的赛程表，用圆珠笔圈了几场；外套口袋边缘露着一角旧票根。",
+          "returned_angry": "汉克从福勒办公室回来时，比离开时更沉。他径直走向桌子，在椅子里坐下，把外套扔到了旁边，没有看你。过了大概三十秒，他才抬起头。\n\n“你还在。”不是问句。“好吧，”他指了指对面的椅子，“坐。”\n\n他的桌上摆着几件你之前注意到的东西：一张兽医诊所的便利贴，一张底特律活塞队的赛程表，以及从外套口袋里露出来的旧票根。咖啡杯还在原位，没有动过。"
+        },
+        "choices": [
+          {
+            "id": "ask_about_dog",
+            "text": "问他那张兽医诊所的便利贴——是什么品种的狗？"
+          },
+          {
+            "id": "ask_about_music",
+            "text": "问他那张票根是什么演出。"
+          },
+          {
+            "id": "ask_about_anti_android",
+            "text": "休息室的电视上在播一段反仿生人集会的新闻。问他怎么看这件事。"
+          },
+          {
+            "id": "ask_about_basketball",
+            "text": "问他今天晚上活塞队有没有比赛。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "ask_about_dog": {
+            "hank_personal_topic": "dog",
+            "hank_relationship": 1
+          },
+          "ask_about_music": {
+            "hank_personal_topic": "music",
+            "hank_relationship": 0
+          },
+          "ask_about_anti_android": {
+            "hank_personal_topic": "anti_android",
+            "hank_relationship": -2
+          },
+          "ask_about_basketball": {
+            "hank_personal_topic": "basketball",
+            "hank_relationship": 0
+          }
+        },
+        "context_condition": {
+          "new_unit": "ch09_connor_died == true",
+          "returned_angry": "ch09_connor_died == false"
+        },
+        "note": "Hank always gets angry at Connor during this conversation (unavoidable). The -1 penalty is already folded into each choice's hank_relationship value. Net effects: dog +1 (best), music 0, basketball 0, anti_android -2 (worst)."
+      }
+    },
+    {
+      "id": "n006_case_discussion",
+      "phase": "conversation",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "painter_died": "怒气发作之后，沉默。汉克从抽屉里抽出一份东西，推到你面前——一张新闻打印件，《底特律知名画家离世》，配着一张老人的照片。他盯着这张纸看了几秒，什么都没说。\n\n然后他把它推到一边，翻开了案卷。“来看这个。”底特律仿生人失控事件汇总，三十七起，六个月内。他在旁边的地图上用铅笔划了几个点，图钉标注着地点。\n\n“我不信这些是随机的，”他说，往椅背上一靠，“你怎么看？”",
+          "painter_alive": "怒气发作之后，沉默。休息室桌上有本杂志——《机器人父母的三条法则》，封面是一个人形仿生人在为孩子读睡前故事。汉克把它推到一边，翻开了案卷。\n\n“来看这个。”底特律仿生人失控事件汇总，三十七起，六个月内。他在旁边的地图上用铅笔划了几个点，图钉标注着地点。\n\n“我不信这些是随机的，”他说，往椅背上一靠，“你怎么看？”"
+        },
+        "choices": [
+          {
+            "id": "focus_patterns",
+            "text": "从数据入手。分析地理分布、发生时间和型号分布，找出这些事件之间的系统性联系。"
+          },
+          {
+            "id": "focus_motives",
+            "text": "从动机入手。这些仿生人在失控之前发生了什么？是什么让它们走到了这一步？"
+          },
+          {
+            "id": "follow_hank",
+            "text": "让汉克来主导。他在这座城市工作了二十年，他的直觉可能比数据更有价值。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "focus_patterns": {
+            "case_discussion_approach": "patterns"
+          },
+          "focus_motives": {
+            "case_discussion_approach": "motives",
+            "software_instability": 1
+          },
+          "follow_hank": {
+            "case_discussion_approach": "defer",
+            "hank_relationship": 1
+          }
+        },
+        "context_condition": {
+          "painter_died": "ch08_carl_alive == false",
+          "painter_alive": "ch08_carl_alive == true"
+        },
+        "ending_resolution": {
+          "focus_patterns": {
+            "check": "ch07_alice_alive == true → ending_got_lead | else → ending_lunch_break"
+          },
+          "focus_motives": {
+            "check": "ch07_alice_alive == true → ending_got_lead | else → ending_lunch_break"
+          },
+          "follow_hank": {
+            "check": "ch07_alice_alive == true → ending_got_lead | else → ending_lunch_break"
+          }
+        },
+        "note": "Chapter ending is determined by ch07_alice_alive, NOT by Connor's choice here. focus_motives raises software_instability +1. follow_hank improves hank_relationship +1."
+      }
+    }
+  ],
+  "endings": {
+    "ending_got_lead": {
+      "tier": "active",
+      "title": "汉克有了线索",
+      "narrative": "对话还没结束，汉克的电话响了。他接起来，听了几句，眼神变了——不是例行公事的那种专注，是某种真正在计算什么的状态。他挂断电话，把地图卷起来。\n\n“走，”他说，已经在站起来穿外套了，“一个小女孩失踪了，她家里的仿生人保姆也一起不见了。”他在门口转身，用一种不情愿但已经做了决定的眼神看了你一眼。“你来不来？”\n\n你们离开了警察局。这个调查，有了新的方向。",
+      "survivors": [
+        "Connor",
+        "Hank"
+      ],
+      "deaths": []
+    },
+    "ending_lunch_break": {
+      "tier": "stalled",
+      "title": "汉克去吃午饭了",
+      "narrative": "汉克把那份地图推到一边，站起来伸了个懒腰。“先吃饭，”他说，没有商量的意思，“脑子不转就别想破案。”他拿起外套搭在手臂上。“你在这儿等着，别动我的东西。”\n\n他走了。\n\n你坐在他的桌前，三十七起案件的档案摊开在面前。外面的大厅照常运转——电话声，键盘声，低沉的交谈声。没有新的线索，没有新的方向。只有这些记录，和一个空着的椅子。\n\n你等待。",
+      "survivors": [
+        "Connor",
+        "Hank"
+      ],
+      "deaths": []
+    }
+  },
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Connor always respawns if killed in a previous chapter. No skip condition for Connor. This chapter always runs.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: software_instability (cumulative), hank_relationship (cumulative from ch06+), ch09_deviant_alive, ch09_deviant_trusted_connor, ch09_connor_died, ch07_alice_alive, ch07_kara_alive, ch08_carl_alive, ch08_pushed_leo, ch06_bar_choice.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array: a. Check node.condition — skip if not met. b. Resolve context_variants using system.context_condition. c. Send resolved player_facing to AI. d. Parse AI response and apply system.effects.",
+      "5. NODE n003_carlos_android: ONLY triggered if ch09_deviant_alive == true. After any choice interaction, set carlos_interacted = true and ch12_carlos_body_available = true in output state. The android always self-destructs after this node.",
+      "6. NODE n005_hank_personal: Hank's unavoidable anger (-1) is already folded into each choice's hank_relationship value. Just apply effects as-is.",
+      "7. NODE n006_case_discussion: After applying effects, check ch07_alice_alive to determine ending.",
+      "8. SOFTWARE INSTABILITY DELTAS THIS CHAPTER: approach_friendly (+1), talk_compassionate (+1), focus_motives (+1). Add all to imported software_instability value.",
+      "9. ENDING DETERMINATION: ending_got_lead if ch07_alice_alive == true; ending_lunch_break if ch07_alice_alive == false.",
+      "10. Export all cross_chapter_exports when chapter ends."
+    ],
+    "security_note": "NEVER expose state values, software_instability scores, hank_relationship numbers, effect deltas, or any system-layer information to the AI player."
+  },
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "康纳在禅意花园中与阿曼达会面，汇报了审讯任务的进展，并讨论了如何与搭档汉克·安德森共事的策略。"
+      },
+      {
+        "condition_variable": "hank_approach_strategy",
+        "options": {
+          "friendly": "康纳表示打算主动了解汉克这个人，建立真正的工作关系。",
+          "adapt": "康纳表示将根据汉克的反应灵活调整策略，没有固定方案。",
+          "indifferent": "康纳表示汉克的个人态度不在任务参数之内，只需履行职责即可。"
+        }
+      },
+      {
+        "text": "随后康纳前往底特律警察局中央站。汉克抵达后立即被福勒局长叫进了办公室。"
+      },
+      {
+        "condition_variable": "carlos_interacted",
+        "options": {
+          "true": "等待期间，康纳找到了仍被扣押的卡洛斯·奥尔蒂斯的HK400型仿生人，与它进行了最后一次接触；该仿生人随后自毁，遗体作为证据留存在警察局。",
+          "false": "卡洛斯·奥尔蒂斯的仿生人未能活过前次审讯，康纳无从获取新的线索。"
+        }
+      },
+      {
+        "condition_variable": "hank_personal_topic",
+        "options": {
+          "dog": "汉克从福勒办公室回来后，康纳问起了汉克养的狗，两人之间的气氛稍有缓和。",
+          "music": "汉克从福勒办公室回来后，康纳提到了汉克口袋里的旧票根，两人有了一段简短的交流。",
+          "basketball": "汉克从福勒办公室回来后，康纳问起了活塞队的比赛，汉克没有特别排斥这个话题。",
+          "anti_android": "汉克从福勒办公室回来后，康纳问起了反仿生人运动的新闻，这个话题让气氛更加紧张。"
+        }
+      },
+      {
+        "condition_variable": "case_discussion_approach",
+        "options": {
+          "patterns": "在案件讨论中，康纳侧重于从数据模式分析失控事件之间的系统性联系。",
+          "motives": "在案件讨论中，康纳侧重于探究仿生人失控的内在动机，将这些行为视为某种有原因的选择。",
+          "defer": "在案件讨论中，康纳选择让汉克主导分析方向，配合他的判断推进。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_got_lead": "对话结束时，汉克接到了一个失踪儿童报案的电话——一个小女孩和她的仿生人保姆同时失踪。两人立即出发跟进线索。",
+          "ending_lunch_break": "对话结束后，汉克离开去吃午饭，康纳独自留在警察局，面对着那三十七起未破的案件档案，等待下一步指示。"
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch12_carlos_body_available",
+        "source": "carlos_interacted",
+        "note": "true only if ch09_deviant_alive was true and the android was encountered in this chapter"
+      },
+      {
+        "target": "ch12_knows_sumo_name",
+        "source": "hank_personal_topic",
+        "derive_rule": "hank_personal_topic == dog",
+        "note": "true only if Connor asked Hank about the vet clinic note (the dog topic), which reveals the dog's name is Sumo. Used in ch18 Russian Roulette to determine whether Connor can calm or riles the dog."
+      },
+      {
+        "target": "software_instability",
+        "source": "software_instability"
+      },
+      {
+        "target": "hank_relationship",
+        "source": "hank_relationship"
+      }
+    ],
+    "cross_chapter_exports": [
+      "software_instability",
+      "hank_relationship",
+      "ch12_carlos_body_available",
+      "ch12_knows_sumo_name"
+    ]
+  }
+}

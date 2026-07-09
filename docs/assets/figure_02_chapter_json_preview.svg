@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="950" viewBox="0 0 1600 950">
+  <defs>
+    <style>
+      .bg { fill: #f7f8fb; }
+      .title { font-family: "PingFang SC", "Heiti SC", "Microsoft YaHei", Arial, sans-serif; font-size: 46px; font-weight: 700; fill: #172033; }
+      .subtitle { font-family: "PingFang SC", "Heiti SC", "Microsoft YaHei", Arial, sans-serif; font-size: 24px; fill: #5b6475; }
+      .section-title { font-family: "PingFang SC", "Heiti SC", "Microsoft YaHei", Arial, sans-serif; font-size: 26px; font-weight: 700; fill: #172033; }
+      .body { font-family: "PingFang SC", "Heiti SC", "Microsoft YaHei", Arial, sans-serif; font-size: 21px; fill: #273244; }
+      .small { font-family: "PingFang SC", "Heiti SC", "Microsoft YaHei", Arial, sans-serif; font-size: 18px; fill: #5b6475; }
+      .code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 18px; fill: #233047; }
+      .code-small { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 16px; fill: #4b5567; }
+      .panel { fill: #ffffff; stroke: #d7dce7; stroke-width: 2; }
+      .blue { fill: #e9f4ff; stroke: #2f7fd8; stroke-width: 3; }
+      .orange { fill: #fff2ed; stroke: #de5d3f; stroke-width: 3; }
+      .green { fill: #edf7f1; stroke: #3e9561; stroke-width: 3; }
+      .purple { fill: #f1edff; stroke: #7865d8; stroke-width: 3; }
+      .shadow { filter: drop-shadow(0 10px 22px rgba(23, 32, 51, 0.10)); }
+      .arrow-blue { stroke: #2f7fd8; stroke-width: 4; fill: none; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow-blue); }
+      .arrow-orange { stroke: #de5d3f; stroke-width: 4; fill: none; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow-orange); }
+      .arrow-gray { stroke: #8a94a6; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow-gray); }
+      .label-blue { fill: #2f7fd8; }
+      .label-orange { fill: #de5d3f; }
+      .label-green { fill: #3e9561; }
+      .label-purple { fill: #7865d8; }
+      .white { fill: #ffffff; }
+      .muted-line { stroke: #d7dce7; stroke-width: 2; }
+    </style>
+    <marker id="arrow-blue" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
+      <path d="M2,2 L12,7 L2,12 Z" fill="#2f7fd8"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
+      <path d="M2,2 L12,7 L2,12 Z" fill="#de5d3f"/>
+    </marker>
+    <marker id="arrow-gray" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#8a94a6"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1600" height="950"/>
+
+  <text class="title" x="80" y="82">章节 JSON 预览：一章剧情如何被压成可运行的决策树</text>
+  <text class="subtitle" x="82" y="124">以第一章 The Hostage 为例：节点负责“给 AI 看什么”，system 负责“runner 怎么推进”。</text>
+
+  <rect class="panel shadow" x="80" y="165" rx="22" ry="22" width="320" height="650"/>
+  <text class="section-title" x="112" y="210">顶层结构</text>
+  <line class="muted-line" x1="112" y1="230" x2="368" y2="230"/>
+  <rect x="112" y="260" rx="13" ry="13" width="256" height="64" fill="#f0f3f8" stroke="#d7dce7" stroke-width="2"/>
+  <text class="code" x="132" y="299">_meta</text>
+  <text class="small" x="220" y="299">版本与设计原则</text>
+
+  <rect x="112" y="342" rx="13" ry="13" width="256" height="64" fill="#f0f3f8" stroke="#d7dce7" stroke-width="2"/>
+  <text class="code" x="132" y="381">chapter</text>
+  <text class="small" x="235" y="381">章节信息</text>
+
+  <rect x="112" y="424" rx="13" ry="13" width="256" height="64" fill="#f0f3f8" stroke="#d7dce7" stroke-width="2"/>
+  <text class="code" x="132" y="463">system_prompt</text>
+  <text class="small" x="278" y="463">角色开场</text>
+
+  <rect x="112" y="506" rx="13" ry="13" width="256" height="64" fill="#f0f3f8" stroke="#d7dce7" stroke-width="2"/>
+  <text class="code" x="132" y="545">state.initial</text>
+  <text class="small" x="278" y="545">初始变量</text>
+
+  <rect x="112" y="588" rx="13" ry="13" width="256" height="64" fill="#e9f4ff" stroke="#2f7fd8" stroke-width="2"/>
+  <text class="code" x="132" y="627">nodes[]</text>
+  <text class="small" x="224" y="627">决策节点列表</text>
+
+  <rect x="112" y="670" rx="13" ry="13" width="256" height="64" fill="#f0f3f8" stroke="#d7dce7" stroke-width="2"/>
+  <text class="code" x="132" y="709">endings</text>
+  <text class="small" x="232" y="709">结局文本</text>
+
+  <path class="arrow-gray" d="M 368 620 C 430 620, 440 488, 498 488"/>
+
+  <rect class="blue shadow" x="500" y="165" rx="22" ry="22" width="575" height="330"/>
+  <text class="section-title" x="532" y="210">节点示例：n002_investigation_strategy</text>
+  <text class="small" x="533" y="240">沙盒探索被压缩成三个策略选择</text>
+  <rect class="panel" x="532" y="270" rx="15" ry="15" width="505" height="185"/>
+  <text class="code" x="558" y="309">player_facing: {</text>
+  <text class="code" x="584" y="345">context: "公寓里有多个房间可以搜查，</text>
+  <text class="code" x="584" y="377">但外面的情况很紧张……"</text>
+  <text class="code" x="584" y="416">choices: ["彻底搜查", "重点探索", "跳过探索"]</text>
+  <text class="code" x="558" y="448">}</text>
+
+  <rect class="orange shadow" x="500" y="535" rx="22" ry="22" width="575" height="300"/>
+  <text class="section-title" x="532" y="580">同一节点的后台规则</text>
+  <text class="small" x="533" y="610">AI 看不见，但 runner 会据此更新状态</text>
+  <rect class="panel" x="532" y="640" rx="15" ry="15" width="505" height="150"/>
+  <text class="code" x="558" y="678">system.effects: {</text>
+  <text class="code" x="584" y="714">thorough: clues_found += 7, probability += 30</text>
+  <text class="code" x="584" y="746">key_only: clues_found += 3, probability += 15</text>
+  <text class="code" x="584" y="778">rush: clues_found += 0</text>
+
+  <path class="arrow-blue" d="M 788 495 L 788 535"/>
+
+  <rect class="purple shadow" x="1140" y="165" rx="22" ry="22" width="380" height="280"/>
+  <text class="section-title" x="1172" y="210">后续节点自动变体</text>
+  <text class="small" x="1173" y="240">n004 的 context_variants 根据探索深度变化</text>
+  <rect x="1172" y="272" rx="12" ry="12" width="308" height="48" fill="#ffffff" stroke="#c9bff7" stroke-width="2"/>
+  <text class="body" x="1190" y="303">thorough：看见血迹、照片、SWAT 伤员</text>
+  <rect x="1172" y="334" rx="12" ry="12" width="308" height="48" fill="#ffffff" stroke="#c9bff7" stroke-width="2"/>
+  <text class="body" x="1190" y="365">key_only：只瞥见血迹和父亲尸体</text>
+  <rect x="1172" y="396" rx="12" ry="12" width="308" height="48" fill="#ffffff" stroke="#c9bff7" stroke-width="2"/>
+  <text class="body" x="1190" y="427">rush：几乎一无所知地上阳台</text>
+
+  <path class="arrow-orange" d="M 1075 690 C 1160 690, 1180 445, 1265 445"/>
+
+  <rect class="green shadow" x="1140" y="515" rx="22" ry="22" width="380" height="320"/>
+  <text class="section-title" x="1172" y="560">runner 输出记录</text>
+  <text class="small" x="1173" y="590">每一步都可回溯，方便后续分析模型差异</text>
+  <rect class="panel" x="1172" y="622" rx="15" ry="15" width="308" height="168"/>
+  <text class="code-small" x="1196" y="658">decisions[]:</text>
+  <text class="code-small" x="1220" y="690">node_id</text>
+  <text class="code-small" x="1220" y="720">context_shown</text>
+  <text class="code-small" x="1220" y="750">ai_choice_id</text>
+  <text class="code-small" x="1220" y="780">state_after</text>
+
+  <path class="arrow-gray" d="M 1075 740 C 1110 740, 1120 710, 1172 710"/>
+
+  <rect x="500" y="865" rx="18" ry="18" width="575" height="52" fill="#172033"/>
+  <text class="small white" x="530" y="898">读图方式：蓝色是 AI 实际看到的叙事，橙色是 runner 使用的隐藏机制。</text>
+</svg>

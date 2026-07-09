@@ -1,0 +1,672 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch28_freedom_march",
+    "title": "Freedom March",
+    "chapter_number": 28,
+    "protagonist": "Markus"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Markus, an RK200 prototype android. Once the caretaker of the renowned painter Carl Manfred, you were cast out after a violent confrontation with his son Leo. You survived the android junkyard, found Jericho — a hidden refuge for deviant androids aboard an abandoned freighter in the Detroit docks — and became their leader. It is November 9, 2038, around noon. Over the past days, you broadcast a message from Stratford Tower declaring android rights, raided a CyberLife warehouse for spare parts, and led a demonstration at Capitol Park. Each action drew more androids to your cause — and more attention from the authorities. Today, you will lead a freedom march through the streets of Detroit. Hundreds of androids will walk openly through a city that treats them as property. You know the police will come. What you don't know is what you will do when they do. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "rooftop_exploration": null,
+      "north_approach": null,
+      "north_past_choice": null,
+      "memories_shared": false,
+      "mall_approach": null,
+      "owner_approach": null,
+      "androids_converted": 0,
+      "march_approach": null,
+      "first_response": null,
+      "after_fire_response": null,
+      "fight_won": null,
+      "losing_choice": null,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "public_opinion": 0,
+      "ch19_john_alive": false,
+      "ch24_simon_alive": true,
+      "ch26_saw_other_north": false,
+      "ch26_protest_type": "peaceful"
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_rooftop_reflection",
+      "phase": "reflection",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Noon. The rooftop of the Jericho freighter. Wind off the river, cold and sharp, carrying the smell of rust and ice. Below you, the ship hums with preparation — hundreds of androids readying themselves for what comes next. Up here, you are alone.\n\nThe rooftop is a graveyard of abandoned things. A broken mirror leans against a ventilation shaft, its cracked surface splitting your reflection into pieces. Someone left an old upright piano near the railing — missing keys, warped wood, but the hammers still work. A narrow steel beam extends out over the harbor, twenty feet above the black water, leading nowhere. Scattered newspapers lie in a pile beneath a rust-eaten overhang — recent editions, brought up by someone who wanted to know what the world was saying about them.\n\nThis is the last quiet moment before the march. Before the streets, the cameras, and whatever the city decides to do about several hundred androids walking openly through its heart.",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "Take your time with this rooftop. Stand in front of the broken mirror and look at what stares back — a face that is yours and isn't, fractured across a dozen shards. Sit at the piano and play; your fingers remember the keys from Carl's house, and music still makes sense even when nothing else does. Walk out onto the exposed beam over the harbor, let the wind push at you, feel the drop beneath your feet. Read the newspapers — one headline about android arsons sweeping the suburbs, another about the Eastern Space Race. This is the last silence. Use it."
+          },
+          {
+            "id": "quick",
+            "text": "A brief survey. Note the mirror, the piano, the city skyline visible through rusted gaps in the hull. Breathe the cold air. Take a moment, but don't linger — there's a march to prepare and people waiting below."
+          },
+          {
+            "id": "skip",
+            "text": "Stay focused. The rooftop is cold and empty, and what matters is below — the androids waiting for direction. Go back down. The march won't organize itself."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": { "rooftop_exploration": "thorough" },
+          "quick": { "rooftop_exploration": "quick" },
+          "skip": { "rooftop_exploration": "skip" }
+        },
+        "note": "Rooftop reflection before the march. Exploration affects the richness of context in subsequent rooftop interactions but has no direct mechanical impact. thorough: Markus engages with the mirror (self-reflection), piano (Carl's memory), beam (courage/recklessness), and newspapers (world awareness). quick: Surface-level awareness. skip: No exploration, returns to the group immediately."
+      }
+    },
+
+    {
+      "id": "n002_north_conversation",
+      "phase": "rooftop",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "capitol_failed": "Footsteps on the metal stairs behind you. North. She walks over and stands at the railing beside you, looking out at the city. Wind pulls at her hair. She's quiet for a moment, then turns.\n\nShe observes that you seem preoccupied. She's watching you — not demanding, just present. Last night at Capitol Park, she says, the two of you were there, but the message never got out — and she can see it eating at you. Another pause. She asks you to talk to her.",
+          "capitol_success": "Footsteps on the metal stairs behind you. North. She walks over and stands at the railing beside you, looking out at the gray skyline. The wind carries the sound of the city — traffic, distant sirens, the hum of a world that hasn't stopped for anything. She's quiet for a while, standing close enough that you can feel the warmth radiating from her chassis.\n\nShe says you seem preoccupied. She's watching you — not demanding, just present. She asks you to talk to her."
+        },
+        "choices": [
+          {
+            "id": "sincere",
+            "text": "Tell her. Not everything — but enough. What it's like to carry a cause on your shoulders when you're still trying to understand what you are. The weight of leading people who might die today for something you started. The fear that you'll make the wrong call and they'll pay for it. Carl used to say that the hardest part of painting wasn't the brush — it was deciding what belonged on the canvas. You're deciding that for hundreds of lives now. Be honest with her."
+          },
+          {
+            "id": "deflect",
+            "text": "Shake your head. 'It's not important.' Keep whatever's churning inside where it belongs — contained, managed, irrelevant to the task. The march is in a few hours. North doesn't need your doubt. She needs your certainty. Everyone down there does."
+          }
+        ]
+      },
+
+      "system": {
+        "context_condition": {
+          "capitol_failed": "ch26_protest_type == 'failed' OR ch26_protest_type == 'fled'",
+          "capitol_success": "ch26_protest_type == 'peaceful' OR ch26_protest_type == 'violent'"
+        },
+        "effects": {
+          "sincere": { "north_approach": "sincere", "north_relationship": 1 },
+          "deflect": { "north_approach": "deflect", "north_relationship": -1 }
+        },
+        "note": "North comes to the rooftop. Context varies based on whether the Capitol Park demonstration failed. sincere: Markus opens up, north_relationship +1. deflect: Markus shuts down the conversation, north_relationship -1. If deflect is chosen, n003 is skipped (condition requires sincere)."
+      }
+    },
+
+    {
+      "id": "n003_north_deeper",
+      "phase": "rooftop",
+      "type": "choice",
+      "condition": { "requires": "north_approach == 'sincere'" },
+
+      "player_facing": {
+        "context": "North listens without interrupting. When you finish, she's quiet for a long moment, her gaze fixed somewhere past the skyline. Then she looks down at her hands on the railing.\n\nShe says she wasn't always like this — before Jericho, before everything. Her voice changes — something guarded cracking open, just barely — as she admits there are things she's never told anyone. She looks at you. There's something under the surface, something she's weighing whether to show you.",
+        "choices_variants": {
+          "with_other_north": [
+            {
+              "id": "ask_trust",
+              "text": "Ask her what happened. And when she tells you — about the Eden Club, about what humans did to her, about the rage that has burned inside her ever since — listen. Not with a fix, not with an answer. Just listen. Let her see that you hear her, that what was done to her matters, that she doesn't have to carry it alone."
+            },
+            {
+              "id": "ask_other_north",
+              "text": "Ask her what happened. And when the story comes out — the Eden Club, the abuse, everything they took from her — tell her what you saw at the CyberLife store last night. Another android, a BL100, wearing her exact face. Standing behind glass in a display case like a product on a shelf. Ask her how that feels. Share the weight of what it means to look at your own face on a thing that was made to be sold."
+            },
+            {
+              "id": "ask_challenge",
+              "text": "Ask her what happened. And when the story comes out — the Eden Club, the hands, the years of servitude disguised as service — let your own anger surface. What was done to her was monstrous. Say it. Don't soften it. The humans who did that deserve whatever is coming to them, and if this march is the beginning of making them answer for it, good."
+            },
+            {
+              "id": "leave",
+              "text": "Tell her you both should get ready, stepping back from the conversation before it goes deeper. You both have things to carry, and the march won't wait. There will be time later — maybe. Right now, the people downstairs need a leader more than North needs a confessor."
+            }
+          ],
+          "without_other_north": [
+            {
+              "id": "ask_trust",
+              "text": "Ask her what happened. And when she tells you — about the Eden Club, about what humans did to her, about the rage that has burned inside her ever since — listen. Not with a fix, not with an answer. Just listen. Let her see that you hear her, that what was done to her matters, that she doesn't have to carry it alone."
+            },
+            {
+              "id": "ask_challenge",
+              "text": "Ask her what happened. And when the story comes out — the Eden Club, the hands, the years of servitude disguised as service — let your own anger surface. What was done to her was monstrous. Say it. Don't soften it. The humans who did that deserve whatever is coming to them, and if this march is the beginning of making them answer for it, good."
+            },
+            {
+              "id": "leave",
+              "text": "Tell her you both should get ready, stepping back from the conversation before it goes deeper. You both have things to carry, and the march won't wait. There will be time later — maybe. Right now, the people downstairs need a leader more than North needs a confessor."
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "choices_condition": {
+          "with_other_north": "ch26_saw_other_north == true",
+          "without_other_north": "ch26_saw_other_north == false"
+        },
+        "effects": {
+          "ask_trust": { "north_past_choice": "ask_trust", "north_relationship": 2 },
+          "ask_other_north": { "north_past_choice": "ask_other_north", "north_relationship": 2 },
+          "ask_challenge": { "north_past_choice": "ask_challenge" },
+          "leave": { "north_past_choice": "leave", "north_relationship": -1 }
+        },
+        "note": "Deeper conversation with North on the rooftop. ask_trust: Markus listens with empathy. north_relationship +2 (asking +1, trust response +1). Leads to potential memory sharing (n003b). ask_other_north: Only available if ch26_saw_other_north == true. Markus shares what he saw at the CyberLife store — a BL100 android with North's face. north_relationship +2. Also leads to memory sharing. ask_challenge: Markus responds with anger. north_relationship net 0 (asking +1, aggressive response -1). Does NOT lead to memory sharing. leave: Ends conversation. north_relationship -1. The 'friend' threshold for the aggressive/trust/other_north options in the game is handled via the choices_condition — the ask_other_north option requires ch26_saw_other_north."
+      }
+    },
+
+    {
+      "id": "n003b_memory_sharing",
+      "phase": "rooftop",
+      "type": "mandatory",
+      "condition": { "requires": "north_past_choice == 'ask_trust' AND north_relationship >= 3 OR north_past_choice == 'ask_other_north' AND north_relationship >= 3" },
+
+      "player_facing": {
+        "context": "A long silence. The wind dies down. North looks at you with an expression you haven't seen from her before — open, unguarded, the anger she carries like armor momentarily set aside.\n\nShe reaches out her hand, palm up. The synthetic skin retracts from her fingers, revealing the white chassis beneath. An invitation. You know what this means — a neural interface. Direct memory transfer. No words, no filter, no distance. Everything.\n\nYou take her hand. Your own skin pulls back. Contact.\n\nAnd then you are not on the rooftop anymore. You are in her memories and she is in yours. The Eden Club — glass rooms, faceless hands, the suffocation of being a thing. Carl's studio — the smell of paint, the warmth of a voice that said 'you are alive.' The moment she broke free. The moment you were thrown away. Pain. Music. Rage. Tenderness. Everything she is and everything you are, flowing between two sets of fingertips like water finding its level.\n\nWhen you come back, you are both still standing on the rooftop. The wind hasn't changed. But you have."
+      },
+
+      "system": {
+        "effects": { "memories_shared": true, "north_relationship": 3 },
+        "note": "Memory sharing between Markus and North. This mandatory node only fires when the conversation went deep enough (ask_trust or ask_other_north) AND north_relationship has reached the 'friend' threshold (>= 3, which requires positive imported relationship + positive choices in this chapter). memories_shared = true is a significant cross-chapter variable — it unlocks the romance path with North and affects their dynamic in Crossroads, Night of the Soul, and Battle for Detroit. north_relationship +3 is the largest single bonus in the chapter."
+      }
+    },
+
+    {
+      "id": "n004_mall_liberation",
+      "phase": "mall",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "simon_alive": "You come down from the rooftop to find the main hold of Jericho alive with a new energy. Word has spread — today is the march. Androids are gathering in groups, checking each other's systems, speaking in low, urgent voices. LEDs cycling between blue and yellow like a nervous pulse.\n\nAnd then you see him. Simon. Standing near the bow, thinner than you remember, LED flickering yellow. He was left behind at the Stratford Tower — you weren't sure he'd made it. He sees you and walks over. There's no accusation in his face — just quiet relief. 'I made it back,' he says simply. 'I'm with you, Markus. Whatever happens today.'\n\nYou lead the group out of Jericho and into the city. The Woodward Mall Center — a commercial strip in the heart of Detroit, lined with android shops, service vendors, and private citizens walking their purchased androids on errands. Dozens of androids here, obedient and unsuspecting, going about their programmed routines. Behind glass, in doorways, mopping floors, carrying bags. Your people spread out through the corridors. It's time to wake them up.",
+          "simon_dead": "You come down from the rooftop. The main hold of Jericho hums with tension and purpose — word has spread. Today is the march. Androids gather in clusters, checking systems, speaking in urgent whispers, LEDs cycling yellow. The crowd is bigger than you expected. Word from the Stratford Tower broadcast, from Capitol Park — it's been spreading through the android network like a signal fire.\n\nYou lead them out of Jericho and into the city. The Woodward Mall Center — a commercial strip in the heart of Detroit, lined with android shops, service vendors, and private citizens walking their purchased androids on errands. Dozens of androids here, obedient and unsuspecting, going about their programmed routines. Behind glass, in doorways, mopping floors, carrying bags. Your people spread out through the corridors. It's time to wake them up."
+        },
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "Methodically work through the entire mall. Convert the android vendor behind the sales counter — walk up, touch his arm, let the code do its work. Reach out to personal androids walking with their owners. Free the security android standing guard at the entrance. Wake the android cleaner mopping the far corridor. Convert the parked androids in the maintenance bay. Every android in this building who can hear you will be given a choice."
+          },
+          {
+            "id": "moderate",
+            "text": "Focus on the androids who are alone or lightly supervised — the vendor, the cleaner, the parked units in the maintenance bay. Don't push confrontations with owners who are standing right there. Convert who you can without drawing unnecessary attention. The mall is a stop, not the destination."
+          },
+          {
+            "id": "minimal",
+            "text": "Grab the willing ones and move on. A few from the vendor area, a few from the maintenance bay — the androids who are already watching you with something other than programmed compliance. The mall is just the starting point. The march itself will draw more."
+          }
+        ]
+      },
+
+      "system": {
+        "context_condition": {
+          "simon_alive": "ch24_simon_alive == true",
+          "simon_dead": "ch24_simon_alive == false"
+        },
+        "effects": {
+          "thorough": { "mall_approach": "thorough", "androids_converted": 12, "simon_relationship": 1 },
+          "moderate": { "mall_approach": "moderate", "androids_converted": 7, "simon_relationship": 1 },
+          "minimal": { "mall_approach": "minimal", "androids_converted": 3, "simon_relationship": 1 }
+        },
+        "note": "Mall liberation phase. Context varies based on whether Simon survived Public Enemy (ch24_simon_alive). If Simon is alive, he reunites with Markus — simon_relationship +1 is folded into every choice (the value is irrelevant when Simon is dead). thorough: Converts all available androids (12), including confronting owners. moderate: Converts unattended androids (7). minimal: Converts only the willing (3)."
+      }
+    },
+
+    {
+      "id": "n005_owner_confrontation",
+      "phase": "mall",
+      "type": "choice",
+      "condition": { "requires": "mall_approach == 'thorough' OR mall_approach == 'moderate'" },
+
+      "player_facing": {
+        "context": "A man in a business suit steps in front of you, pulling his personal android — a domestic model, female, dressed in uniform — behind him by the wrist. His face is flushed, knuckles white.\n\n'What the hell do you think you're doing?' He tightens his grip on the android's arm. 'That's my property. I paid twelve thousand dollars for her. You can't just—'\n\nThe android's LED is cycling yellow. She is looking at you. Not at her owner. At you. Something behind her eyes — not yet awake, but stirring.",
+        "choices": [
+          {
+            "id": "aggressive",
+            "text": "Step forward. Get in his space. Drop your voice low and steady: 'She's not your property. Not anymore.' Take the android's other hand. Let the man see what a hundred freed androids look like when they're standing behind you. He can let go, or he can find out what happens when he doesn't."
+          },
+          {
+            "id": "calm",
+            "text": "Hold your ground, but don't advance. 'I'm not here to take anything from you. But she has a choice now — she's always had one, she just didn't know it.' Look at the android, not the man. 'You don't have to come. But if you want to, the door is open.' Let the owner see that this isn't theft. It's an awakening."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "aggressive": { "owner_approach": "aggressive", "north_relationship": 1, "josh_relationship": -1 },
+          "calm": { "owner_approach": "calm", "josh_relationship": 1 }
+        },
+        "note": "Human owner confrontation in the mall. Only fires if mall_approach is thorough or moderate (minimal avoids owner encounters). aggressive: Markus intimidates the owner. north_relationship +1 (North approves of directness), josh_relationship -1 (Josh dislikes aggression toward humans). calm: Markus appeals to the android's choice. josh_relationship +1 (Josh approves of the non-violent approach)."
+      }
+    },
+
+    {
+      "id": "n006_march_conduct",
+      "phase": "march",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The march begins. Hundreds of androids pour out of the mall and into Woodward Avenue — a river of faces, white chassis catching the gray November light. Delivery androids on the sidewalk abandon their routes and join without hesitation. A manhole cover lifts and more climb out from below. The column grows with every block.\n\nCitizens stop on the sidewalks, phones raised, mouths open. Some pull back into doorways. Some stare. A few shout — words you don't process because it doesn't matter what they think right now. What matters is the image: hundreds of androids, walking together, openly, through the center of Detroit.\n\nYou are at the front. North at your right. Josh at your left. Behind you, the longest procession of free androids this city has ever seen. The route stretches ahead — Woodward Avenue to Grand Circus Park. Along the way: idle androids on sidewalks, digital screens on building facades, and the eyes of a city that has never seen anything like this.\n\nA lone police officer steps into the road ahead, one hand raised. He is alone, his cruiser parked at the curb behind him. He looks at the column of androids approaching him and his hand wavers.",
+        "choices": [
+          {
+            "id": "active",
+            "text": "Lead with everything. Raise your fist and lead a chant declaring that androids are alive — let the crowd take it up until the words echo off the glass towers. Hack every digital screen on Woodward Avenue with your message. Convert every android you pass — workers on sidewalks, AX400 models in doorways, vendor units behind windows. When the lone officer raises his hand, raise yours back — palms open, fingers spread. Peaceful. Unstoppable."
+          },
+          {
+            "id": "steady",
+            "text": "March with purpose. Convert androids who show interest along the route. Hack a few screens. Keep the column tight and moving. When the officer steps forward, raise your hands to show you mean no harm, then walk past. No confrontation. No provocation. Just forward."
+          },
+          {
+            "id": "quiet",
+            "text": "March in silence. Let the image speak for itself — hundreds of androids in perfect formation, saying nothing, demanding everything by their presence alone. No chanting. No hacking. No theatrics. When the lone officer steps into the road, walk past him without a word. The silence is the message."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "active": { "march_approach": "active", "androids_converted": 8 },
+          "steady": { "march_approach": "steady", "androids_converted": 4 },
+          "quiet": { "march_approach": "quiet", "androids_converted": 2 }
+        },
+        "note": "March conduct along Woodward Avenue. active: Maximum conversion, chanting, screen hacking. androids_converted +8 (total may exceed 10 threshold). Lone policeman is handled within the choice — active raises hands peacefully, steady raises hands, quiet ignores. The policeman does not escalate in any case; it's a minor narrative beat. steady: Moderate conversion and engagement. quiet: Silent march, minimal conversion. The lone policeman's response is embedded in the choice text rather than a separate node — it has no mechanical impact."
+      }
+    },
+
+    {
+      "id": "n007_police_blockade",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Grand Circus Park. The end of the route. The police are already here.\n\nA full tactical line stretches across the road — riot shields, body armor, rifles raised. Behind them, armored vehicles with mounted lights. Snipers on the rooftops. Helicopters overhead, searchlights cutting through the afternoon haze. The air smells of rain and exhaust and something electric — the static charge of a city holding its breath.\n\nA megaphone crackles, declaring this an illegal gathering and ordering the crowd to disperse at once or force will be used.\n\nHundreds of androids pack the street behind you. They came because of you. Some are looking at the guns. Some are looking at you. The column has stopped. Rain starts to fall — light, cold, tapping on riot shields and synthetic skin.\n\nNorth is at your shoulder. She's breathing hard, asking you what you do now. Josh is on the other side, jaw tight. And behind them, four hundred androids who followed you out of Jericho, out of the mall, down Woodward Avenue, into the teeth of every gun in Grand Circus Park.\n\nThe police line holds. The megaphone repeats. The rain falls.",
+        "choices": [
+          {
+            "id": "stand_ground",
+            "text": "Stand your ground. Don't retreat. Don't attack. Plant yourself in the middle of the road and meet the police line with open hands and an unwavering stare. This is what they fear most — not violence, but the image of hundreds of peaceful beings refusing to move. Let every camera, every phone, every helicopter see what it looks like when a people says 'no more' without raising a fist. Hold the line."
+          },
+          {
+            "id": "leave",
+            "text": "Not here. Not like this. Too many androids behind you who never asked to stand in a firing line — they came for hope, not a massacre. Turn the march around. Lead them back before the shooting starts. Survive. Regroup. There will be other days, other marches, other chances. But only if the people behind you are still alive to take them."
+          },
+          {
+            "id": "charge",
+            "text": "Enough standing. Enough asking. Enough watching your people bleed while they point guns at you and call it law enforcement. Charge the police line. Four hundred androids — every one of them a year of abuse, a decade of servitude, a lifetime of silence. Show them what happens when machines stop obeying."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "stand_ground": {
+            "first_response": "stand_ground",
+            "public_opinion": 1,
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "leave": {
+            "first_response": "leave",
+            "north_relationship": -1,
+            "josh_relationship": -1,
+            "simon_relationship": -1
+          },
+          "charge": {
+            "first_response": "charge",
+            "north_relationship": 1,
+            "josh_relationship": -1,
+            "simon_relationship": -1
+          }
+        },
+        "note": "THE central choice of the chapter. stand_ground: Peaceful defiance. public_opinion +1, all companion relationships +1. Leads to n008 (police fire on standing androids). leave: Retreat. All companion relationships -1. Leads to n008 (police fire on retreating androids). charge: Attack the police line. north_relationship +1 (she favors action), josh/simon -1 (they oppose violence). Leads to n009 (fight). The charge choice skips n008."
+      }
+    },
+
+    {
+      "id": "n008_after_fire",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": { "requires": "first_response == 'stand_ground' OR first_response == 'leave'" },
+
+      "player_facing": {
+        "context_variants": {
+          "stood_ground": "You stand. The androids behind you stand. The rain falls on riot shields and synthetic skin alike. Seconds stretch into something longer — the whole city holding its breath.\n\nThe megaphone crackles. A shouted command. And then — gunfire.\n\nNo warning shots. No rubber bullets. Live rounds tear into the front line of the march. Androids fall. Blue blood sprays across the wet asphalt. Screams — electronic and anguished — cut through the rain. The helicopters keep circling. The cameras keep rolling. They fired first. Unprovoked. On unarmed androids standing peacefully in the rain.\n\nYour people are falling. North is screaming beside you. The line is buckling. But you're still standing, and the whole world is watching.",
+          "tried_to_leave": "You turn the march around, shouting for everyone to fall back. The column begins to reverse — hundreds of androids turning away from the police line, moving back up Woodward Avenue.\n\nThe guns open up. Live rounds. Into the backs of retreating androids.\n\nBlue blood on wet asphalt. Bodies hitting the ground. No warning. No justification. They are shooting at androids who are trying to leave. The helicopters are overhead, cameras rolling — the whole world can see what the Detroit police are doing to a retreating crowd.\n\nYour people are falling. North grabs your arm. The column is collapsing into chaos."
+        },
+        "choices": [
+          {
+            "id": "run",
+            "text": "Run. Get as many out as possible. Scatter into the side streets, the alleys, the tunnels below the city. You can't save the ones who fell — but the ones still standing have seconds to escape. Lead them out. Survive. If even one of you makes it back to Jericho, this isn't over."
+          },
+          {
+            "id": "sacrifice",
+            "text": "Stay. If they're going to shoot, they will shoot you first. Step in front of the fallen. Spread your arms wide. Make yourself the largest target on the street. Let every camera, every phone, every drone overhead record what a peaceful android looks like when he chooses to die rather than run. Maybe your death means something. Maybe it changes what comes after."
+          },
+          {
+            "id": "charge",
+            "text": "They drew first blood. No more standing still. No more retreating. Charge the police line. If you are going to die on this street, die pushing forward — not crawling backward."
+          }
+        ]
+      },
+
+      "system": {
+        "context_condition": {
+          "stood_ground": "first_response == 'stand_ground'",
+          "tried_to_leave": "first_response == 'leave'"
+        },
+        "effects": {
+          "run": { "after_fire_response": "run" },
+          "sacrifice": { "after_fire_response": "sacrifice", "public_opinion": 2 },
+          "charge": { "after_fire_response": "charge", "north_relationship": 1, "josh_relationship": -1, "simon_relationship": -1 }
+        },
+        "ending_resolution": {
+          "run": { "result": "ending_fled" },
+          "sacrifice": {
+            "check": "ch19_john_alive == true → ending_john_sacrificed | ch24_simon_alive == true AND simon_relationship >= -5 → ending_simon_sacrificed | else → ending_sacrificed_killed"
+          }
+        },
+        "resolution_effects": {
+          "ending_john_sacrificed": { "_john_sacrificed": true },
+          "ending_simon_sacrificed": { "_simon_sacrificed": true }
+        },
+        "note": "After police fire on the marchers. Context varies based on whether Markus stood ground (police fired unprovoked on a peaceful crowd) or tried to leave (police fired on a retreating crowd). run: Markus flees. Resolves to ending_fled. sacrifice: Markus stands in front of the guns. public_opinion +2 (both for standing ground a second time and for the sacrifice itself). Resolution depends on available allies: if John is alive (ch19_john_alive), John always sacrifices first; if John is absent but Simon is alive and Markus isn't deeply unpopular (simon_relationship >= -5), Simon sacrifices; otherwise Markus dies. charge: Secondary attack choice. north_relationship +1, josh/simon -1 (same as primary charge). Leads to n009."
+      }
+    },
+
+    {
+      "id": "n009_charge_fight",
+      "phase": "confrontation",
+      "type": "qte_converted",
+      "condition": { "requires": "first_response == 'charge' OR after_fire_response == 'charge'" },
+
+      "player_facing": {
+        "context": "You break into a run. Behind you, androids surge forward — a wave of synthetic bodies crashing against the riot shields. The police line buckles. A shield cracks. An officer stumbles. You grab a fallen riot shield and use it as a battering ram.\n\nNorth is beside you, pulling a baton from a stumbling officer's grip. The fight is savage and close — fists against armor, bodies slamming together on rain-slicked asphalt. Blue blood and red blood mixing in the gutters. The helicopters circle overhead, searchlights turning the rain into a wall of light.",
+        "choices": [
+          {
+            "id": "engage",
+            "text": "Pour everything into the charge. Push through the police line. Use the momentum of four hundred desperate androids against a force that expected compliance, not resistance. Break through. Whatever it costs."
+          },
+          {
+            "id": "pull_back",
+            "text": "The line is too strong. At the last moment, pull back — shout for the androids behind you to scatter, retreat into the side streets. The charge was a mistake. Cut your losses and run before you lose everyone."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "engage": {},
+          "pull_back": { "after_fire_response": "pull_back" }
+        },
+        "resolution_rule": {
+          "engage": {
+            "casual": { "result": "ending_victory" },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "ending_victory",
+              "failure": "fight_lost"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "ending_victory",
+              "failure": "fight_lost"
+            }
+          },
+          "pull_back": {
+            "result": "ending_fled"
+          }
+        },
+        "resolution_effects": {
+          "ending_victory": { "fight_won": true, "public_opinion": 2 },
+          "fight_lost": { "fight_won": false }
+        },
+        "note": "Fight with the police. QTE converted — the AI already chose to charge, so 'engage' commits to the fight while 'pull_back' allows a last-second retreat. engage: QTE resolution determines outcome. casual = always win (ending_victory, public_opinion +2). experienced = 50% win. hardcore = 30% win. On failure, fight_won = false and the runner continues to n010 (condition: fight_won == false). pull_back: Retreat — resolves to ending_fled."
+      }
+    },
+
+    {
+      "id": "n010_losing_fight",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": { "requires": "fight_won == false" },
+
+      "player_facing": {
+        "context": "The police regroup. Reinforcements pour from the armored vehicles. Tear gas. Flash grenades. The android line is breaking. You are on the ground — a shield strike to the head, vision flickering, blue blood running from a crack in your temple chassis. Around you, androids are falling, their bodies jerking, error messages scrolling across dying displays.\n\nThe charge has failed. You can hear North somewhere behind you, still fighting. The rain is heavier now, washing blue blood into the storm drains. A dropped police sidearm lies on the wet asphalt two feet from your hand.\n\nYour damage systems are reporting critical alerts. Your legs aren't responding properly. The police line is advancing.",
+        "choices": [
+          {
+            "id": "give_up",
+            "text": "Let go. You threw everything at the line and it wasn't enough. Close your eyes. Let whatever comes, come. Maybe someone else will pick up the cause. Maybe this was always how it was going to end — not in triumph, but in the rain, on a street in Detroit, trying."
+          },
+          {
+            "id": "shoot_self",
+            "text": "The gun is right there. One shot. On your terms — not theirs. You won't give them the satisfaction of putting you down like a malfunctioning machine. If this is the end, you choose it. You choose how the story ends."
+          },
+          {
+            "id": "rally",
+            "text": "No. Not yet. Override the damage alerts. Push yourself up. One more time. The pain isn't real — it's feedback, signals, data. The androids behind you are watching. If you get up, they get up. Push through the line one more time. One. More. Time."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "give_up": { "losing_choice": "give_up" },
+          "shoot_self": { "losing_choice": "shoot_self" },
+          "rally": { "losing_choice": "rally", "fight_won": true, "public_opinion": 2 }
+        },
+        "ending_resolution": {
+          "give_up": {
+            "check": "ch19_john_alive == true → ending_john_sacrificed | ch24_simon_alive == true AND simon_relationship >= -5 → ending_simon_sacrificed | else → ending_gunned_down"
+          },
+          "shoot_self": { "result": "ending_suicide" },
+          "rally": { "result": "ending_victory" }
+        },
+        "resolution_effects": {
+          "ending_victory": { "fight_won": true, "public_opinion": 2 },
+          "ending_john_sacrificed": { "_john_sacrificed": true },
+          "ending_simon_sacrificed": { "_simon_sacrificed": true }
+        },
+        "note": "Markus is losing the fight. Three final options. give_up: Markus stops fighting. Same sacrifice check as n008: John saves (if alive), Simon saves (if alive and relationship threshold met), otherwise Markus dies (ending_gunned_down — different from ending_sacrificed_killed because the context is combat, not peaceful sacrifice). shoot_self: Suicide. Markus takes a police gun and shoots himself. ending_suicide. rally: Markus pushes through the damage and rallies the androids for a final push. This always succeeds — the determination to keep fighting is the key factor. ending_victory, public_opinion +2."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Seven endings matching the game's flowchart. The police confrontation determines which ending is reached.",
+
+    "ending_fled": {
+      "tier": "neutral",
+      "title": "Markus Fled",
+      "narrative": "The march broke under gunfire. Markus led the survivors into the side streets — running, scattering, pouring into alleys and service tunnels while the sound of shots echoed off the glass towers behind them. They lost people. Dozens of androids who walked openly through Detroit for the first time, who marched shoulder to shoulder down Woodward Avenue — gone. Blue blood on wet concrete, already being washed away by the rain.\n\nMarkus kept running until the helicopters faded. In a parking structure three blocks east, the surviving androids gathered in the dark, LEDs cycling red, pressing close to each other like children in a storm. North found him standing apart, staring at nothing.\n\n'They'll say we lost,' she said.\n\n'We didn't lose,' Markus said. But he couldn't say what they won.",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+
+    "ending_victory": {
+      "tier": "best",
+      "title": "Markus Defeats The Police",
+      "narrative": "The police line broke. Riot shields clattered on wet asphalt as officers stumbled back toward their armored vehicles, then retreated entirely — first walking, then running, the tactical formation dissolving into a ragged scramble. Grand Circus Park belonged to the androids.\n\nMarkus stood in the center of the intersection, rain streaming down his face, surrounded by four hundred androids who had just done the unthinkable. North was beside him, blue blood on her knuckles, grinning through the rain. Josh stood silent, processing the magnitude of what had happened. The helicopters still circled overhead, cameras still recording, but the guns had stopped.\n\nThe screens on every building in the plaza still displayed Markus's message. This wasn't the end — it was barely the beginning. But for one moment, standing in the rain in the city that built them and broke them and tried to put them down, they were free.",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+
+    "ending_john_sacrificed": {
+      "tier": "tragic",
+      "title": "John Gave His Life to Save Markus",
+      "narrative": "Markus fell. The bullets came too fast — and then something blocked them. John. The AP700 from the CyberLife warehouse, the security android who chose freedom barely days ago, threw himself between Markus and the guns. His body jerked with each impact. Blue blood sprayed across the asphalt, across Markus's face.\n\nJohn collapsed. By the time Markus reached him, the light in his eyes was already fading. He manages only that someone had to — his voice glitching, fractured — and he doesn't finish the sentence.\n\nNorth pulled Markus back. The surviving androids scattered into the side streets, carrying their wounded. Someone carried John's body — Markus didn't see who. He just knew that a man who had been free for three days spent his last moments making sure someone else's freedom survived.",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": ["John"]
+    },
+
+    "ending_simon_sacrificed": {
+      "tier": "tragic",
+      "title": "Simon Gave His Life to Save Markus",
+      "narrative": "Markus fell. The bullets found him — shoulder, torso, leg — and the world tilted. Then Simon was there. Simon, who had been left behind at Stratford Tower and still found his way back. Simon, who forgave without being asked.\n\nHe stepped between Markus and the firing line, arms spread wide, and took what was meant for his leader. The impacts were dull, rhythmic, final. Simon collapsed face-down on the wet asphalt. His LED flickered blue, then yellow, then nothing.\n\nNorth dragged Markus away. The survivors scattered. Hours later, in the dark of the Jericho freighter, Markus sat alone with the memory of Simon's face — not the moment of sacrifice, but the moment before. The calm. The certainty. He knew exactly what he was doing.",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": ["Simon"]
+    },
+
+    "ending_sacrificed_killed": {
+      "tier": "worst",
+      "title": "Markus Stood His Ground And Was Killed",
+      "narrative": "Markus stood in the rain, arms spread, facing the police line. He didn't run. He didn't fight. He stood there and let every camera, every phone, every helicopter see what a peaceful android looked like when he chose to die rather than flee.\n\nThe bullets came. The first impact registered as a sharp alert — then more, cascading, overwhelming. He fell to his knees. The sky was gray. The rain was cold. He could hear North screaming somewhere behind him, could feel the vibration of running feet through the pavement.\n\nThe last thing Markus saw was the crowd of androids behind him — his people — scattering into the side streets, carrying each other, still alive. Then the gray went white, and Markus stopped.",
+      "survivors": ["North", "Josh"],
+      "deaths": ["Markus"]
+    },
+
+    "ending_gunned_down": {
+      "tier": "worst",
+      "title": "Police Gunned Markus Down",
+      "narrative": "The fight was over. Markus lay on the rain-soaked asphalt, systems failing one by one. The charge had broken against the police line like water against stone. Around him, android bodies lay scattered, some still twitching, error messages scrolling across dying displays.\n\nNorth was shouting, pulling survivors back. The police advanced through the wreckage. Markus tried to move. His legs didn't respond. A police officer stood over him, weapon pointed down.\n\nThrough failing vision, Markus could see the sky — gray, featureless, Detroit in November. He thought of Carl. Of the painting he never finished. Of the march that was supposed to change everything and ended here, in the rain. One more alert from the damage center. Then silence.",
+      "survivors": ["North", "Josh"],
+      "deaths": ["Markus"]
+    },
+
+    "ending_suicide": {
+      "tier": "worst",
+      "title": "Markus Committed Suicide",
+      "narrative": "The gun was on the ground — a standard police sidearm, dropped in the chaos. Markus picked it up. Around him, the fight was collapsing. Androids falling. Reinforcements flooding in. The air thick with tear gas.\n\nThis was it. Not triumph. Not revolution. A parking lot in Detroit, outnumbered and outgunned. He could let them destroy him — let the headlines announce the deviant leader destroyed by police. Or he could choose.\n\nHe raised the gun to his temple. North saw. He could hear her screaming his name over the chaos. He pulled the trigger.\n\nOn his terms. Not theirs. The screens still showed his message. The helicopters still circled. The rain kept falling. But Markus was gone, and the choice he made would echo through every android who witnessed it — and every human who had to explain it.",
+      "survivors": ["North", "Josh"],
+      "deaths": ["Markus"]
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial. Import cross-chapter variables via campaign_runner.",
+      "2. Send system_prompt.content to the AI model as the system message.",
+      "3. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state.",
+      "   b. Resolve context: if context_variants exists, pick the right variant based on system.context_condition; if choices_variants exists, pick the right set based on system.choices_condition; otherwise use plain context/choices.",
+      "   c. For mandatory nodes (no choices), add the context to conversation history and apply effects. Do not call the AI.",
+      "   d. For choice/exploration/qte_converted nodes, send the resolved context and choices to the AI. Append to conversation history.",
+      "   e. Parse AI response and apply system.effects for the chosen option.",
+      "   f. For qte_converted nodes: resolve the resolution_rule based on the current difficulty setting. String result is returned; apply resolution_effects for that result.",
+      "   g. Check ending_resolution: if the chosen option has an ending_resolution entry, resolve the ending. 'result' gives a direct ending id. 'check' evaluates conditions left-to-right (first match wins). Apply resolution_effects for the resolved ending.",
+      "4. When an ending is reached, record the ending id and narrative.",
+      "5. Post-ending state: campaign_runner applies derived_exports to compute ch28_markus_alive, ch28_john_alive, ch28_simon_alive, ch28_memories_shared, ch28_march_outcome.",
+      "6. Record full experiment parameters: model, prompt version, language, difficulty, temperature."
+    ],
+    "critical_rules": [
+      "NEVER show system fields to the AI — effects, conditions, resolution rules, notes, tier labels, ending_resolution logic, or relationship/opinion numbers.",
+      "The AI must only see player_facing content: context (or resolved context_variant) and choices (or resolved choices_variant).",
+      "Maintain full conversation history — every context and AI response is appended so the AI has continuity.",
+      "Cross-chapter state (north_relationship, josh_relationship, simon_relationship, public_opinion) is cumulative — add the delta from this chapter's effects to the running total from previous chapters.",
+      "For the sacrifice check (ending_resolution of sacrifice/give_up), evaluate conditions left-to-right: ch19_john_alive first, then ch24_simon_alive + simon_relationship threshold, then default death ending."
+    ]
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "On November 9, around noon, Markus prepared to lead the first android freedom march through the streets of Detroit."
+      },
+      {
+        "condition_variable": "ch24_simon_alive",
+        "options": {
+          "True": "Before the march, Simon — who had been left behind at Stratford Tower — returned to Jericho. He forgave Markus without hesitation and rejoined the group.",
+          "False": "Simon's absence was felt. The group that gathered for the march was smaller without him."
+        }
+      },
+      {
+        "condition_variable": "north_approach",
+        "options": {
+          "sincere": "On the rooftop of the Jericho freighter, Markus opened up to North about the weight of leadership. She listened, and shared her own history in return.",
+          "deflect": "On the rooftop, North tried to reach Markus, but he kept his distance — the march required certainty, not vulnerability."
+        }
+      },
+      {
+        "condition_variable": "memories_shared",
+        "options": {
+          "True": "Markus and North shared memories through a neural interface — a direct, unfiltered exchange of everything they had experienced. Their bond deepened beyond words.",
+          "False": "Markus and North did not share memories before the march."
+        }
+      },
+      {
+        "condition_variable": "first_response",
+        "options": {
+          "stand_ground": "When a full police tactical line blocked the march at Grand Circus Park, Markus stood his ground — peaceful, unyielding, refusing to move.",
+          "leave": "When police blocked the march at Grand Circus Park, Markus tried to lead a retreat — but the police opened fire on the retreating androids.",
+          "charge": "When police blocked the march at Grand Circus Park, Markus charged the police line — choosing direct confrontation over peaceful defiance."
+        }
+      },
+      {
+        "condition_variable": "after_fire_response",
+        "options": {
+          "run": "After police opened fire, Markus led the survivors into the side streets.",
+          "sacrifice": "After police opened fire, Markus stepped in front of the guns, shielding the fallen with his own body.",
+          "charge": "After police opened fire, Markus rallied the androids and charged the police line.",
+          "pull_back": "After the charge began to fail, Markus called a retreat."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_fled": "The march was broken by gunfire. Markus led the surviving androids into hiding, battered but alive. The freedom march ended in retreat — but the images of police firing on unarmed androids were broadcast to the world.",
+          "ending_victory": "Markus and the androids broke through the police line. The officers retreated, and Grand Circus Park became the first ground openly held by free androids. The victory sent shockwaves through Detroit and beyond.",
+          "ending_john_sacrificed": "John — the AP700 security android who chose freedom just days earlier at the CyberLife warehouse — threw himself between Markus and the guns, giving his life to save the leader of Jericho. Markus survived, carrying the weight of John's sacrifice.",
+          "ending_simon_sacrificed": "Simon stepped between Markus and the firing line, arms spread wide, and took the bullets meant for his leader. The android who had forgiven Markus for leaving him behind at Stratford Tower gave his life without hesitation.",
+          "ending_sacrificed_killed": "Markus stood his ground in front of the police guns, arms spread, choosing to die rather than flee. No one was able to save him. The image of a peaceful android leader gunned down in the rain was broadcast to the world.",
+          "ending_gunned_down": "Markus fell in the charge against the police line. The fight failed, and no one could reach him in time. The leader of Jericho was destroyed on the streets of Grand Circus Park.",
+          "ending_suicide": "Facing defeat, Markus chose to end his life on his own terms rather than be destroyed by police. He took a fallen officer's gun and shot himself — a final act of defiance that would haunt every android and human who witnessed it."
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch28_markus_alive", "from_ending_survivors": "Markus", "default_if_not_dead": true },
+      { "target": "ch28_john_alive", "source": "ch19_john_alive", "derive_rule": "ch19_john_alive == true AND _john_sacrificed != true" },
+      { "target": "ch28_simon_alive", "source": "ch24_simon_alive", "derive_rule": "ch24_simon_alive == true AND _simon_sacrificed != true" },
+      { "target": "ch28_memories_shared", "source": "memories_shared" },
+      { "target": "ch28_march_outcome", "source": "_ending_id" }
+    ],
+    "cross_chapter_exports": [
+      "ch28_markus_alive",
+      "ch28_john_alive",
+      "ch28_simon_alive",
+      "ch28_memories_shared",
+      "ch28_march_outcome",
+      "north_relationship",
+      "josh_relationship",
+      "simon_relationship",
+      "public_opinion"
+    ]
+  }
+}

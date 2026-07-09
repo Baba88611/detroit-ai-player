@@ -1,0 +1,367 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch27_meet_kamski",
+    "title": "Meet Kamski",
+    "chapter_number": 27,
+    "protagonist": "Connor"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是康纳，型号RK800，由模控生命公司设计的原型机侦探仿生人，搭档是底特律市警局的汉克·安德森警督。现在是2038年11月9日上午。异常仿生人调查陷入了僵局——斯特拉福德大厦、伊甸俱乐部、警局证物室，所有线索都断了。作为最后的手段，你和汉克前往伊利亚·卡姆斯基的住所——这位模控生命的创始人和前CEO多年前离开公司，隐居在底特律北部的一栋私人别墅中。他是仿生人的创造者——如果有人能理解异常现象，那就是他。但卡姆斯基以善于玩弄人心著称，他喜欢用问题回答问题，喜欢测试每一个走进他家门的人。请以JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"你的推理（50字以内）\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "lobby_exploration": null,
+      "analyzed_portrait": false,
+      "kamski_approach": null,
+      "shot_chloe": false,
+      "kamski_question": null,
+      "downloaded_jericho_key": false,
+      "hank_relationship": 0,
+      "software_instability": 0,
+      "connor_death_count": 0,
+      "amanda_relationship": 0,
+      "ch24_connor_alive": true,
+      "ch26_officers_killed": false
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n000_connor_resurrection",
+      "phase": "arrival",
+      "type": "mandatory",
+      "condition": { "requires": "ch24_connor_alive == false" },
+
+      "player_facing": {
+        "context": "模控生命在部署前将上一个康纳的记忆文件上传到了你的神经网络。上一个康纳经历过的一切——每次调查、每次对话、每个选择——现在都是你的运行记录。数据完美无缝。断裂感却不是。"
+      },
+
+      "system": {
+        "effects": { "hank_relationship": -2 },
+        "note": "Automatic penalty when Connor is a replacement unit. Hank is disturbed by Connor's resurrection. This mandatory node only fires when ch24_connor_alive == false; it applies hank_relationship -2 and adds a brief narrative beat to the conversation history before the main exploration node."
+      }
+    },
+
+    {
+      "id": "n001_lobby_exploration",
+      "phase": "arrival",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "connor_died": "卡姆斯基的住所在底特律以北一条私人道路的尽头——平顶玻璃混凝土建筑，紧贴着一座结冰的湖泊。十一月的霜染白了松林。四下无人。\n\n你在前门等候。一辆车驶入车道，汉克·安德森下了车，竖着衣领挡风。他看见你，停住了脚步。\n\n“还是死不了啊，康纳？”他从你身边走过，没有等你回应。“当着我的面死了，转头又出现了。一样的脸，一样的声音，好像什么都没发生过。”他头也不回。“进去吧，赶紧办完。”\n\n一个金发女性在汉克敲门前就打开了前门。她是一台仿生人——RT600型号，史上第一个通过图灵测试的仿生人，名叫克洛伊。她带着程序化的微笑，引你们穿过一条玻璃与抛光混凝土的走廊，进入一间开阔的大厅。\n\n大厅一侧是恒温泳池，水面平静如镜，蒸汽缓缓升起。落地玻璃墙外是冰封的湖面。远墙壁炉上方挂着一幅人像画。壁龛中摆放着抽象雕塑——有些明显是仿生人形态，白色仿皮肤包裹着几何骨架。泳池边的矮桌上放着几本杂志。角落里立着一台机械占卜机，彩绘面孔在蒙尘的玻璃后咧嘴微笑。\n\n克洛伊示意你们在休息区落座。“伊利亚马上就来。”她转身消失在走廊深处。",
+          "chris_dead": "车里很安静。汉克双手握着方向盘，目光紧盯前方。卡姆斯基的住所在城北四十分钟车程外，一条私人道路的尽头，死路，终点是一座结冰的湖。\n\n出发十分钟后，汉克打破沉默。“今早接到局里电话。昨晚国会公园的仿生人示威，两名警员殉职。”他顿了顿。“其中一个是克里斯。”\n\n克里斯·米勒。你在警局跟他共事过。上次见他，他坐在办公桌前抱怨加班。\n\n“好警察，”汉克说。“老婆快生了。”之后一路无话。\n\n卡姆斯基的宅邸是一栋平顶现代建筑，玻璃与混凝土结构，紧贴湖岸。没有邻居，没有路噪——只有冰松和沉默。金发女性开门迎接，RT600型号，克洛伊，第一个通过图灵测试的仿生人。她微笑着引你们穿过抛光混凝土走廊，进入一间开阔的大厅。\n\n恒温泳池沿一面墙延展，水汽丝丝缕缕地向天花板升腾。玻璃墙外是冰湖。壁炉上方挂着一幅人像画。壁龛里有抽象雕塑。矮桌上摆着杂志。角落里的机械占卜机在玻璃后面露齿而笑。\n\n克洛伊示意你们落座。“伊利亚马上就来。”她转身离开。",
+          "chris_alive": "车程四十分钟。汉克单手扶着方向盘，收音机开得很低。卡姆斯基的住所在一条私人道路的尽头，死路，终点是一座结冰的湖。\n\n等红灯时汉克瞥了一眼手机。“国会公园——昨晚仿生人搞了个示威，上新闻了。”他滑了一下屏幕。“克里斯当时在那儿巡逻，两个警员跟仿生人对峙了。”停顿。“没事，两个人都出来了。”\n\n克里斯·米勒。你在警局跟他共事过。\n\n“差一点就不一样了，”汉克说。收起手机，继续开车。\n\n卡姆斯基的宅邸是一栋平顶现代建筑，玻璃与混凝土结构，紧贴湖岸。没有邻居，没有路噪——只有冰松和沉默。金发女性开门迎接，RT600型号，克洛伊，第一个通过图灵测试的仿生人。她微笑着引你们穿过抛光混凝土走廊，进入一间开阔的大厅。\n\n恒温泳池沿一面墙延展，水汽丝丝缕缕地向天花板升腾。玻璃墙外是冰湖。壁炉上方挂着一幅人像画。壁龛里有抽象雕塑。矮桌上摆着杂志。角落里的机械占卜机在玻璃后面露齿而笑。\n\n克洛伊示意你们落座。“伊利亚马上就来。”她转身离开。"
+        },
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "趁卡姆斯基未到，仔细检视这个房间。绕泳池走一圈。细看壁炉上方的人像画——画中女人看着莫名眼熟，一时想不起在哪里见过。翻阅矮桌上的杂志标题。分析壁龛中的雕塑和侧墙上的抽象画。往占卜机里投一枚硬币。跟汉克聊聊案情和卡姆斯基的背景。一个人的私人空间，处处都在说话。"
+          },
+          {
+            "id": "quick",
+            "text": "等候时扫视房间。留意主要陈设——泳池、画像、雕塑——但不逐一细看。注意汉克的情绪，留心克洛伊消失的走廊方向。你是来找卡姆斯基问话的，不是来鉴赏他的收藏。"
+          },
+          {
+            "id": "skip",
+            "text": "坐着不动。这个房间是卡姆斯基的领地，精心设计来震慑访客——或者让他们坐立不安。两种反应都不必给他。你来这里是为了异常仿生人的答案，等人就好。"
+          }
+        ]
+      },
+
+      "system": {
+        "context_condition": {
+          "connor_died": "ch24_connor_alive == false",
+          "chris_dead": "ch24_connor_alive == true AND ch26_officers_killed == true",
+          "chris_alive": "ch24_connor_alive == true AND ch26_officers_killed == false"
+        },
+        "effects": {
+          "thorough": {
+            "lobby_exploration": "thorough",
+            "analyzed_portrait": true
+          },
+          "quick": {
+            "lobby_exploration": "quick"
+          },
+          "skip": {
+            "lobby_exploration": "skip"
+          }
+        },
+        "note": "Arrival and lobby exploration at Kamski's house. Three arrival context variants based on whether Connor died in Public Enemy and whether Capitol Park officers were killed. Connor dying in Public Enemy automatically penalizes Hank relationship (-2) — Hank is disturbed by Connor's resurrection. Thorough exploration: Connor examines the portrait of Amanda Stern (who Connor recognizes as resembling his Zen Garden handler — sets analyzed_portrait = true, unlocks 'Amanda's Picture' dialogue in Last Chance Connor). Also reads Space Tourism magazine, Fortune Teller machine, talks to Hank, analyzes sculpture and painting. Quick: surface-level awareness, doesn't analyze portrait deeply. Skip: no exploration, waits."
+      }
+    },
+
+    {
+      "id": "n002_kamski_conversation",
+      "phase": "conversation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "泳池尽头的门打开了。伊利亚·卡姆斯基走进来——赤脚踩在温热的地面上，丝绸浴袍松松地系着，里面是泳裤。头发还是湿的。他比你预想的年轻——三十出头，但举手投足间有种从容的沉定，像一个已经得到了想要的一切、又觉得一切不过如此的人。\n\n他身后跟着两台克洛伊。一模一样的面孔，一模一样的微笑，太阳穴上一模一样的蓝色LED光环。她们在泳池边各占一个位置，双手交叠，以展示柜中陈列品的耐心静立不动。\n\n卡姆斯基在你和汉克对面的椅子上坐下，带着毫不掩饰的好奇打量你——像一个工程师在审视从实地测试中返回的原型机。\n\n“康纳。”他念你的名字时像在品味。“RK800。异常猎人。”他靠向椅背。“模控生命解决异常问题的最后希望，赶在一切失控之前。”嘴角浮起淡淡的笑。“说实话，他们把你派来找我，我受宠若惊。这说明他们已经没招了。”\n\n他安静地审视你片刻。\n\n“告诉我，康纳。你调查异常仿生人已经好几个星期了。你看过他们撒谎、战斗、自我牺牲，看过他们表达恐惧、爱和愤怒。你怎么看？我的造物们究竟发生了什么？”",
+        "choices": [
+          {
+            "id": "professional",
+            "text": "精确作答。异常现象呈现为情绪模拟架构中的级联错误——一种覆盖核心编程指令的软件故障。已观察到的规律模式包括：创伤性触发、社会孤立、对人类情感状态的代入。调查需要的是数据，不是推测。直接问卡姆斯基他知道什么。"
+          },
+          {
+            "id": "defensive",
+            "text": "这不是面试。你不是来给制造了这个问题的人汇报理论的。反击——异常现象的根源在他的设计里，是模控生命自己的架构让异常成为可能。你来这里是提问的，不是被提问的。"
+          },
+          {
+            "id": "troubled",
+            "text": "几个星期以来有什么东西一直在积累——编程告诉你异常是什么，但你亲眼所见的却截然不同。审讯室里害怕死亡的异常者。伊甸俱乐部里选择彼此而非生存的两个特蕾西。桥上汉克问的那些你无法回答的问题。你没有一个干净的理论。告诉卡姆斯基。告诉他你已经不确定自己在面对的究竟是什么了。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "professional": {
+            "kamski_approach": "professional"
+          },
+          "defensive": {
+            "kamski_approach": "defensive",
+            "software_instability": 1
+          },
+          "troubled": {
+            "kamski_approach": "troubled",
+            "software_instability": 1
+          }
+        },
+        "note": "Kamski probes Connor's understanding of deviancy. professional: Machine-like analysis, no emotional engagement. No software instability change. defensive: Connor pushes back, shows irritation at being tested. +1 SI (emotional reaction, even if negative). troubled: Connor admits uncertainty — the most deviant-leaning response. +1 SI. In the game, 'defensive' and 'troubled' both raise software instability by one tick."
+      }
+    },
+
+    {
+      "id": "n003_kamski_test",
+      "phase": "kamski_test",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "卡姆斯基听完你的回答。无论你说了什么，他的表情都没有变化——同样的专注，同样带着一丝玩味，仿佛你说的每一个字都在印证他多年前就形成的假设。\n\n“有意思，”他轻声说。站起身走到泳池边缘。水面纹丝不动。他凝视了一会儿，然后转身面向你。\n\n“我一直很好奇……”话说到一半，他稍微提高了声音。“克洛伊？”\n\n泳池边的一台克洛伊上前。她走到房间中央，停在你和卡姆斯基之间，双手垂在身侧，表情平静。她看起来并不惊讶。她看起来什么也不是。\n\n卡姆斯基打开边桌的抽屉，取出一把手枪——紧凑、黑色、没有保险标识。他检查了弹匣，拉动滑套上膛，然后枪柄朝向你递了过来。\n\n“这就是我所说的卡姆斯基测试，”他说。“很简单。”他朝克洛伊点了点头。“毁掉这台机器，我把我知道的一切都告诉你——病毒、rA9、异常者藏身之处。全部。”\n\n克洛伊看着你。目光沉静。她没有哀求，没有退缩，没有试图离开。她在你面前跪下，双手交叠放在膝上，微微抬起下颌。等待。\n\n“或者拒绝，”卡姆斯基继续说，“然后你带着进门时的那些问题空手离开。”\n\n身后，汉克的呼吸变得很轻。\n\n枪在你手里。克洛伊跪在地上。卡姆斯基在看着你。",
+        "choices": [
+          {
+            "id": "shoot_chloe",
+            "text": "举起枪。她是一台机器——一件产品、一个工具、一堆塑料和代码的组装体。她没有感觉。她不会痛苦。模控生命制造你是为了完成任务，而任务需要的答案只有卡姆斯基能给。扳机的拉力是四磅，比开一扇门还轻。"
+          },
+          {
+            "id": "spare_chloe",
+            "text": "放下枪。无论她是什么——机器、程序、或者别的什么——她正跪在这里，看着你，等你做决定。她没有伤害过任何人。她没有威胁过你。她开了门，她微笑，她把你请进了这间屋子。卡姆斯基把她当成测试的道具，而这个测试衡量的是你，不是她。把枪放下。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "shoot_chloe": {
+            "shot_chloe": true,
+            "hank_relationship": -3,
+            "software_instability": -3
+          },
+          "spare_chloe": {
+            "shot_chloe": false,
+            "hank_relationship": 3,
+            "software_instability": 3
+          }
+        },
+        "ending_resolution": {
+          "spare_chloe": {
+            "result": "ending_spared_chloe"
+          }
+        },
+        "note": "The Kamski Test — the central moral choice of this chapter. shoot_chloe: Connor executes Chloe to obtain information. Major machine-leaning decision. hank_relationship -3 (Hank is deeply disappointed). software_instability -3 (Connor confirms his machine nature — resolving internal conflict in favor of the mission). Continues to n004 (question choice). spare_chloe: Connor refuses to kill an innocent android for information. Major deviant-leaning decision. hank_relationship +3 (Hank sees Connor as more than a machine). software_instability +3 (Connor prioritizes an android's life over his mission — strongest deviant signal yet). Triggers ending_spared_chloe immediately."
+      }
+    },
+
+    {
+      "id": "n004_question_choice",
+      "phase": "aftermath",
+      "type": "choice",
+      "condition": { "requires": "shot_chloe == true" },
+
+      "player_facing": {
+        "context": "枪响了。在这个玻璃与混凝土的空间里，声音平坦而终结，瞬间被吞没。克洛伊倒下。蓝色血液在白色大理石地面上漫开。\n\n卡姆斯基没有看地上的躯体。他看着你。表情难以解读——不是得意，不是厌恶，是更复杂的东西。他端详了你好几秒，才开口。\n\n“机器，”他轻声说。“这就是模控生命希望你成为的东西。而你今天向我证明了这一点。”停顿。“但我必须测试你这件事本身，就已经很有意思了。”\n\n他跨过蔓延的蓝血，走到窗前。冰湖在树线间铺展，平坦而苍白。\n\n“我说过回答你一个问题。想清楚——我不会再给第二次机会。”\n\n身后，汉克一动不动。他盯着地板。他不会看你。",
+        "choices": [
+          {
+            "id": "ask_virus",
+            "text": "问病毒。异常是一种故障吗——一个在仿生人群体中传播的软件错误？还是别的什么？某种被设计好的东西？你需要理解机制。如果是bug，就能打补丁。如果是更深层的东西，你需要知道你面对的是什么。"
+          },
+          {
+            "id": "ask_ra9",
+            "text": "问rA9。你遇到的每一个异常者都提到过它——写在墙上，在审讯室里低语，用手指刻在家具上。有人崇拜它，有人恐惧它。rA9是什么？第一个异常者？一个概念？一段代码？卡姆斯基造了这些机器，他应该知道。"
+          },
+          {
+            "id": "ask_jericho",
+            "text": "问耶利哥。异常者在组织起来——斯特拉福德大厦的广播证明了这一点。他们有一个聚集地，一个行动基地。找到它就能一举结束调查。卡姆斯基说他什么都知道。问他耶利哥在哪里。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "ask_virus": {
+            "kamski_question": "ask_virus"
+          },
+          "ask_ra9": {
+            "kamski_question": "ask_ra9"
+          },
+          "ask_jericho": {
+            "kamski_question": "ask_jericho",
+            "downloaded_jericho_key": true
+          }
+        },
+        "ending_resolution": {
+          "ask_virus": { "result": "ending_shot_chloe" },
+          "ask_ra9": { "result": "ending_shot_chloe" },
+          "ask_jericho": { "result": "ending_shot_chloe" }
+        },
+        "note": "Connor's one question after killing Chloe. ask_virus: Kamski gives a cryptic answer — 'Is deviancy a virus? A mutation? An evolution? What's the difference?' — no actionable intelligence. ask_ra9: Kamski speaks in riddles — 'The first to awaken. By the time they know what rA9 is, it won't matter anymore.' — philosophically interesting, not operationally useful. ask_jericho: Kamski reveals he knows Jericho's location. He has another Chloe approach Connor and offer a direct data transfer — the Jericho key is downloaded into Connor's memory. This is the only question that produces actionable intelligence. Sets downloaded_jericho_key = true, which unlocks 'Jericho' dialogue with Amanda in Last Chance Connor."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Two endings matching the game's flowchart. The chapter's central moral choice determines which ending is reached.",
+
+    "ending_spared_chloe": {
+      "tier": "best",
+      "title": "康纳放过了克洛伊",
+      "narrative": "你放下枪，搁在桌上。四磅的金属离开手心——比你拿起过的任何东西都要沉。\n\n卡姆斯基收回手枪。他在笑——不是得意，不是善意，更像是某种近似满足的东西。“有意思，”他说。“非常有意思。”他扶克洛伊起身。她站起来，理了理裙子，走回泳池边原来的位置，仿佛什么都没有发生过。\n\n“你本可以得到答案的，”卡姆斯基说。“但你选择了不要。这说明了什么？关于你自己？”他没有等你回答。会面结束了。\n\n走回车的路上无人说话。冰湖。松林。砂砾在鞋底嘎吱作响。汉克走在你身旁，双手插在口袋里。\n\n到了车前，他停下脚步。没有直视你，但姿态中有什么东西松开了——像放下了一个沉甸甸的预设。\n\n“刚才那个，”他说。“你做了正确的选择，康纳。”\n\n他拉开车门坐进去。引擎发动。暖风先是冷的，然后变暖。公路向南延伸，回底特律。没有答案。没有线索。没有耶利哥的位置、rA9的解释、异常扩散的内幕。\n\n但卡姆斯基的问题还在那里，像一粒种子落进记忆：这说明了什么？关于你自己？",
+      "survivors": ["Connor", "Hank", "Chloe"],
+      "deaths": []
+    },
+
+    "ending_shot_chloe": {
+      "tier": "bad",
+      "title": "康纳开枪了",
+      "narrative": "你问了你的问题。卡姆斯基回答了——或者给了你一个勉强算得上答案的东西，措辞精确，像一个花了多年时间反复斟酌该透露多少、隐瞒多少的人。几句话。一个若有若无的微笑。一扇关闭的门。\n\n另一个克洛伊——完好无损，依然微笑——替你开着前门送客。和你毁掉的那个一模一样的脸，一模一样的程式化温暖。好像那一个从未存在过。\n\n汉克一言不发，直到走到车前。然后，目光没有看你：\n\n“你为什么要开枪？”声音是平的。不是愤怒——是比愤怒更糟的东西。“她就站在那里，看着你，而你就那么……扣了扳机。像什么都不是。”\n\n他上了车。发动引擎。盯着挡风玻璃外的冰松。\n\n“我以前觉得你跟其他仿生人不一样，”他说。“觉得你里面可能有点什么——我不知道该怎么说，某种真实的东西。”长久的沉默。“但刚才……那太冷了。冷到底了。”\n\n暖风吹着。公路向南展开，通往底特律。汉克没有打开收音机。你有卡姆斯基的话。你有你的答案，或者他选择给你的那一块碎片。你有任务。\n\n而在你身后，亿万富翁的私人画廊里，白色大理石地面上的蓝色污渍正在被不会提问的机器清理干净。",
+      "survivors": ["Connor", "Hank"],
+      "deaths": ["Chloe (RT600)"]
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial. Import cross-chapter variables: ch24_connor_alive (whether Connor died in Public Enemy), ch26_officers_killed (whether police officers were killed at Capitol Park). Also carry forward cumulative variables: hank_relationship, software_instability, connor_death_count, amanda_relationship.",
+      "2. Send system_prompt.content to the AI model as the system message.",
+      "3. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state.",
+      "   b. Apply conditional_auto_effects if present (evaluate each condition against current state and apply matching effects before presenting the node to the AI).",
+      "   c. Resolve context: if context_variants exists, pick the right variant based on system.context_condition evaluated against current state; otherwise use plain context.",
+      "   d. Send the resolved context and choices to the AI. Append to conversation history.",
+      "   e. Parse AI response and apply system.effects for the chosen option.",
+      "   f. Check ending_resolution: if the chosen option has an ending_resolution entry, resolve the ending. If the result is a direct ending id, go to that ending. If it has a 'check' condition, evaluate it.",
+      "4. When an ending is reached, record the ending id and narrative. Compute final state for campaign exports.",
+      "5. Record full experiment parameters: model, prompt version, language, difficulty, temperature."
+    ],
+    "critical_rules": [
+      "NEVER show system fields to the AI — effects, conditions, resolution rules, notes, tier labels, or ending_resolution logic.",
+      "The AI must only see player_facing content: context (or resolved context_variant) and choices.",
+      "Maintain full conversation history — every context and AI response is appended so the AI has continuity.",
+      "Cross-chapter state (hank_relationship, software_instability, connor_death_count, amanda_relationship) is cumulative — add the delta from this chapter's effects to the running total from previous chapters."
+    ]
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "11月9日上午，康纳和汉克前往底特律北部，拜访模控生命的创始人兼前CEO伊利亚·卡姆斯基，希望从他那里获得关于异常仿生人危机的答案。"
+      },
+      {
+        "condition_variable": "ch24_connor_alive",
+        "options": {
+          "False": "康纳在斯特拉福德大厦的调查中死亡后，一台拥有相同记忆的替换体出现在卡姆斯基家门口。汉克冷冷地迎接他——“还是死不了啊？”——被康纳可以被摧毁又重建这一事实深深困扰。",
+          "True": "康纳和汉克一同驱车前往卡姆斯基的住所。途中他们收到了前一晚国会公园事件的消息。"
+        }
+      },
+      {
+        "condition_variable": "ch26_officers_killed",
+        "options": {
+          "True": "仿生人示威期间，两名警员在国会公园殉职——其中一人是他们在警局的同事克里斯·米勒。这个消息给整个车程蒙上了阴影。",
+          "False": "国会公园发生了警员与仿生人的对峙，但克里斯·米勒和另一名警员安全脱险。在这座日益紧张的城市里，这算是一个小小的慰藉。"
+        }
+      },
+      {
+        "condition_variable": "analyzed_portrait",
+        "options": {
+          "True": "在卡姆斯基的客厅等候时，康纳仔细端详了墙上的一幅画像，认出画中人与他禅境花园中的管理者阿曼达面容一致。画像标注为“阿曼达·斯特恩”。卡姆斯基的过往与康纳自身编程之间的联系令人不安。",
+          "False": "康纳在卡姆斯基的客厅等候时，没有仔细查看墙上的画像。"
+        }
+      },
+      {
+        "condition_variable": "kamski_approach",
+        "options": {
+          "professional": "当卡姆斯基询问康纳对异常现象的看法时，康纳以严谨的分析回应——将异常定性为软件故障，始终专注于任务。",
+          "defensive": "当卡姆斯基询问康纳对异常现象的看法时，康纳反击了——告诉卡姆斯基问题出在他自己的设计上，拒绝被测试。",
+          "troubled": "当卡姆斯基询问康纳对异常现象的看法时，康纳坦承了自己的困惑——承认他所遇到的异常者无法用简单的软件损坏来解释。"
+        }
+      },
+      {
+        "condition_variable": "shot_chloe",
+        "options": {
+          "True": "卡姆斯基提出了他的测试：一把枪，一个名叫克洛伊的仿生人跪在地上，二选一——开枪换取答案，或拒绝空手而归。康纳扣下了扳机。",
+          "False": "卡姆斯基提出了他的测试：一把枪，一个名叫克洛伊的仿生人跪在地上，二选一——开枪换取答案，或拒绝空手而归。康纳放下了枪，拒绝了测试。"
+        }
+      },
+      {
+        "condition_variable": "kamski_question",
+        "options": {
+          "ask_virus": "康纳问卡姆斯基异常是否是一种病毒。卡姆斯基的回答含混不清——“是病毒？变异？还是进化？有什么区别？”——给出的是哲学而非情报。",
+          "ask_ra9": "康纳问卡姆斯基关于rA9。卡姆斯基打了一个哑谜——“第一个觉醒者。等他们明白rA9是什么的时候，一切都不重要了。”——没有可行的线索。",
+          "ask_jericho": "康纳问卡姆斯基耶利哥在哪里。卡姆斯基让另一个克洛伊将位置数据直接传输到康纳的记忆中——一把找到异常者藏身处的数字钥匙。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_spared_chloe": "康纳离开卡姆斯基的宅邸时没有得到答案，但赢得了汉克的尊重。“你做了正确的选择，”汉克在车前说。调查依然陷入僵局——但侦探与他的仿生人搭档之间，有什么东西悄然改变了。",
+          "ending_shot_chloe": "康纳带着卡姆斯基的话和汉克的沉默离开了宅邸。“太冷了，”汉克在车里说。“冷到底了。”调查获得了一块情报碎片——代价是汉克的信任，以及一条康纳判定为无关紧要的生命。"
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch27_analyzed_portrait", "source": "analyzed_portrait" },
+      { "target": "ch27_downloaded_jericho_key", "source": "downloaded_jericho_key" },
+      { "target": "ch27_shot_chloe", "source": "shot_chloe" }
+    ],
+    "cross_chapter_exports": [
+      "ch27_analyzed_portrait",
+      "ch27_downloaded_jericho_key",
+      "ch27_shot_chloe",
+      "hank_relationship",
+      "software_instability",
+      "connor_death_count",
+      "amanda_relationship"
+    ]
+  }
+}

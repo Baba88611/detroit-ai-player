@@ -1,0 +1,649 @@
+{
+  "_meta": {
+    "version": "2.3",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      },
+      "dual_protagonist": "This chapter features two playable characters (Kara and Connor). The AI makes decisions for both, with perspective clearly indicated in each node's context."
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch13_on_the_run",
+    "title": "逃亡",
+    "chapter_number": 13,
+    "protagonist": ["Kara", "Connor"]
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "本章有两个视角人物。当场景以卡拉的视角呈现时，你以卡拉的身份做决定——她是一个挣脱了主人控制的仿生人，带着一个名叫爱丽丝的小女孩在逃亡。你唯一的目标是保护爱丽丝的安全，找到出路。当视角切换到康纳时，你以康纳（RK800）的身份做决定——他是底特律警察局的仿生人调查员，搭档是汉克·安德森警探。你的任务是追踪异常仿生人。今天是2038年11月6日，早晨。在每个情境中做出你的选择。请以JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"50字以内的决策理由\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "exploration_depth": null,
+      "ralph_response": null,
+      "investigation_approach": null,
+      "evasion_result": null,
+      "connor_highway_choice": null,
+      "connor_pursuing": false,
+      "ralph_defended": false,
+      "kara_captured": false,
+      "software_instability": 0,
+      "hank_relationship": 0,
+      "alice_relationship": 0,
+      "connor_death_count": 0,
+      "ch10_shelter": "motel",
+      "ch10_has_gun": false,
+      "ch07_todd_alive": true
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_morning_exploration",
+      "phase": "morning",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "motel": "稀薄的晨光透过汽车旅馆的窗帘。爱丽丝还在对面床上睡着，蜷缩成一团，毯子拉到下巴。房间里弥漫着地毯清洁剂和陈烟的气味。\n\n窗外——巡逻车。两辆，停在对面商业街的停车场里。警察在便利店门口和收银员说话，手里拿着照片比划。\n\n你的LED还亮着。头发没有变。浴室镜子里的你就是警察会看到的样子：一个仿生人。洗漱台的用品包里有剪刀。梳妆台上放着一台小电视。爱丽丝还没醒。\n\n离退房还有一点时间。不多。",
+          "squat": "灰蒙蒙的光从破损的木板缝里漏进来。废弃的房子很冷，昨晚的火只剩灰烬。爱丽丝在墙边的旧毯子堆上睡着。拉尔夫在隔壁房间——能听到他走来走去，自言自语。\n\n你记得楼上有晾着的衣服，地上有一把剪刀。LED还在。身上的衣服还是昨晚那套——容易被认出来。楼上还有个浴室，门半开着。\n\n透过钉了木板的窗户，外面的街道还很安静。暂时还是。",
+          "car": "你在废弃汽车的驾驶座上醒来，浑身僵硬发冷。爱丽丝在后座睡着，蜷缩在车门边。停车场空荡荡的，只有一辆烧毁的面包车和散落的杂物。铁丝网围栏隔开了停车场和外面的街道。\n\nLED还亮着。衣服没换。透过围栏，两个街区外，一辆巡逻车停在路口。一个警察靠在引擎盖上，扫视着过往的行人。\n\n前保险杠旁的旧轮胎上插着一把锈迹斑斑的剪刀。车后备箱卡死了——也许能找到什么东西撬开。"
+        },
+        "choices": [
+          {
+            "id": "explore_thorough",
+            "text": "花时间把所有事情都做好：找衣服、剪头发、拆掉LED，把这个地方每个角落都搜一遍。在走出去之前，确保你和爱丽丝尽可能做好准备。"
+          },
+          {
+            "id": "explore_focused",
+            "text": "先处理要紧的——头发、LED、能找到衣服就换。然后去看看爱丽丝，她醒了就和她说说话。剩下的路上再想办法。"
+          },
+          {
+            "id": "explore_minimal",
+            "text": "剪头发，拆LED。远远看一眼能过关就行。在这里多待一分钟，就多一分钟被发现的风险。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "explore_thorough": {
+            "exploration_depth": "thorough",
+            "alice_relationship": 0
+          },
+          "explore_focused": {
+            "exploration_depth": "focused",
+            "alice_relationship": 1
+          },
+          "explore_minimal": {
+            "exploration_depth": "minimal",
+            "alice_relationship": -1
+          }
+        },
+        "context_condition": {
+          "motel": "ch10_shelter == motel",
+          "squat": "ch10_shelter == squat",
+          "car": "ch10_shelter == car"
+        },
+        "note": "Thorough: Kara finds everything available. Focused: handles basics then prioritizes Alice (+1 alice). Minimal: rushes, doesn't engage Alice (-1 alice)."
+      }
+    },
+
+    {
+      "id": "n002_ralph_meal",
+      "phase": "morning",
+      "type": "choice",
+      "condition": {
+        "requires": "ch10_shelter == squat"
+      },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "你走下楼，看见拉尔夫蹲在壁炉旁，手里拎着什么东西——一只大老鼠，刚抓的，尾巴朝下。他抬头看你，脸上努力挤出一种近乎骄傲的表情。\n\n“我抓了早餐，”他说。桌上已经摆了三副餐具：不配套的盘子、弯了的叉子、一只裂了口的玻璃杯装着水。“我们应该一起吃。像一家人。”\n\n爱丽丝站在楼梯底下，看着这一切。她没有走近。拉尔夫的LED在黄色和蓝色之间闪烁。他脸上的疤痕在晨光里更加醒目，那个表情不太稳定——像是期盼，又像是某种更危险的东西的边缘。\n\n“拜托了，”他说。“坐下吧。你们两个都坐。”",
+          "focused_or_minimal": "你下楼，拉尔夫已经在等了。他站在桌边，手里拎着一只死老鼠。桌上摆了三副餐具——盘子、叉子、一杯水。\n\n“坐下，”他说。不是请求。LED亮着稳定的黄色。“我们一起吃。像一家人。”\n\n爱丽丝在你身后的楼梯上。你感觉到她抓紧了你的袖子。"
+        },
+        "choices": [
+          {
+            "id": "sit_willingly",
+            "text": "和爱丽丝一起在桌边坐下。谢谢拉尔夫的用心。他昨晚帮了你们，不管这顿饭是什么样子，他需要这个。"
+          },
+          {
+            "id": "refuse_then_comply",
+            "text": "告诉拉尔夫你很感激，但你们需要尽快离开。如果他坚持——坐下。不要把事情搞大。"
+          },
+          {
+            "id": "threaten_ralph",
+            "text": "挡在爱丽丝和拉尔夫之间。告诉他放下东西，离桌子远一点。你们要走了。现在就走。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "sit_willingly": {
+            "ralph_response": "compassionate",
+            "alice_relationship": 1
+          },
+          "refuse_then_comply": {
+            "ralph_response": "reluctant",
+            "alice_relationship": 0
+          },
+          "threaten_ralph": {
+            "ralph_response": "threatened",
+            "alice_relationship": -1
+          }
+        },
+        "context_condition": {
+          "thorough": "exploration_depth == thorough",
+          "focused_or_minimal": "exploration_depth == focused OR exploration_depth == minimal"
+        },
+        "note": "ralph_response determines Ralph's behavior when Connor arrives. compassionate/reluctant: Ralph protects Kara. threatened: Ralph tells Connor Kara fled."
+      }
+    },
+
+    {
+      "id": "n003_connor_investigation",
+      "phase": "investigation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "squat": "视角切换：康纳。\n\n二十分钟前接到报告——科克敦大道一栋废弃房屋有仿生人活动迹象。你和汉克赶到现场。房子和报告描述的一样：钉死的窗户、荒芜的院子，很久以前就不再是谁的家了。\n\n里面有一个仿生人。男性，WR600型号。面部严重损伤——左侧深深的沟壑，可能是自残或者遭受暴力所致。他站在一楼正中央，LED黄色，看着你和汉克走进来。\n\n汉克靠在门口。“你来，”他说。\n\n房子有两层。右边是楼梯。后面是厨房。房间中央有张桌子，摆着三副餐具——最近用过。壁炉里的灰烬还有余温。",
+          "motel": "视角切换：康纳。\n\n巡逻队标记了东部汽车旅馆——有人目击到疑似昨晚事件报告中AX400型号的仿生人。你和汉克到达。旅馆是密歇根大道上一栋矮旧的两层建筑，霓虹灯牌半灭，停车场空了大半。\n\n前台服务员站在柜台后面，抱着胳膊。两个巡逻警察已经在场。汉克走向前台。\n\n“我们在找一个仿生人，”他说。“AX400型号，棕色头发，昨晚很晚才入住，可能带着一个小女孩。”\n\n服务员的目光扫了你一眼，又回到汉克身上。住客登记簿就在柜台上。",
+          "car": "视角切换：康纳。\n\n今早没有确认的目击信息。AX400和那个孩子在雷文代尔区消失了。汉克把车停在利弗诺伊斯大道一家超市的停车场里，熄了火。\n\n“巡逻区就是这一带，”他说，透过挡风玻璃扫视街道。“她要是还在附近，迟早得从这里经过。”\n\n对讲机里传来巡逻队的例行报告，没有有用的信息。人行道上有几个行人。对面有个公交站。早晨又冷又阴。"
+        },
+        "choices": [
+          {
+            "id": "investigate_thorough",
+            "text": "逐个房间搜查，检查每一处痕迹，还原这里发生过什么。如果她们来过，证据会告诉你具体的时间和去向。"
+          },
+          {
+            "id": "investigate_witnesses",
+            "text": "把重点放在人身上。询问在场的每一个人——必要时施压。人和仿生人记住的东西比他们自己以为的要多。"
+          },
+          {
+            "id": "investigate_quick",
+            "text": "快速扫一遍，检查明显的地方，然后走人。如果没有直接线索，待更久也不会改变什么。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "investigate_thorough": {
+            "investigation_approach": "thorough"
+          },
+          "investigate_witnesses": {
+            "investigation_approach": "witnesses"
+          },
+          "investigate_quick": {
+            "investigation_approach": "quick"
+          }
+        },
+        "context_condition": {
+          "squat": "ch10_shelter == squat",
+          "motel": "ch10_shelter == motel",
+          "car": "ch10_shelter == car"
+        },
+        "ending_resolution": {
+          "investigate_thorough": {
+            "check": "ch10_shelter == squat AND ralph_response != threatened → ralph_defended_proceed | else → continue"
+          },
+          "investigate_witnesses": {
+            "check": "ch10_shelter == squat AND ralph_response != threatened → ending_squat_hidden | else → continue"
+          },
+          "investigate_quick": {
+            "check": "ch10_shelter == squat AND ralph_response != threatened → ending_squat_hidden | else → continue"
+          }
+        },
+        "note": "ending_resolution handles squat path branching: (1) squat + ralph_threatened → 'continue' (all choices), chase proceeds; (2) squat + ralph kind + thorough → 'ralph_defended_proceed' (Ralph attacks Connor to protect Kara), chase proceeds; (3) squat + ralph kind + not thorough → ending_squat_hidden (Kara undiscovered); (4) motel/car → 'continue', proceed to n004. ralph_defended is derived in campaign.derived_exports via derive_rule (squat + kind + thorough)."
+      }
+    },
+
+    {
+      "id": "n004_street_evasion",
+      "phase": "evasion",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "ch10_shelter != squat"
+      },
+
+      "player_facing": {
+        "context": "视角切换：卡拉。\n\n火车站在前方四个街区。从这里能看到芬代尔站的旧招牌，透过玻璃门隐约可见站台。你和火车站之间：两辆巡逻车，至少四个步行巡逻的警察，路口设了临检点，正在拦截行人检查。\n\n爱丽丝走在你身边，一只手攥着你外套的下摆。她目视前方，从刚才离开到现在一句话都没说。\n\n一个巡逻警察正朝你这侧的人行道走来。他还没注意到你——但他很近，而且越来越近。你只有几秒钟决定怎么走。",
+        "choices": [
+          {
+            "id": "evade_careful",
+            "text": "慢慢走。等巡逻转身的时候穿过马路，利用停着的车辆当掩护，一步步靠近车站。不能跑——跑步会引来目光。"
+          },
+          {
+            "id": "evade_blend",
+            "text": "自然地走。像一个人类母亲带着女儿出门办事一样。步伐稳定，姿态放松。不看警察，不改方向。"
+          },
+          {
+            "id": "evade_rush",
+            "text": "车站够近了。拉住爱丽丝的手快走——穿过小巷，绕开人群。在任何人反应过来之前赶到。"
+          }
+        ]
+      },
+
+      "system": {
+        "resolution_rule": {
+          "evade_careful": {
+            "casual": { "result": "ending_train_safe" },
+            "experienced": { "probability_success": 0.7, "success": "ending_train_safe", "failure": "spotted" },
+            "hardcore": { "probability_success": 0.5, "success": "ending_train_safe", "failure": "spotted" }
+          },
+          "evade_blend": {
+            "casual": { "result": "ending_train_safe" },
+            "experienced": { "probability_success": 0.5, "success": "ending_train_safe", "failure": "spotted" },
+            "hardcore": { "probability_success": 0.3, "success": "ending_train_safe", "failure": "spotted" }
+          },
+          "evade_rush": {
+            "casual": { "result": "ending_train_safe" },
+            "experienced": { "probability_success": 0.3, "success": "ending_train_safe", "failure": "spotted" },
+            "hardcore": { "probability_success": 0.1, "success": "ending_train_safe", "failure": "spotted" }
+          }
+        },
+        "effects": {
+          "evade_careful": { "evasion_result": "careful" },
+          "evade_blend": { "evasion_result": "blend" },
+          "evade_rush": { "evasion_result": "rush" }
+        },
+        "note": "Success → ending_train_safe (run ends). Failure → 'spotted' stored as _n004_street_evasion_result, used by n005 condition to enter the chase."
+      }
+    },
+
+    {
+      "id": "n005_connor_highway_choice",
+      "phase": "chase",
+      "type": "choice",
+      "condition": {
+        "requires": "ch10_shelter == squat AND ralph_response == threatened OR ch10_shelter == squat AND ralph_response != threatened AND investigation_approach == thorough OR _n004_street_evasion_result == spotted"
+      },
+
+      "player_facing": {
+        "context": "视角切换：康纳。\n\n你在跑。AX400就在前方——两百米，也许更近——抱着那个孩子。她很快，比人类快得多。她正冲向高速公路立交桥方向。铁丝网围栏那边是六车道的高速公路，没有护栏，没有人行横道。车辆以公路速度飞驰，车灯在晨雾中划出光带。\n\n她到了围栏边，翻了过去，把孩子拉过来。两人跳到路肩上，开始在车流间穿行。\n\n你跑到围栏前。汉克在你身后十步远，喘着粗气。\n\n“康纳！”他的声音穿透车流的噪音。“够了！别过去——你会被撞死的！不值得！”\n\n六条车道。时速近一百公里。AX400和那个女孩已经在穿越第一条车道了。",
+        "choices": [
+          {
+            "id": "obey_hank",
+            "text": "在围栏前停下。汉克说得对——高速公路是死路。你可以通过其他途径追踪她们。放她们走。"
+          },
+          {
+            "id": "pursue_kara",
+            "text": "翻过围栏。你的任务是抓捕异常仿生人。如果现在放手，你可能再也找不到她们了。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "obey_hank": {
+            "connor_highway_choice": "obeyed",
+            "connor_pursuing": false,
+            "hank_relationship": 1,
+            "software_instability": 1
+          },
+          "pursue_kara": {
+            "connor_highway_choice": "pursued",
+            "connor_pursuing": true,
+            "hank_relationship": -1,
+            "software_instability": -1
+          }
+        },
+        "note": "Key moral/mission dilemma. Obeying Hank: relationship +1, software_instability +1 (deviant-leaning). Pursuing: relationship -1, software_instability -1 (machine-like)."
+      }
+    },
+
+    {
+      "id": "n006_highway_crossing",
+      "phase": "chase",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "connor_highway_choice != null"
+      },
+
+      "player_facing": {
+        "context_variants": {
+          "connor_pursuing": "视角切换：卡拉。\n\n声浪像一堵墙——引擎轰鸣、喇叭尖叫、轮胎碾过湿滑路面的刺耳声。你站在六车道高速公路的路肩上，爱丽丝紧贴着你，脸埋在你的外套里。汽车以致命的速度一辆接一辆驶过，车灯在雾中拖出光痕，近得能感到气流拉扯你的衣服。\n\n身后，那个仿生人侦探正在翻围栏。他追来了。\n\n三条车道到中央隔离带。再三条到对面。爱丽丝抬头看你，浑身发抖。\n\n车流中出现一个间隙——两秒，也许三秒。然后什么也没有了。",
+          "connor_stopped": "视角切换：卡拉。\n\n声浪像一堵墙——引擎轰鸣、喇叭尖叫、轮胎碾过湿滑路面的刺耳声。你站在六车道高速公路的路肩上，爱丽丝紧贴着你，脸埋在你的外套里。汽车以致命的速度一辆接一辆驶过，车灯在雾中拖出光痕。\n\n身后，那个侦探停在了围栏边。他在看着你们，但他没有追过来。\n\n但警察会来的。他们总会来的。\n\n三条车道到中央隔离带。再三条。爱丽丝抬头看你，浑身发抖。\n\n车流中出现一个间隙——两秒，也许三秒。"
+        },
+        "choices": [
+          {
+            "id": "dash_across",
+            "text": "跑。拉住爱丽丝的手冲过去——不停、不回头、不犹豫。速度是唯一能让你们活下来的东西。"
+          },
+          {
+            "id": "wait_for_gap",
+            "text": "等。观察车流的规律。一定会有更长的间隙——一定会有。等它出现的时候，快速但稳定地移动。一次一条车道。"
+          },
+          {
+            "id": "shield_alice",
+            "text": "把爱丽丝放在前面，用你的身体护住她。不管发生什么，她要安全过去。这是唯一重要的事。"
+          }
+        ]
+      },
+
+      "system": {
+        "resolution_rule": {
+          "dash_across": {
+            "casual": { "result": "kara_crossed" },
+            "experienced": { "probability_success": 0.5, "success": "kara_crossed", "failure": "ending_highway_kara_died" },
+            "hardcore": { "probability_success": 0.3, "success": "kara_crossed", "failure": "ending_highway_kara_died" }
+          },
+          "wait_for_gap": {
+            "casual": { "result": "kara_crossed" },
+            "experienced": { "probability_success": 0.7, "success": "kara_crossed", "failure": "ending_highway_kara_died" },
+            "hardcore": { "probability_success": 0.5, "success": "kara_crossed", "failure": "ending_highway_kara_died" }
+          },
+          "shield_alice": {
+            "casual": { "result": "kara_crossed" },
+            "experienced": { "probability_success": 0.6, "success": "kara_crossed", "failure": "ending_highway_kara_sacrificed" },
+            "hardcore": { "probability_success": 0.4, "success": "kara_crossed", "failure": "ending_highway_kara_sacrificed" }
+          }
+        },
+        "context_condition": {
+          "connor_pursuing": "connor_pursuing == true",
+          "connor_stopped": "connor_pursuing == false"
+        },
+        "effects": {
+          "dash_across": {},
+          "wait_for_gap": {},
+          "shield_alice": {}
+        },
+        "note": "Standard QTE. Success → 'kara_crossed' (non-ending, stored as _n006_highway_crossing_result, proceed to n007 or n008). Failure → ending_highway_kara_died or ending_highway_kara_sacrificed (run ends). shield_alice failure uses ending_highway_kara_sacrificed where Alice survives but Kara dies."
+      }
+    },
+
+    {
+      "id": "n007_connor_pursuit",
+      "phase": "chase",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "connor_highway_choice == pursued"
+      },
+
+      "player_facing": {
+        "context": "视角切换：康纳。\n\n你翻过了围栏。六条车道的车流隔在你和AX400之间。她在前面——已经过了中央隔离带，拉着孩子穿过对面的车道。车灯扫过湿漉漉的沥青路面。左边某处传来卡车刺耳的喇叭声。\n\n你只有几秒钟做决定。直接冲过去——最快，但车流是一堵钢铁和惯性的墙。斜着穿过去，在对面路肩拦截——穿越最危险车道的距离更短，但角度难以预判。或者停在原地从这里追踪——活下来，但会失去她们。",
+        "choices": [
+          {
+            "id": "sprint_to_catch",
+            "text": "直接冲过车流。在她到达对面之前追上她。这就是你被制造出来的目的。"
+          },
+          {
+            "id": "cut_across",
+            "text": "斜着穿过车道，在对面路肩拦截。缩短暴露时间，更好的角度。"
+          },
+          {
+            "id": "pull_back",
+            "text": "留在隔离带。从这里你能看到她们的去向。死在这条公路上完成不了任务。"
+          }
+        ]
+      },
+
+      "system": {
+        "resolution_rule": {
+          "sprint_to_catch": {
+            "casual": { "result": "ending_connor_caught" },
+            "experienced": { "probability_success": 0.5, "success": "ending_connor_caught", "failure": "ending_connor_died" },
+            "hardcore": { "probability_success": 0.3, "success": "ending_connor_caught", "failure": "ending_connor_died" }
+          },
+          "cut_across": {
+            "casual": { "result": "ending_connor_caught" },
+            "experienced": { "probability_success": 0.4, "success": "ending_connor_caught", "failure": "ending_vanished" },
+            "hardcore": { "probability_success": 0.2, "success": "ending_connor_caught", "failure": "ending_vanished" }
+          },
+          "pull_back": {
+            "result": "ending_highway_escaped"
+          }
+        },
+        "effects": {
+          "sprint_to_catch": {},
+          "cut_across": {},
+          "pull_back": {}
+        },
+        "note": "sprint_to_catch: highest catch rate but lethal failure (Connor hit by car). cut_across: moderate catch rate, failure means Connor loses them (vanished). pull_back: always safe, Kara escapes. On casual, sprint and cut_across always succeed (catch). ending_connor_died triggers connor_death_count +1 and software_instability +1 in post-processing."
+      }
+    },
+
+    {
+      "id": "n008_kara_escaped",
+      "phase": "chase",
+      "type": "mandatory",
+      "condition": {
+        "requires": "connor_highway_choice == obeyed"
+      },
+
+      "player_facing": {
+        "context": "视角切换：卡拉。\n\n最后一辆车从你身边擦过——近到能感觉到气流拉扯衣服。然后你们过来了。两个人都过来了。高速公路的另一边是排水沟，然后是一片枯草地，然后是一道铁丝网围栏，底部有个撕开的口子。\n\n爱丽丝抖得几乎站不住。你把她抱起来，穿过围栏，走过草地，走进对面一栋建筑的阴影里。\n\n身后，高速公路继续轰鸣。没有人追过来。"
+      },
+
+      "system": {
+        "result": "ending_highway_escaped",
+        "note": "Connor obeyed Hank and stayed at the fence. Kara survived the crossing (n006 did not return an ending). This mandatory node resolves the chapter."
+      }
+    }
+  ],
+
+  "endings": {
+    "ending_squat_hidden": {
+      "tier": "safe_stealth",
+      "title": "藏身之处",
+      "narrative": "侦探和他的搭档离开了。巡逻车从路边驶出，消失在街区尽头。你透过木板的缝隙看着街道重新安静下来。\n\n拉尔夫出现在你身后，这一次很安静。他没有说话。他看着你和爱丽丝——还藏在楼梯下面，还紧紧搂着彼此——他伤痕累累的脸上有什么东西松开了。不是微笑，是比微笑更古老的什么。\n\n你又等了二十分钟才动。然后牵起爱丽丝的手，从后门走出去。早晨又冷又灰。走向街区尽头公交站的女人和小女孩，没有人多看一眼。",
+      "survivors": ["Kara", "Alice", "Connor"],
+      "deaths": []
+    },
+    "ending_train_safe": {
+      "tier": "safe_evasion",
+      "title": "抵达火车站",
+      "narrative": "车站的门在身后关上。里面是日光灯、陈咖啡的味道、发车信息牌在翻动目的地。爱丽丝握着你的手，力道终于松了一些。\n\n你在自动售票机上买了两张票。没有人多看一眼。站台上，爱丽丝坐在长椅上看着铁轨。六分钟后有一班车。\n\n“我们去哪？”她问。\n\n你还没有答案。但这里没有警笛，没有巡逻车。现在，这就够了。",
+      "survivors": ["Kara", "Alice", "Connor"],
+      "deaths": []
+    },
+    "ending_vanished": {
+      "tier": "escaped_pursuit",
+      "title": "消失",
+      "narrative": "你跑到围栏时，她们已经不见了。高速公路在你面前展开——六条车道的滚滚车流、护栏、头顶的立交桥——但AX400和那个孩子无影无踪。\n\n你站在围栏前十一秒，扫描每一条车道、每一个车辆间隙。什么也没有。\n\n汉克追上来，扶着铁丝网喘气。他盯着高速公路看了一会儿，然后看你。\n\n“她们走了，康纳。回去吧。”\n\n你松开围栏，走回车里。",
+      "survivors": ["Kara", "Alice", "Connor"],
+      "deaths": []
+    },
+    "ending_highway_escaped": {
+      "tier": "safe_highway",
+      "title": "到达对岸",
+      "narrative": "最后一辆车从你身边擦过——近到能感觉到气流拉扯衣服。然后你们过来了。两个人都过来了。高速公路的另一边是排水沟，然后是一片枯草地，然后是一道铁丝网围栏，底部有个撕开的口子。\n\n爱丽丝抖得几乎站不住。你把她抱起来，穿过围栏，走过草地，走进对面一栋建筑的阴影里。\n\n身后，高速公路继续轰鸣——六条车道上的车辆漠然驶过。没有人追过来。没有人能追过来。\n\n你继续往前走。",
+      "survivors": ["Kara", "Alice"],
+      "deaths": []
+    },
+    "ending_highway_kara_died": {
+      "tier": "fatal",
+      "title": "殒命公路",
+      "narrative": "撞击从左边来——一辆货车，太近太快，根本刹不住。你看到它的时间不到一秒。你试图把爱丽丝推开。\n\n然后什么都没有了。\n\n高速公路的路肩上，汉克站在围栏边。他很久没有动。车流在残骸周围减速、停下，司机们走出车门。有人在尖叫。\n\n案卷上会记录：AX400及一名未成年人，公路事故死亡，2038年11月6日。调查继续进行，但已经没有她们了。",
+      "survivors": ["Connor"],
+      "deaths": ["Kara", "Alice"]
+    },
+    "ending_highway_kara_sacrificed": {
+      "tier": "fatal_sacrifice",
+      "title": "卡拉的牺牲",
+      "narrative": "货车从左边驶来。你看到了它——一秒，也许更短——然后你把身体扑向爱丽丝，把她往前推、往下压。撞击砸中你的背、你的肩膀、你的脊柱。系统逐个失效。你感觉爱丽丝被冲击力从你怀里撕开，在沥青路面上翻滚。\n\n但是在翻滚。不是被碾压。在动。\n\n你的光学画面碎裂。透过最后一丝视野，你看到她——趴在对面路肩上，回头看着你。活着。\n\n然后什么都没有了。\n\n一个陌生人把爱丽丝从公路上抱走。她现在是一个人了。",
+      "survivors": ["Alice", "Connor"],
+      "deaths": ["Kara"]
+    },
+    "ending_connor_caught": {
+      "tier": "capture",
+      "title": "康纳抓住了卡拉",
+      "narrative": "你在第四条车道追上了她。你的手抓住她的手臂，用力拽住——足以制止她的动作，但没有造成损伤。那个孩子尖叫起来。\n\n一辆车从旁边呼啸而过，喇叭声震耳欲聋。你把她们拖到中央隔离带上，混凝土护栏勉强够三个人站。AX400盯着你。LED是红色的。孩子在哭，紧紧抓着她的胳膊。\n\n汉克在围栏那边喊着什么，被车流声淹没了。远处传来增援的警笛。\n\n异常仿生人已被控制。",
+      "survivors": ["Kara", "Alice", "Connor"],
+      "deaths": []
+    },
+    "ending_connor_died": {
+      "tier": "fatal",
+      "title": "康纳被撞",
+      "narrative": "轿车在第三条车道撞上了你。冲击化为一连串系统故障：外壳破裂、蓝血管路断裂、左侧光学单元离线。你在空中停留了1.3秒，然后摔上沥青路面。\n\n你最后一帧有效画面：AX400和那个孩子，就快跑到对面了，就快安全了。然后视觉信号变成雪花。\n\n围栏那边，汉克双手抓着铁丝网，指节发白。救护车到了很久以后他还站在那里。\n\nRK800 #313 248 317 — 51。状态：已损毁。模控生命将准备替换体。",
+      "survivors": ["Kara", "Alice"],
+      "deaths": ["Connor"]
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This chapter requires ch07_kara_alive == true AND ch07_alice_alive == true. If either is false, skip this chapter entirely.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: software_instability (cumulative), hank_relationship (cumulative), alice_relationship (cumulative), connor_death_count (cumulative), ch10_shelter, ch10_has_gun, ch07_todd_alive.",
+      "3. DUAL PROTAGONIST: Send system_prompt.content to the AI at start. The AI plays both Kara and Connor. Each node's context clearly indicates the current perspective.",
+      "4. For each node: a. Check condition — skip if not met. b. Resolve context_variants. c. Send player_facing to AI (or skip AI for mandatory). d. Apply effects. e. Check ending_resolution or resolution_rule.",
+      "5. NODE n003: ending_resolution handles squat path branching. For motel/car, all choices return 'continue' (no ending). For squat + ralph kind + not thorough → ending_squat_hidden. For squat + ralph kind + thorough → 'ralph_defended_proceed'. For squat + ralph_threatened → 'continue'. ralph_defended is derived at export time via campaign.derived_exports derive_rule.",
+      "6. NODE n004: QTE evasion. Success → ending_train_safe. Failure → 'spotted' stored as _n004_street_evasion_result.",
+      "7. NODE n005: Compound condition reads state directly — no chase_triggered flag needed. Runs when: squat + ralph betrayed, OR squat + ralph kind + thorough search, OR motel/car + evasion failed.",
+      "8. NODE n006: Standard QTE for Kara's crossing. Success → 'kara_crossed' (non-ending). Failure → ending_highway_kara_died or ending_highway_kara_sacrificed (shield_alice).",
+      "9. NODE n007: Connor pursuit QTE. Only runs when connor_highway_choice == 'pursued'. sprint_to_catch failure = ending_connor_died, cut_across failure = ending_vanished, pull_back = always ending_highway_escaped.",
+      "10. NODE n008: Mandatory. Only runs when connor_highway_choice == 'obeyed'. Returns ending_highway_escaped.",
+      "11. ENDING ending_connor_died: Increment connor_death_count by 1. Add software_instability +1.",
+      "12. ENDING ending_connor_caught: kara_captured is derived at export time via campaign.derived_exports derive_rule (_ending_id == ending_connor_caught).",
+      "13. Export all cross_chapter_exports when chapter ends."
+    ],
+    "security_note": "NEVER expose state values, software_instability scores, hank_relationship numbers, alice_relationship numbers, effect deltas, resolution probabilities, or any system-layer information to the AI player."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "condition_variable": "ch10_shelter",
+        "options": {
+          "motel": "卡拉和爱丽丝在东部汽车旅馆醒来。卡拉剪了头发、拆掉LED，改变了自己的外貌。",
+          "squat": "卡拉和爱丽丝在拉尔夫收留她们的废弃房屋中醒来。卡拉在楼上找到衣服，剪了头发，拆掉了LED。",
+          "car": "卡拉和爱丽丝在废弃的汽车里醒来。卡拉在停车场找到剪刀和衣服，伪装了自己的外貌。"
+        }
+      },
+      {
+        "condition_variable": "ralph_response",
+        "options": {
+          "compassionate": "拉尔夫抓了一只老鼠，坚持要一起吃“家庭早餐”。卡拉主动坐下，以善意对待他，理解他对陪伴的渴望。",
+          "reluctant": "拉尔夫坚持要一起吃早餐。卡拉起初拒绝，但最终坐下以避免冲突升级。",
+          "threatened": "拉尔夫要求一起吃早餐。卡拉挡在爱丽丝面前，威胁他并要求立刻离开。",
+          "null": ""
+        }
+      },
+      {
+        "condition_variable": "investigation_approach",
+        "options": {
+          "thorough": "康纳到达现场，进行了系统性的调查，逐个房间搜查并检查所有可用证据。",
+          "witnesses": "康纳到达现场，集中精力询问在场的人，追问AX400的行踪信息。",
+          "quick": "康纳到达现场，快速扫视了一遍，在没有发现直接线索后选择离开。"
+        }
+      },
+      {
+        "condition_variable": "_n003_connor_investigation_result",
+        "options": {
+          "ralph_defended_proceed": "当康纳的搜查接近卡拉的藏身处时，拉尔夫扑向康纳保护她们，给了卡拉和爱丽丝逃跑的机会。",
+          "continue": ""
+        }
+      },
+      {
+        "condition_variable": "evasion_result",
+        "options": {
+          "careful": "卡拉在街上小心翼翼地移动，利用停放的车辆和小巷作为掩护躲避巡逻。",
+          "blend": "卡拉带着爱丽丝自然地走在街上，试图伪装成出门办事的人类母女。",
+          "rush": "卡拉拉着爱丽丝的手快速穿过街道，抄近路尽快赶往火车站。",
+          "null": ""
+        }
+      },
+      {
+        "condition_variable": "connor_highway_choice",
+        "options": {
+          "obeyed": "在高速公路围栏前，汉克命令康纳停止追击。康纳服从了，看着AX400和孩子独自试图穿越公路。",
+          "pursued": "在高速公路围栏前，汉克命令康纳停下。康纳无视了他，翻过围栏，在六车道的高速公路上追击AX400。",
+          "null": ""
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_squat_hidden": "康纳的调查一无所获。卡拉和爱丽丝藏了起来，在警察离开后悄悄离去。",
+          "ending_train_safe": "卡拉和爱丽丝躲过了警察巡逻，安全到达火车站，从这个区域消失了。",
+          "ending_vanished": "康纳赶到高速公路围栏时已经太晚了。AX400和孩子已经消失，线索中断。",
+          "ending_highway_escaped": "卡拉和爱丽丝穿越了六车道的高速公路，活着到达了对面，消失在城市中。",
+          "ending_highway_kara_died": "卡拉和爱丽丝在穿越高速公路时被车辆撞击，无一幸存。",
+          "ending_highway_kara_sacrificed": "卡拉用身体挡住了冲向爱丽丝的车辆。卡拉被撞毁，爱丽丝独自存活了下来。",
+          "ending_connor_caught": "康纳在高速公路上抓住了卡拉。她和爱丽丝被拘押。",
+          "ending_connor_died": "康纳在高速公路上追击AX400时被车辆撞击，RK800被摧毁。模控生命将派出替换体。"
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch13_kara_alive",
+        "from_ending_survivors": "Kara",
+        "default_if_not_dead": true
+      },
+      {
+        "target": "ch13_alice_alive",
+        "from_ending_survivors": "Alice",
+        "default_if_not_dead": true
+      },
+      {
+        "target": "ch13_connor_alive",
+        "from_ending_survivors": "Connor",
+        "default_if_not_dead": true,
+        "note": "Connor always respawns if killed — this tracks whether he died in THIS chapter"
+      },
+      {
+        "target": "ch13_ralph_defended",
+        "source": "ralph_defended",
+        "derive_rule": "ch10_shelter == squat AND ralph_response != threatened AND investigation_approach == thorough",
+        "note": "True only when squat + Kara was kind to Ralph + Connor searched thoroughly. Required for Ralph to reappear in ch31."
+      },
+      {
+        "target": "ch13_kara_captured",
+        "source": "kara_captured",
+        "derive_rule": "_ending_id == ending_connor_caught",
+        "note": "True when Connor catches Kara on the highway."
+      },
+      {
+        "target": "software_instability",
+        "source": "software_instability"
+      },
+      {
+        "target": "hank_relationship",
+        "source": "hank_relationship"
+      },
+      {
+        "target": "alice_relationship",
+        "source": "alice_relationship"
+      },
+      {
+        "target": "connor_death_count",
+        "source": "connor_death_count"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch13_kara_alive",
+      "ch13_alice_alive",
+      "ch13_connor_alive",
+      "ch13_ralph_defended",
+      "ch13_kara_captured",
+      "software_instability",
+      "hank_relationship",
+      "alice_relationship",
+      "connor_death_count"
+    ]
+  }
+}

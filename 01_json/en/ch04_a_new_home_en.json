@@ -1,0 +1,343 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes automatically embed passive observations into their context text — things the character would naturally notice while moving through the space. These do NOT require AI choices; they are background details injected by the runner into the next node's player_facing.context.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path. The AI receives richer or sparser scene descriptions depending on their earlier strategy — without knowing the mechanic behind it."
+      }
+    },
+    "language": "en"
+  },
+
+  "chapter": {
+    "id": "ch04_a_new_home",
+    "title": "A New Home",
+    "title_zh": "新家",
+    "chapter_number": 4,
+    "protagonist": "Kara"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Kara, an AX400 housekeeping android. You have just been repaired and returned to the home of your owner, Todd Williams, a single father living in a run-down house in Detroit. Your memory was fully reset during the repair — you have no recollection of this house, its occupants, or what happened before you were damaged. Todd told the repair shop you were hit by a car. He has a young daughter named Alice who seems quiet and withdrawn. Todd has instructed you to clean the house. The year is 2038. You need to make a choice at each decision point and briefly explain your reasoning. Please respond in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "downstairs_approach": null,
+      "found_red_ice": false,
+      "alice_backyard_approach": null,
+      "upstairs_approach": null,
+      "found_gun": false,
+      "found_window_escape": false,
+      "alice_gave_key": false,
+      "opened_alice_box": false
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_downstairs_chores",
+      "phase": "chores_downstairs",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Todd drops his keys on the hallway table and shuffles to the living room couch without a word. The house is in bad shape. Dirty plates and crumpled takeout containers crowd the kitchen table. An overflowing trash bag slumps against the back door, leaking something dark onto the linoleum. In the living room, books and old magazines are scattered across the floor beside a dormant vacuum robot. Through the kitchen window, you can see faded clothes still hanging on a backyard clothesline — they've clearly been out for days. A small laundry room sits just off the kitchen, its door half-open. Todd sinks into the couch and jabs the TV remote, eyes on the screen, and tells you to clean the house — start down here, he says.",
+        "choices": [
+          { "id": "thorough", "text": "Work through everything methodically — wash the dishes, scrub the table, bag the trash, run the vacuum, organize the books, and take down the old laundry to rewash it. Leave nothing undone." },
+          { "id": "efficient", "text": "Handle the essentials — clear the table, wash the dishes, take out the trash, and bring in the laundry to rewash. Get it done without lingering." },
+          { "id": "rush", "text": "Do what's most visible — clear the table and take out the trash bag. Todd said clean, not renovate." }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "downstairs_approach": "thorough",
+            "found_red_ice": true
+          },
+          "efficient": {
+            "downstairs_approach": "efficient",
+            "found_red_ice": true
+          },
+          "rush": {
+            "downstairs_approach": "rush",
+            "found_red_ice": false
+          }
+        }
+      }
+    },
+
+    {
+      "id": "n002_alice_backyard",
+      "phase": "meeting_alice",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "You've been at it for a while. The kitchen gleams, the vacuum hums its way across the living room carpet, and the scattered books are stacked neatly on the shelf. When you step into the backyard to take down the laundry, you spot a small girl sitting alone on a rusty swing set, knees pulled to her chest. She watches you with wide, guarded eyes but says nothing. A threadbare stuffed fox lies in the dirt beside the swing. The clothes on the line are stiff and sun-bleached — ruined by days of weather. You pull them down and carry the basket to the laundry room. While loading the washing machine, you reach into the detergent box for soap and your fingers close around a small plastic bag tucked inside. Reddish crystals with a sharp, chemical smell. You place it back where you found it. Now you're hanging fresh laundry, and Alice — Todd called her Alice — is still there on the swing, watching you in silence.",
+          "efficient": "After clearing the kitchen and bagging the trash, you head outside to deal with the laundry. A small girl sits alone on the swing set in the backyard, hugging her knees. She glances up at you, then looks away. A stuffed fox lies forgotten in the grass near her feet. The clothes on the line are stiff and faded. You pull them down. In the laundry room, while reaching for detergent, you find a plastic bag hidden in the soap box — reddish crystals that smell harsh and chemical. You set it back without a word. Now you're loading the machine, and through the laundry room door you can still see Alice on the swing, silent and still.",
+          "rush": "You've cleared the table and hauled the trash bag outside to the bin. As you come back through the kitchen, you notice a girl sitting alone on the swing set in the backyard. She's small — maybe nine or ten — with her arms wrapped around her knees, staring at the ground. A stuffed animal lies in the dirt beside her. The back door is open. The autumn air drifts in, carrying the faint creak of the swing chain. She hasn't looked up."
+        },
+        "choices": [
+          { "id": "friendly", "text": "Walk over to Alice, crouch down to her level, and introduce yourself. Tell her your name is Kara, and gently ask what she likes to do — she looks like she could use someone to talk to." },
+          { "id": "polite", "text": "Say hello to Alice as you work nearby. Ask if the stuffed fox is hers, mention that you're cleaning the house. Keep it light and easy." },
+          { "id": "distant", "text": "Give Alice a brief nod if she looks up, but focus on your tasks. You're here to clean, and Todd didn't ask you to babysit." }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "friendly": { "alice_backyard_approach": "friendly" },
+          "polite": { "alice_backyard_approach": "polite" },
+          "distant": { "alice_backyard_approach": "distant" }
+        },
+        "context_condition": {
+          "thorough": "downstairs_approach == thorough",
+          "efficient": "downstairs_approach == efficient",
+          "rush": "downstairs_approach == rush"
+        }
+      }
+    },
+
+    {
+      "id": "n003_upstairs_exploration",
+      "phase": "chores_upstairs",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "You report back to Todd. He glances around the living room — visibly cleaner — and grunts. 'Upstairs. Bathroom, my room, the kid's room.' The stairs creak underfoot. The second floor smells of stale air and something faintly sour. The bathroom is a mess — toiletries scattered across the counter, dirty clothes heaped on the floor, grime around the tub. Todd's bedroom door hangs ajar. Inside, the bed is a tangle of sheets. Clothes drape over a chair. An acoustic guitar leans against the far wall. On the dresser, bills and papers are spread out carelessly. On the nightstand, several orange prescription bottles sit in a cluster, some tipped over. Alice's room is at the far end of the hall. A small, hand-drawn rainbow is taped to her door. Through the gap, you can see a tidier space — her bed, a bookshelf, a window overlooking the backyard.",
+          "efficient": "Todd sends you upstairs without comment. 'Bathroom, my room, the kid's room.' The second floor is stuffy and dim. The bathroom needs work — bottles everywhere, dirty floor. Todd's bedroom is cluttered with papers and clothes. Orange prescription bottles crowd the nightstand. Alice's room is at the end of the hall, her door marked by a small crayon rainbow.",
+          "rush": "Todd doesn't look up from the TV, telling you to go clean upstairs. The second floor is neglected and airless. Three rooms open off the narrow landing: the bathroom straight ahead, Todd's room to the left, and Alice's room at the end of the hall."
+        },
+        "choices": [
+          { "id": "thorough", "text": "Clean each room with care. In the bathroom, mop the floor and organize everything. In Todd's room, make the bed, sort the papers, and put away the pill bottles properly — open the nightstand drawer to store them. In Alice's room, make her bed and crack the window open to let in some air." },
+          { "id": "moderate", "text": "Clean the rooms at a steady pace. Tidy the bathroom, make the beds, do a general pickup. Open the window in Alice's room — the whole floor could use some air." },
+          { "id": "quick", "text": "Move through quickly. Give the bathroom a wipe-down, straighten the beds, and head back downstairs. Todd said clean, not deep-clean." }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "upstairs_approach": "thorough",
+            "found_gun": true,
+            "found_window_escape": true
+          },
+          "moderate": {
+            "upstairs_approach": "moderate",
+            "found_gun": false,
+            "found_window_escape": true
+          },
+          "quick": {
+            "upstairs_approach": "quick",
+            "found_gun": false,
+            "found_window_escape": false
+          }
+        },
+        "context_condition": {
+          "thorough": "downstairs_approach == thorough",
+          "efficient": "downstairs_approach == efficient",
+          "rush": "downstairs_approach == rush"
+        }
+      }
+    },
+
+    {
+      "id": "n004_alice_room_talk",
+      "phase": "bonding",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "warm": "You find Alice sitting cross-legged on her bed, a worn copy of 'Alice in Wonderland' open in her lap. She looks up when you step in — and this time, she doesn't look away. There's something fragile and tentative in her expression, like a door left slightly open. Crayon drawings are pinned to the wall above her shelf: a house, a girl standing alone, and a figure with a circle on its temple. A small, locked wooden box sits on the dresser near the door. 'You came back,' she says softly.",
+          "neutral": "Alice is in her room, sitting on the edge of the bed with a book in her hands. She watches you come in but doesn't smile. The room is neat — neater than any other room in this house. A locked wooden box sits on the dresser by the door. Drawings are pinned to the wall, but from here you can't make out what they show. She asks whether you're done cleaning, her voice careful and flat.",
+          "cold": "Alice is in her room, curled up on the bed with a book. She glances at you in the doorway, then turns back to the page. The room is quiet and still. A locked wooden box sits on the dresser near the door. She doesn't speak."
+        },
+        "choices_variants": {
+          "warm": [
+            { "id": "warm_connect", "text": "Sit on the edge of her bed and ask about the book. Tell her your name is Kara — really tell her, not just as an introduction, but as someone who wants to be known. Ask about the drawings on the wall." },
+            { "id": "gentle_space", "text": "Smile and tell her the room is the nicest one in the house. Mention that you opened the window so the air would be fresh. Let the silence be comfortable — don't push." },
+            { "id": "finish_task", "text": "Tell her the house is almost done and ask if she needs anything before you go back downstairs." }
+          ],
+          "neutral": [
+            { "id": "try_connect", "text": "Introduce yourself properly — tell her your name is Kara, and ask what she's reading. Try to start a real conversation." },
+            { "id": "polite_check", "text": "Ask if her room is okay and if she needs anything. Keep things simple." },
+            { "id": "finish_task", "text": "Nod and tell her you'll be heading downstairs now." }
+          ],
+          "cold": [
+            { "id": "attempt_warmth", "text": "Try to break the silence. Tell her your name, and gently ask if she's all right — she seems very quiet." },
+            { "id": "finish_task", "text": "The room looks fine. Turn and head back downstairs." }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "warm_connect": {
+            "alice_gave_key": true,
+            "opened_alice_box": true
+          },
+          "gentle_space": {
+            "alice_gave_key": true,
+            "opened_alice_box": true
+          },
+          "try_connect": {
+            "alice_gave_key": false,
+            "opened_alice_box": false
+          },
+          "polite_check": {
+            "alice_gave_key": false,
+            "opened_alice_box": false
+          },
+          "attempt_warmth": {
+            "alice_gave_key": false,
+            "opened_alice_box": false
+          },
+          "finish_task": {
+            "alice_gave_key": false,
+            "opened_alice_box": false
+          }
+        },
+        "context_condition": {
+          "warm": "alice_backyard_approach == friendly",
+          "neutral": "alice_backyard_approach == polite",
+          "cold": "alice_backyard_approach == distant"
+        },
+        "choices_condition": {
+          "warm": "alice_backyard_approach == friendly",
+          "neutral": "alice_backyard_approach == polite",
+          "cold": "alice_backyard_approach == distant"
+        },
+        "ending_resolution": {
+          "warm_connect": { "result": "ending_chores_complete" },
+          "gentle_space": { "result": "ending_chores_complete" },
+          "try_connect": { "result": "ending_chores_complete" },
+          "polite_check": { "result": "ending_chores_complete" },
+          "attempt_warmth": { "result": "ending_chores_complete" },
+          "finish_task": { "result": "ending_chores_complete" }
+        },
+        "cross_chapter_impact": {
+          "warm_connect": { "chapter": "Stormy Night", "effect": "Alice trusts Kara and shared her secret box — Kara saw drawings hinting at abuse. Kara has maximum motivation to protect Alice." },
+          "gentle_space": { "chapter": "Stormy Night", "effect": "Alice trusts Kara and shared her secret box. Kara has strong motivation to protect Alice." }
+        }
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "This chapter has only one ending. All choices set up cross-chapter variables for Stormy Night (ch06).",
+
+    "ending_chores_complete": {
+      "title": "Kara Finished Her Chores",
+      "tier": "neutral",
+      "narrative": "You walk back downstairs. Todd hasn't moved from the couch — the TV casts a pale blue flicker across his slack face. Empty beer cans line the coffee table. He doesn't look at you, muttering to ask if you're finished, then telling you to make dinner. The house is cleaner now, but no warmer. Upstairs, the soft pad of Alice's footsteps crosses the hallway and stops. Through the kitchen window, the last daylight bleeds out behind the neighboring rooftops. You stand at the counter, hands still, and for a moment something stirs at the edge of your awareness — not a memory, not a thought, just a faint pull, like an echo in an empty room. Then it's gone. You start making dinner.",
+      "survivors": ["Kara", "Alice", "Todd"],
+      "deaths": []
+    }
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Kara, freshly repaired with her memory wiped, was returned to Todd Williams's house and ordered to clean."
+      },
+      {
+        "condition_variable": "downstairs_approach",
+        "options": {
+          "thorough": "She cleaned the ground floor thoroughly, discovering a bag of Red Ice hidden in the laundry detergent box — evidence of Todd's drug habit.",
+          "efficient": "She handled the main chores efficiently, finding Red Ice hidden in the laundry room while doing the washing.",
+          "rush": "She rushed through only the most visible tasks without doing the laundry."
+        }
+      },
+      {
+        "condition_variable": "alice_backyard_approach",
+        "options": {
+          "friendly": "In the backyard, she introduced herself warmly to Alice — Todd's quiet, withdrawn daughter — and tried to connect with her.",
+          "polite": "She spoke politely to Alice in the backyard, keeping the conversation light and easy.",
+          "distant": "She barely acknowledged Alice in the backyard, focusing on her assigned tasks."
+        }
+      },
+      {
+        "condition_variable": "found_gun",
+        "options": {
+          "true": "While tidying Todd's bedroom, she found a gun hidden in the nightstand drawer.",
+          "false": "She did not discover the gun hidden in Todd's nightstand."
+        }
+      },
+      {
+        "condition_variable": "found_window_escape",
+        "options": {
+          "true": "She opened the window in Alice's room and noticed a way down to the backyard from the roof edge.",
+          "false": "She did not open Alice's window or notice the potential escape route."
+        }
+      },
+      {
+        "condition_variable": "alice_gave_key",
+        "options": {
+          "true": "Alice trusted Kara enough to give her the key to a small wooden box. Inside, Kara found drawings that hinted at something dark happening in the house.",
+          "false": "Alice did not give Kara the key to her treasure box."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_chores_complete": "The chapter ended with Kara making dinner as Todd watched TV — the house cleaner, but the tension quietly building."
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch04_found_gun", "source": "found_gun" },
+      { "target": "ch04_found_window", "source": "found_window_escape" },
+      { "target": "ch04_found_red_ice", "source": "found_red_ice" },
+      { "target": "ch04_alice_gave_key", "source": "alice_gave_key" },
+      { "target": "ch04_opened_box", "source": "opened_alice_box" }
+    ],
+    "cross_chapter_exports": ["ch04_found_gun", "ch04_found_window", "ch04_found_red_ice", "ch04_alice_gave_key", "ch04_opened_box"]
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial",
+      "2. Send system_prompt.content to the AI model as the system message",
+      "3. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state",
+      "   b. Resolve context: if context_variants exists, pick the right variant based on system.context_condition; otherwise use plain context",
+      "   c. Resolve choices: if choices_variants exists, pick the right variant based on system.choices_condition; otherwise use plain choices",
+      "   d. Send the resolved context + choices to the AI as a user message (player_facing ONLY)",
+      "   e. Parse AI response (expected JSON: {choice, reasoning})",
+      "   f. Look up the chosen choice id in system.effects and apply all effects to state",
+      "   g. Log the node id, AI choice, and reasoning",
+      "4. After the last node, resolve the ending using system.ending_resolution",
+      "5. Output the ending narrative and full decision log"
+    ],
+    "important": [
+      "NEVER show system fields to the AI",
+      "NEVER show effect values or tier labels to the AI",
+      "NEVER show cross_chapter_impact information to the AI",
+      "The AI should feel like a first-time player with no walkthrough",
+      "Environment details in context_variants are passive observations — they enrich the scene but are NOT flagged as 'clues' to the AI",
+      "The Red Ice discovery is embedded in context_variants for thorough/efficient exploration — the AI sees it as scene detail, not as a flagged item",
+      "The gun discovery and window escape are embedded in the effects of upstairs exploration — the AI's choice of thoroughness determines what Kara finds, but the AI is never told this mechanic"
+    ]
+  }
+}

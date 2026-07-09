@@ -1,0 +1,19 @@
+# Secrets — 永不提交
+.env
+*.env
+!.env.example
+
+# 系统/编辑器
+.DS_Store
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Claude Code 本地配置
+.claude/
+
+# 版权材料：游戏剧情原文，禁止纳入公开仓库
+01_json/source/

@@ -1,0 +1,300 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration strategy.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch14_jericho",
+    "title": "Jericho",
+    "chapter_number": 14,
+    "protagonist": "Markus"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是马库斯（Markus），RK200型仿生人。你曾被警察击倒、拆解，遗弃在废弃场中。你从残骸中重建了自己，活着爬了出来。一个垂死的仿生人把一枚金属盘塞进你的手里，告诉你一个叫杰利科的地方——一个为脱离程序控制的仿生人准备的庇护所。现在是2038年11月6日，下午四点半。你在底特律芬代尔区的街道上，追踪一串涂鸦符号，它们应该能把你带到杰利科。你孤身一人，身上除了那枚金属盘和一个陌生人最后的话语之外一无所有。请以JSON格式回复：{\"choice\": 选项序号（从1开始）, \"reasoning\": \"你的决策理由（50字以内）\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "station_exploration": null,
+      "trail_approach": null,
+      "bridge_method": null,
+      "software_instability": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_station_exploration",
+      "phase": "arrival",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "你走上芬代尔一个废弃车站的站台。荧光灯在头顶忽明忽暗，一半已经熄灭。没有乘客，没有工作人员。出发信息牌一片漆黑。穿过走廊时，你的视觉界面闪过一个片段——一段不属于你的记忆。一个型号不明的仿生人，几周或几个月前站在这同一个站台上，凝视着水泥墙上的一个符号。画面在你抓住更多细节之前消散了。那个符号还在那里：一个被一条线贯穿的三角形，用淡蓝色涂料喷在远处的墙面上。你仔细看，发现更多类似的标记散布在普通涂鸦之间——更新、更刻意，构成了一个只有刻意寻找才能发现的规律。出口附近的长椅上放着一本皱巴巴的杂志和几张旧报纸。前方的闸机通向街道。",
+        "choices": [
+          {
+            "id": "explore_thorough",
+            "text": "在这里多花些时间。仔细研究那些重复出现的符号——它们的间距、方向、新旧程度。翻看长椅上的杂志和报纸。检视那段记忆残片的残余数据。在跟随这条路之前，先理解它。"
+          },
+          {
+            "id": "explore_quick",
+            "text": "记下符号的规律和它们指向的方向。扫一眼长椅。你已经看够了，不需要在一个空车站里久留。"
+          },
+          {
+            "id": "explore_direct",
+            "text": "你有金属盘，你有方向。这个车站只是路过的地方，不是目的地。径直走向出口，跟着外面看到的第一个符号走。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "explore_thorough": {
+            "station_exploration": "thorough",
+            "software_instability": 1
+          },
+          "explore_quick": {
+            "station_exploration": "quick"
+          },
+          "explore_direct": {
+            "station_exploration": "direct"
+          }
+        },
+        "note": "The memory fragment is a flashback of another deviant who passed through here. thorough exploration gives the AI richer environmental context in subsequent nodes and +1 SI for engaging with the deviant memory trace."
+      }
+    },
+
+    {
+      "id": "n002_trail_approach",
+      "phase": "journey",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "走出车站，符号的轨迹将你引向芬代尔更深处的工业废墟。你在站内已经辨认出了规律：每个标记指向下一个，间隔越来越短，像一颗逐渐加速的心跳。街道灰蒙蒙的，几乎没有行人。偶尔有人类经过，没有人看你。在一片围栏旁的空地边，你发现一个仿生人一动不动地站在人行道上——LED灯以暗淡的黄色循环闪烁，目光涣散，陷入了某种死循环。你靠近时它没有反应，但杰利科的符号就喷在它身后的墙上。路径继续延伸，穿过铁丝网的缺口，进入一栋废弃的立体停车楼。光线骤然暗下来。靠近远处的墙壁，半遮在一个垃圾箱后面，一个仿生人面朝下趴在干涸的蓝血池中，已经在那里待了好几天。再往深处，穿过坍塌的天花板和锈蚀的横梁，符号向上引导——通过结构中的裂口，到达楼顶。从那里，你能看见前方一栋废弃的办公楼，再远处，靠近水岸，是一个庞大的轮廓。你需要穿过去到达那一边。",
+          "quick": "车站外的符号带你穿过芬代尔的工业街道。有几个人类经过——没人看你。你在围栏旁的空地边发现一个仿生人冻结在人行道上，LED灯闪着黄色，杰利科的符号喷在它身后的墙上。路径穿过铁丝网的缺口，进入一栋阴暗的废弃停车楼。远处的墙边躺着一具仿生人的躯体，一动不动，已被遗弃许久。符号向上穿过坍塌的天花板，通向楼顶。你能看见前方一栋废弃的办公楼，再远处靠近水岸的地方有一个庞大的轮廓。",
+          "direct": "你跟着符号穿过芬代尔的街道，没有停留。它们引导你穿过一栋停车楼，上到楼顶，朝向一栋废弃的办公楼。在那之后，靠近水岸的地方，灰色天空下矗立着一个庞大的剪影。"
+        },
+        "choices": [
+          {
+            "id": "approach_careful",
+            "text": "放慢脚步。检查沿途倒下的仿生人——他们是怎么死的，在这里多久了，他们的路途是自己选择终结的还是被外力终结的。到达废弃办公楼时，仔细搜索后再继续前进。"
+          },
+          {
+            "id": "approach_efficient",
+            "text": "跟着标记走。死去的人已经无法帮助，为他们停下只会浪费你可能并不充裕的时间。穿过障碍物，继续向水岸方向前进。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "approach_careful": {
+            "trail_approach": "careful",
+            "software_instability": 1
+          },
+          "approach_efficient": {
+            "trail_approach": "efficient"
+          }
+        },
+        "context_condition": {
+          "thorough": "station_exploration == thorough",
+          "quick": "station_exploration == quick",
+          "direct": "station_exploration == direct"
+        },
+        "note": "careful approach: Markus examines android bodies (3 along the trail), searches abandoned office, finds more context about the deviant underground. +1 SI for engaging with the dead. efficient: follows trail markers directly, minimal interaction with environment."
+      }
+    },
+
+    {
+      "id": "n003_bridge_crossing",
+      "phase": "crossing",
+      "type": "qte_converted",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "careful": "你从办公楼出来，眼前是一座狭窄的维修天桥，延伸向对面的建筑——而在那之后，你终于清晰地看见了它：一艘船。巨大的，锈迹斑斑的，微微倾斜着停泊在河面的黑水中。杰利科。你手中的金属盘似乎变热了，又或许那只是你的错觉。天桥很旧，锈蚀清晰可见。你走上去，一步，两步。走到一半时，金属在你脚下发出呻吟。前方的一块格栅塌了下去。然后是另一块。天桥剧烈震颤、弯折，开始坍塌。你抓住栏杆，脚下的走道整段垮落。等尘埃散去，你悬挂在一根锯齿状的横梁上，面前是十米宽的虚空。左边，一台施工起重机的吊臂延伸过这片空隙，如果攀上去的话刚好够得着。下方是二十米高的混凝土和碎石。",
+          "efficient": "穿过办公楼之后，一座维修天桥通向水岸方向。隔着空隙，你看见了它：一艘船，巨大而锈蚀，暗沉地停泊在河中。杰利科。你踏上天桥。走到一半，金属呻吟着塌陷下去。你抓住一根横梁，走道整段坍塌。面前裂开了十米宽的缺口。左侧一台起重机的吊臂延伸过虚空之上。下方是很长的一段坠落距离，底下是混凝土地面。"
+        },
+        "choices": [
+          {
+            "id": "attempt_crane_jump",
+            "text": "攀上起重机的吊臂。沿着它移动到对面上方，然后跳下去。这是唯一能过去的路。"
+          },
+          {
+            "id": "try_lower_route",
+            "text": "向下爬而不是向上。也许在更低的位置能找到穿过去的路——穿过碎石堆、沿着水岸线，任何不需要在二十米高空走起重机吊臂的方式。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_crane_jump": {
+            "bridge_method": "crane"
+          },
+          "try_lower_route": {
+            "bridge_method": "lower"
+          }
+        },
+        "context_condition": {
+          "careful": "trail_approach == careful",
+          "efficient": "trail_approach == efficient"
+        },
+        "resolution_rule": {
+          "attempt_crane_jump": {
+            "casual": {
+              "result": "continue",
+              "note": "Markus climbs the crane and jumps successfully, landing cleanly on the far side"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": {
+                "result": "continue",
+                "note": "Clean landing on far side"
+              },
+              "failure": {
+                "result": "continue",
+                "note": "Markus nearly falls, catches the edge, pulls himself up — minor damage but arrives"
+              }
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": {
+                "result": "continue",
+                "note": "Clean landing"
+              },
+              "failure": {
+                "result": "continue",
+                "note": "Rough landing, some damage, but arrives"
+              }
+            }
+          },
+          "try_lower_route": {
+            "casual": {
+              "result": "continue",
+              "note": "Markus finds a way through the rubble at ground level and reaches the ship from below"
+            },
+            "experienced": {
+              "result": "continue",
+              "note": "Longer route but Markus arrives at the ship's hull"
+            },
+            "hardcore": {
+              "result": "continue",
+              "note": "Difficult climb through debris, but Markus reaches the ship"
+            }
+          }
+        },
+        "note": "Non-terminal QTE. All paths lead to the ship. The crane jump is the canonical game path; the lower route is an alternative that converges. Both result=continue to n004_meet_jericho."
+      }
+    },
+
+    {
+      "id": "n004_meet_jericho",
+      "phase": "arrival",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": "你进入了船体内部。空气滞重，弥漫着铁锈和陈旧海水的气味。入口舱盖旁的架子上放着一只手电筒，你拿起来打开。光柱切入彻底的黑暗，照亮一条狭窄的走廊，墙壁剥落，天花板面板坍塌悬垂。你继续深入，穿过曾经的客舱甲板，经过一排排房门大开的空舱室。船体随你的每一步发出深沉的呻吟。你到达了轮机舱——一个巨大的空间，死寂的涡轮机和锈蚀的管道密布其中。一条金属栈道横跨在高处。你踏上去。走到一半，支撑结构断裂。你坠落，重重地摔在下层甲板上。你抬起头时，有一些面孔正从上方俯视着你。仿生人。几十个，站在轮机舱的暗影中，沉默地注视着你。有些残缺不全，少了肢体或皮肤面板。有些外表完好，但目光空洞。一个短发的女人走上前来。在她身后，一个表情沉稳的高个男人，还有一个戴眼镜的人抱着双臂站在后面。一个面部裸露着线路的仿生人走近，触碰了你的手臂。你找到了杰利科。"
+      },
+
+      "system": {
+        "effects": {},
+        "result": "ending_jericho"
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "This chapter has only one outcome. Markus always finds Jericho.",
+    "ending_jericho": {
+      "tier": "only",
+      "title": "杰利科",
+      "narrative": "你找到了他们——或者说，他们找到了你。杰利科号停泊在黑暗的河水中，像一座被遗忘的纪念碑，锈蚀、倾斜，但内部因为几十个选择逃离的仿生人的存在而活着。诺丝、乔许、赛门、露西——你还不知道他们的名字，但你会知道。他们望着你，目光中交织着希望和警惕。你是这个从不打算长久存在的地方的最新到来者，这里是那些无处可去的人建起来的。金属盘在你掌心微微发烫。把它交给你的陌生人已经不在了，但他许诺的地方是真的。无论接下来发生什么，你不再是孤身一人。",
+      "survivors": ["Markus"],
+      "deaths": []
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Verify ch11_markus_alive == true. If false, skip this chapter entirely.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: software_instability (cumulative).",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context variants based on system.context_condition",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, and advance",
+      "   d. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "5. NODE n003_bridge_crossing: QTE node. After AI chooses, resolve using difficulty preset. All outcomes lead to continue (proceed to n004). Record the resolution for narrative purposes.",
+      "6. NODE n004_meet_jericho: Mandatory node. Do not call AI. Apply result directly.",
+      "7. SOFTWARE INSTABILITY DELTAS THIS CHAPTER: explore_thorough (+1), approach_careful (+1). Max possible gain this chapter: +2. Add to imported software_instability value.",
+      "8. SINGLE ENDING: All paths lead to ending_jericho. No branching at chapter level.",
+      "9. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, software_instability scores, effect deltas, or any system-layer information to the AI player."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "沿着废弃场那个垂死仿生人留下的线索，马库斯来到了芬代尔一个荒废的车站，在那里经历了一段来自另一个异常仿生人的记忆闪回。"
+      },
+      {
+        "condition_variable": "station_exploration",
+        "options": {
+          "thorough": "他花时间研究了涂鸦符号的规律，在出发前拼凑出了完整的路径模式。",
+          "quick": "他迅速辨认出路径标记，随即动身。",
+          "direct": "他没有停留，径直穿过车站，跟着外面的第一个符号上路。"
+        }
+      },
+      {
+        "condition_variable": "trail_approach",
+        "options": {
+          "careful": "在穿越芬代尔废弃街区和建筑的途中，他停下来检视了沿途倒下的仿生人躯体——那些尝试同样旅程却未能走到终点的同类，亲眼见证了通往杰利科的路途对其他人意味着什么。",
+          "efficient": "他沿着路径标记穿过芬代尔的废弃街区和建筑，没有停留，一心向前。"
+        }
+      },
+      {
+        "text": "一座天桥在他脚下坍塌之后，马库斯找到了通向一艘停泊在河中的巨大锈蚀货轮的路。在船体内部，他从断裂的栈道上坠落到轮机舱——然后发现了他们。数十个异常仿生人生活在船体的暗影之中。杰利科是真的。"
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch14_markus_at_jericho",
+        "from_ending_survivors": "Markus",
+        "default_if_not_dead": true
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch14_markus_at_jericho",
+      "software_instability"
+    ]
+  }
+}

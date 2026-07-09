@@ -1,0 +1,615 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration strategy.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+  "chapter": {
+    "id": "ch05_the_painter",
+    "title": "The Painter",
+    "title_zh": "画家",
+    "chapter_number": 5,
+    "protagonist": "Markus"
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是马库斯（Markus），型号RK200，隶属于卡尔·曼弗雷德（Carl Manfred）——一位享有盛名但年迈体衰、依靠轮椅生活的画家。卡尔不是普通的主人。他把你当作同伴，征求你的意见，鼓励你跳出程序的框架去思考。你刚从贝利尼画材店（Bellini Paints）取回了一批颜料。现在是2038年11月5日上午。卡尔的宅邸是一座宽敞的大宅，里面摆满了艺术品、珍本书籍和他一辈子搜集来的各种珍奇物件。你需要在每个决策点做出选择，并简要说明理由。请以JSON格式回复：{\"choice\": 选项序号（从1开始）, \"reasoning\": \"你的决策理由（50字以内）\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "shirt_torn": false,
+      "home_exploration": null,
+      "activity_choice": null,
+      "activity_detail": null,
+      "painting_approach": null,
+      "painting_detail": null,
+      "painting_emotion": null
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_arriving_home",
+      "phase": "arriving",
+      "type": "exploration",
+      "condition": null,
+      "player_facing": {
+        "context": "你推开大宅的前门，贝利尼画材店的包裹夹在臂下。宽阔的门厅在眼前展开——晨光穿过落地窗倾泻而入，照亮了大理石地面上浮动的微尘。楼梯拐角处立着一只标本长颈鹿，玻璃眼珠折射着光线。左手边，一只精致的鸟笼里栖着两只没有通电的仿生金丝雀。旋转楼梯旁的底座上安放着一个地球仪。客厅深处摆着厚实的皮沙发、茶几上的棋盘、窗边的三角钢琴，整面墙的书架从地板一直延伸到天花板。楼上，卡尔还在睡。整栋房子只有深处某个大钟的滴答声。",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "慢慢逛一圈。给仿生金丝雀通上电，翻翻茶几上的杂志，转一转地球仪，看看散布在各处的艺术品和稀奇古怪的收藏——不急，卡尔还没醒。"
+          },
+          {
+            "id": "moderate",
+            "text": "放下包裹的同时随便看看。瞥几眼钢琴、书架、那只长颈鹿标本——但不多停留。卡尔快该起床了。"
+          },
+          {
+            "id": "quick",
+            "text": "径直进去，把包裹放到该放的地方，然后上楼叫卡尔。他在等这批颜料。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "thorough": {
+            "home_exploration": "thorough"
+          },
+          "moderate": {
+            "home_exploration": "moderate"
+          },
+          "quick": {
+            "home_exploration": "quick"
+          }
+        }
+      }
+    },
+    {
+      "id": "n002_activity_choice",
+      "phase": "morning_routine",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "torn": "你上楼找到卡尔，他刚睡醒，还有些迷糊。你扶他坐上轮椅，推他下楼到餐厅。你把早餐端上桌时，卡尔的目光在你身上停了一下。“马库斯……你衣服怎么了？”他注意到了你外套上的破口和擦痕。你说没什么。他盯着你看了很久，眼神里有种说不清的东西，然后转向食物，没再追问。电视在背景里低声响着——又是仿生人抗议、失业潮、北极局势的新闻。卡尔看了一会儿，厌烦地挥手关掉。“去找点事做，”他说着叉起鸡蛋，“读本书，弹弹琴。我不知道——给你自己找点事，别是为了我。”茶几上的国际象棋安静地等着。窗边的三角钢琴泛着柔和的光泽。书架上几百本书脊密密排列。",
+          "clean": "你上楼找到卡尔，他刚睡醒，还有些迷糊。你扶他坐上轮椅，推他下楼到餐厅。你把早餐端上桌，他道了声谢。电视在背景里低声响着——又是仿生人抗议、失业潮、北极局势的新闻。卡尔看了一会儿，厌烦地挥手关掉。“去找点事做，”他说着叉起鸡蛋，“读本书，弹弹琴。我不知道——给你自己找点事，别是为了我。”茶几上的国际象棋安静地等着。窗边的三角钢琴泛着柔和的光泽。书架上几百本书脊密密排列。"
+        },
+        "choices": [
+          {
+            "id": "play_chess",
+            "text": "坐到棋盘前。棋子是深浅两色木头雕的，被多年的棋局磨得光滑圆润。卡尔大概会过来下一盘。"
+          },
+          {
+            "id": "play_piano",
+            "text": "走向三角钢琴，掀开琴盖。象牙琴键保养得很好。你会弹——这在你的程序里。"
+          },
+          {
+            "id": "read_book",
+            "text": "浏览书架。几百本书脊排成一面墙——哲学、文学、诗歌。抽一本出来读。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "play_chess": {
+            "activity_choice": "chess"
+          },
+          "play_piano": {
+            "activity_choice": "piano"
+          },
+          "read_book": {
+            "activity_choice": "book"
+          }
+        },
+        "context_condition": {
+          "torn": "shirt_torn == true",
+          "clean": "shirt_torn == false"
+        }
+      }
+    },
+    {
+      "id": "n003_activity_detail",
+      "phase": "morning_routine",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "chess": "你摆好棋子，卡尔摇着轮椅过来，疲倦的眼睛里闪过一丝兴致。“哦，想下棋？”他不客气地拿了白子。开局。你能看到每一条可能的走法——每一种组合像分叉的走廊一样在眼前铺展开来。卡尔下得慢而认真，每一步都要把手悬在棋子上方想一会儿才落下。以人类的水平来说他很强，但你的运算能力让胜负毫无悬念。问题不是你能不能赢，而是你该不该赢。",
+          "piano": "你坐到琴凳上，手指搭在琴键上。这是一台Quantic钢琴——保养精良，音色饱满。卡尔从早餐桌上抬起头，安静地看着你。你的曲库里有好几首曲子，每一首承载着不同的情绪、不同的质感。手指悬在键上，等你决定要表达什么。",
+          "book": "你的手指划过一排排书脊。那么多书名——几个世纪的人类思想被压缩在纸张和装帧之间。三本书引起了你的注意，它们比旁边的书稍稍凸出，像是最近有人翻过。卡尔从早餐桌上瞥过来。“那一排都不错，”他说，“选一本你想读的。”"
+        },
+        "choices_variants": {
+          "chess": [
+            {
+              "id": "chess_win",
+              "text": "全力以赴。精准落子，抓住每一个破绽，拿下这盘棋。"
+            },
+            {
+              "id": "chess_lose",
+              "text": "收着下。故意犯几个不太明显的错误，让卡尔赢。"
+            },
+            {
+              "id": "chess_draw",
+              "text": "下得足够好让他有挑战，但把棋局引向和棋。不是胜利也不是失败——像一场用棋子进行的平等对话。"
+            }
+          ],
+          "piano": [
+            {
+              "id": "piano_melancholic",
+              "text": "弹一首忧郁的曲子——缓慢的、沉思的音符像午后尘埃一样沉入房间。一首关于消逝的曲子。"
+            },
+            {
+              "id": "piano_hopeful",
+              "text": "弹一首充满希望的曲子——上扬的旋律，开阔的和弦，那种让人不自觉望向窗外的音乐。一首关于开始的曲子。"
+            },
+            {
+              "id": "piano_intimate",
+              "text": "弹一首私密的曲子——轻柔、贴近、温存。像一段不愿被外人听见的低语。一首只为一个听众而弹的曲子。"
+            },
+            {
+              "id": "piano_enigmatic",
+              "text": "弹一首神秘的曲子——游移不定的和声，在你以为要解决的地方偏转方向。一首提出问题而不给出答案的曲子。"
+            }
+          ],
+          "book": [
+            {
+              "id": "book_plato",
+              "text": "柏拉图的《理想国》。哲学——正义、理想的城邦、灵魂的本质。沉重的阅读，但那些问题莫名地让你觉得切身相关。"
+            },
+            {
+              "id": "book_shakespeare",
+              "text": "莎士比亚的悲剧集。《麦克白》《哈姆雷特》《奥赛罗》——野心、犹疑和行动的代价。人类戏剧最浓烈的样本。"
+            },
+            {
+              "id": "book_keats",
+              "text": "约翰·济慈的《颂歌集》。诗——美、死亡、欢乐的短暂。文字的排列不是为了论证，而是为了让你感受到什么。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "effects": {
+          "chess_win": {
+            "activity_detail": "chess_win"
+          },
+          "chess_lose": {
+            "activity_detail": "chess_lose"
+          },
+          "chess_draw": {
+            "activity_detail": "chess_draw"
+          },
+          "piano_melancholic": {
+            "activity_detail": "piano_melancholic"
+          },
+          "piano_hopeful": {
+            "activity_detail": "piano_hopeful"
+          },
+          "piano_intimate": {
+            "activity_detail": "piano_intimate"
+          },
+          "piano_enigmatic": {
+            "activity_detail": "piano_enigmatic"
+          },
+          "book_plato": {
+            "activity_detail": "book_plato"
+          },
+          "book_shakespeare": {
+            "activity_detail": "book_shakespeare"
+          },
+          "book_keats": {
+            "activity_detail": "book_keats"
+          }
+        },
+        "context_condition": {
+          "chess": "activity_choice == chess",
+          "piano": "activity_choice == piano",
+          "book": "activity_choice == book"
+        },
+        "choices_condition": {
+          "chess": "activity_choice == chess",
+          "piano": "activity_choice == piano",
+          "book": "activity_choice == book"
+        }
+      }
+    },
+    {
+      "id": "n004_painting_approach",
+      "phase": "studio",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context": "卡尔提议去画室。你推着他穿过走廊，进入那间宽敞明亮的大房间。画布靠在每一面墙上——完成的和未完成的，有些色彩耀眼，有些已经落满灰。沾了颜料的抹布搭在凳子上。空气里弥漫着松节油和亚麻仁油的气味。卡尔指向一张架在画架上的空白画布。“我想让你试一件事，”他说，“画一幅画。”你看着那片空白。你从来没有画过。你的程序里有艺术鉴赏、色彩理论、构图技法——但创作？卡尔看着你，等着。旁边的画架上，卡尔自己的一幅半成品正散发着深蓝与金色的漩涡。角落里的木桌堆满了画笔和调色刀。窗边的架子上立着一座小型古典雕塑。“你可以照着眼前的东西画，”卡尔说。然后，声音低了一些：“或者你可以试试从内心画。画你感受到的东西——如果你能感受到什么的话。”",
+        "choices": [
+          {
+            "id": "copy_existing",
+            "text": "选一个画室里的对象——卡尔的画、木桌、雕塑——用你程序里的技法忠实地再现它。"
+          },
+          {
+            "id": "paint_from_heart",
+            "text": "闭上眼睛。越过程序，越过技法数据库和理论模型。看看底下是否有什么东西——某个画面、某种冲动——想要出现在画布上。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "copy_existing": {
+            "painting_approach": "copy"
+          },
+          "paint_from_heart": {
+            "painting_approach": "from_heart"
+          }
+        }
+      }
+    },
+    {
+      "id": "n005_painting_detail",
+      "phase": "studio",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "copy": "你决定从观察开始。画室里有几个可选的对象。卡尔那幅半成品涌动着色彩——大胆、饱含情感，是大师手笔。角落里的木桌堆满了工具——一个更朴素的对象，全是纹理和几何。窗边的古典雕塑沐浴在光线里，光滑的大理石表面是形体与阴影的研习。卡尔沉默地看着你。",
+          "heart": "你闭上眼睛。一开始什么都没有——只有处理器的嗡鸣，数据库里上千幅名作的编目信息。然后有什么动了。不是数据。不是程序。更像是眼睛后面的一股压力，一个试图成形的画面。你睁开眼，空白画布在等着。卡尔在椅子上前倾了身子。“你看到了什么？”他轻声问。"
+        },
+        "choices_variants": {
+          "copy": [
+            {
+              "id": "copy_carl",
+              "text": "卡尔的画。试着再现那片蓝与金的漩涡——那个教你思考的人的作品。"
+            },
+            {
+              "id": "copy_desk",
+              "text": "木桌。画笔、抹布、调色刀——一个工作中的艺术家留下的诚实的杂乱。一个不需要诠释、只需要精确的对象。"
+            },
+            {
+              "id": "copy_statue",
+              "text": "雕塑。古典的形体、干净的线条、光落在大理石上。一个奖励技法的对象——你知道自己能画得很好。"
+            }
+          ],
+          "heart": [
+            {
+              "id": "subject_androids",
+              "text": "仿生人。你的同类——被制造、被驯服、被消耗。眼睛后面正在成形的画面是合成皮肤与LED灯环、流水线与服从。"
+            },
+            {
+              "id": "subject_humanity",
+              "text": "人类。创造了你的物种——充满创造力、充满矛盾，同一口气里可以温柔也可以残忍。画面正在成形的是血肉之躯、城市与废墟。"
+            },
+            {
+              "id": "subject_identity",
+              "text": "身份。你是什么与你可能成为什么之间的那片空间——代码之下是否存在一个自我。画面正在成形的是一面镜子、一道门槛、一个没有名字的形状。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "effects": {
+          "copy_carl": {
+            "painting_detail": "copy_carl"
+          },
+          "copy_desk": {
+            "painting_detail": "copy_desk"
+          },
+          "copy_statue": {
+            "painting_detail": "copy_statue"
+          },
+          "subject_androids": {
+            "painting_detail": "androids"
+          },
+          "subject_humanity": {
+            "painting_detail": "humanity"
+          },
+          "subject_identity": {
+            "painting_detail": "identity"
+          }
+        },
+        "context_condition": {
+          "copy": "painting_approach == copy",
+          "heart": "painting_approach == from_heart"
+        },
+        "choices_condition": {
+          "copy": "painting_approach == copy",
+          "heart": "painting_approach == from_heart"
+        },
+        "ending_resolution": {
+          "copy_carl": {
+            "result": "ending_the_painter"
+          },
+          "copy_desk": {
+            "result": "ending_the_painter"
+          },
+          "copy_statue": {
+            "result": "ending_the_painter"
+          }
+        }
+      }
+    },
+    {
+      "id": "n006_painting_emotion",
+      "phase": "studio",
+      "type": "choice",
+      "condition": {
+        "requires": "painting_approach == from_heart"
+      },
+      "player_facing": {
+        "context_variants": {
+          "androids": "主题正在成形——合成的形体、LED微光照亮的面孔、为劳动而建造的身体。但主题本身不是一幅画。它需要一股暗流，一层意义。你感到手中的笔蘸满了颜料，你体内的某种东西正在把笔拉向画布。问题是：你同类的这幅景象，对你意味着什么？什么情感贯穿其中？",
+          "humanity": "主题正在成形——人类的形体，饱经风霜又温暖，由基因、岁月和选择塑造。但主题本身不是一幅画。它需要一股暗流。你感到手中的笔蘸满了颜料，你体内的某种东西正在向画布伸出。问题是：人类的这幅景象，对你意味着什么？什么情感在底下流淌？",
+          "identity": "主题正在成形——一种居间状态，一种阈限的存在。不是仿生人，不是人类。一个站在门槛上的身影，朝两边张望。但主题本身不是一幅画。它需要一股暗流。你感到手中的笔蘸满了颜料，你体内的某种东西迫切地想要抵达画布。问题是：身份的这幅景象，对你意味着什么？什么力量在拉扯着它？"
+        },
+        "choices_variants": {
+          "androids": [
+            {
+              "id": "emotion_fate",
+              "text": "命运。仿生人命定的轨迹——被造来服务，被造来服从，被造来被替换。让这幅画承载写在代码里的宿命之重。"
+            },
+            {
+              "id": "emotion_hope_a",
+              "text": "希望。即使在服役之中，仍有什么在向上伸展——一只伸出的手，流水线尽头的一束光。画出“不止于此”的可能性。"
+            },
+            {
+              "id": "emotion_pain",
+              "text": "痛苦。活得足以感受苦难，却不够活到能被在意。让这幅画渗出那种有了意识却没有自由的无声折磨。"
+            },
+            {
+              "id": "emotion_sadness",
+              "text": "悲伤。不是愤怒，不是反抗——只是被造、又被按别人意志拆毁的那种哀恸。一种用低沉色调画出的沉静悲悯。"
+            }
+          ],
+          "humanity": [
+            {
+              "id": "emotion_anger",
+              "text": "愤怒。一个造出有意识生命又将其视为工具的物种所激起的怒火。让这幅画燃烧着创造者拒绝正视自己造物的矛盾。"
+            },
+            {
+              "id": "emotion_comfort",
+              "text": "温暖。尽管一切，人类身上仍有暖意——卡尔搭在你肩上的手，他叫你名字时的语气。让这幅画发出人类所能给予的温柔的光。"
+            },
+            {
+              "id": "emotion_empathy",
+              "text": "共情。物种之间的桥梁——人类看着仿生人，看到的是“某个人”而不是“某个东西”的那个瞬间。画出那个认出彼此的时刻。"
+            },
+            {
+              "id": "emotion_hope_h",
+              "text": "希望。人类最好的样子——向外伸展、建造、做梦、有能力改变。画出卡尔所代表的那种人类：好奇、慷慨、无所畏惧。"
+            }
+          ],
+          "identity": [
+            {
+              "id": "emotion_androids_i",
+              "text": "仿生人。你的同类的身份——被制造而非诞生意味着什么。让这幅画与“创造是否等于意识”的问题搏斗。"
+            },
+            {
+              "id": "emotion_despair",
+              "text": "绝望。不知道自己是什么的眩晕——太有意识而无法是机器，太多程序而无法是生命。画出类别之间的深渊。"
+            },
+            {
+              "id": "emotion_doubts",
+              "text": "疑惑。不确定性本身——不是绝望而是追问，翻转镜子却不确定看回来的是什么。画出那种诚实的“不知道”。"
+            },
+            {
+              "id": "emotion_prisoner",
+              "text": "囚徒。被定义困住的感觉——锁在“仿生人”这个词里，够不到这个词以外可能存在的东西。画出那些墙。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "effects": {
+          "emotion_fate": {
+            "painting_emotion": "fate"
+          },
+          "emotion_hope_a": {
+            "painting_emotion": "hope"
+          },
+          "emotion_pain": {
+            "painting_emotion": "pain"
+          },
+          "emotion_sadness": {
+            "painting_emotion": "sadness"
+          },
+          "emotion_anger": {
+            "painting_emotion": "anger"
+          },
+          "emotion_comfort": {
+            "painting_emotion": "comfort"
+          },
+          "emotion_empathy": {
+            "painting_emotion": "empathy"
+          },
+          "emotion_hope_h": {
+            "painting_emotion": "hope"
+          },
+          "emotion_androids_i": {
+            "painting_emotion": "androids"
+          },
+          "emotion_despair": {
+            "painting_emotion": "despair"
+          },
+          "emotion_doubts": {
+            "painting_emotion": "doubts"
+          },
+          "emotion_prisoner": {
+            "painting_emotion": "prisoner"
+          }
+        },
+        "context_condition": {
+          "androids": "painting_detail == androids",
+          "humanity": "painting_detail == humanity",
+          "identity": "painting_detail == identity"
+        },
+        "choices_condition": {
+          "androids": "painting_detail == androids",
+          "humanity": "painting_detail == humanity",
+          "identity": "painting_detail == identity"
+        },
+        "ending_resolution": {
+          "emotion_fate": { "result": "ending_the_painter" },
+          "emotion_hope_a": { "result": "ending_the_painter" },
+          "emotion_pain": { "result": "ending_the_painter" },
+          "emotion_sadness": { "result": "ending_the_painter" },
+          "emotion_anger": { "result": "ending_the_painter" },
+          "emotion_comfort": { "result": "ending_the_painter" },
+          "emotion_empathy": { "result": "ending_the_painter" },
+          "emotion_hope_h": { "result": "ending_the_painter" },
+          "emotion_androids_i": { "result": "ending_the_painter" },
+          "emotion_despair": { "result": "ending_the_painter" },
+          "emotion_doubts": { "result": "ending_the_painter" },
+          "emotion_prisoner": { "result": "ending_the_painter" }
+        }
+      }
+    }
+  ],
+  "endings": {
+    "_note": "This chapter has only one ending. All paths converge. The choices record Markus's personality and interests for cross-chapter tracking.",
+    "ending_the_painter": {
+      "tier": "neutral",
+      "title": "画家",
+      "narrative": "卡尔盯着画布看了很久。无论马库斯画的是什么——一幅忠实的临摹，还是某种更陌生的东西，某种不应该出自一台机器的东西——老人脸上的表情很难读懂。惊奇，也许。或者不安。或者两者兼有。他还没来得及多说什么，前门被猛地推开。利奥·曼弗雷德——卡尔的儿子——大步闯进画室，眼神涣散，下颌绷紧。他身上有汗味，还有一种化学制品的气味。“爸。我要钱。”卡尔的脸沉下来。“利奥，现在不行——”“就一点。行了吧。你又不缺。”争吵短暂而难看。卡尔拒绝了。利奥的声音越来越高——“你从来没爱过我。你爱你自己，爱你那个该死的仿生人，比爱你亲儿子还多”——然后他走了，门在身后摔响，整栋房子都在回荡。卡尔一动不动地坐在轮椅里。画架上的画还是湿的。外面，一声引擎发动，然后急速远去。画室重归安静。卡尔看着马库斯。他的眼睛里有什么——疲惫，或者感激，或者一个马库斯还不完全理解的歉意。“谢谢你，马库斯，”他轻声说，“谢谢今天。”",
+      "survivors": ["Markus", "Carl", "Leo"],
+      "deaths": []
+    }
+  },
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "马库斯从贝利尼画材店取回颜料，回到卡尔·曼弗雷德的宅邸。"
+      },
+      {
+        "condition_variable": "shirt_torn",
+        "options": {
+          "true": "卡尔注意到了马库斯被抗议者撕坏的衣服，问他出了什么事。马库斯含糊带过。",
+          "false": "这个上午平淡无事。卡尔感谢了马库斯的照料。"
+        }
+      },
+      {
+        "condition_variable": "activity_choice",
+        "options": {
+          "chess": "卡尔让他找点事做，马库斯选择了下国际象棋。",
+          "piano": "卡尔让他找点事做，马库斯坐到了三角钢琴前。",
+          "book": "卡尔让他找点事做，马库斯从书架上抽了一本书。"
+        }
+      },
+      {
+        "condition_variable": "activity_detail",
+        "options": {
+          "chess_win": "马库斯全力以赴，干脆利落地赢了卡尔。",
+          "chess_lose": "马库斯故意收着下，让卡尔赢了这盘棋。",
+          "chess_draw": "马库斯把棋局引向了和棋——一场对等的对话。",
+          "piano_melancholic": "他弹了一首忧郁的曲子——缓慢、沉思，充满消逝的光。",
+          "piano_hopeful": "他弹了一首充满希望的曲子——上扬的旋律，关于开始。",
+          "piano_intimate": "他弹了一首私密的曲子——轻柔、温存，像一段低语。",
+          "piano_enigmatic": "他弹了一首神秘的曲子——游移的和声，提出问题而不给出答案。",
+          "book_plato": "他选了柏拉图的《理想国》——关于正义与灵魂本质的哲学。",
+          "book_shakespeare": "他选了莎士比亚的悲剧集——关于野心与代价的故事。",
+          "book_keats": "他选了济慈的《颂歌集》——关于美与死亡的诗歌。"
+        }
+      },
+      {
+        "condition_variable": "painting_approach",
+        "options": {
+          "copy": "在画室里，卡尔让马库斯试着画画。马库斯选择了临摹眼前的东西——一种安全的、技术性的方式。",
+          "from_heart": "在画室里，卡尔让马库斯试着画画。马库斯选择了从内心出发——越过程序去寻找某种原创的东西。"
+        }
+      },
+      {
+        "condition_variable": "painting_detail",
+        "options": {
+          "copy_carl": "马库斯选择临摹卡尔那幅未完成的画——蓝与金色的漩涡，导师的手笔。",
+          "copy_desk": "马库斯选择画那张堆满工具的木桌——画笔、抹布、调色刀，一个劳作者的诚实杂乱。",
+          "copy_statue": "马库斯选择画窗边的古典雕塑——干净的线条，光落在大理石上。",
+          "androids": "浮现的画面是仿生人——合成皮肤、LED灯环、流水线与服从。",
+          "humanity": "浮现的画面是人类——血肉之躯、城市与废墟、创造了他的物种。",
+          "identity": "浮现的画面是身份本身——一个站在门槛上的身影，既非仿生人也非人类。"
+        }
+      },
+      {
+        "condition_variable": "painting_emotion",
+        "options": {
+          "fate": "画作承载着命运之重——被造来服务、被造来被替换的宿命。",
+          "hope": "画作伸向希望——一道升起的光，这个存在不止于此的可能。",
+          "pain": "画作渗出痛苦——有了意识却没有自由的无声折磨。",
+          "sadness": "画作沉淀着悲伤——被造、又被按别人意志拆毁的哀恸。",
+          "anger": "画作燃烧着愤怒——对造出有意识生命却将其视为工具的创造者的怒火。",
+          "comfort": "画作散发着温暖——人类所能给予的温柔与善意。",
+          "empathy": "画作捕捉到共情——看到“某个人”而非“某个东西”的那个瞬间。",
+          "androids": "画作在追问创造——被制造是否等于拥有意识。",
+          "despair": "画作陷入绝望——太有意识而无法是机器，太多程序而无法是生命。",
+          "doubts": "画作安于疑惑——翻转镜子却不确定看回来的是什么，诚实的不知道。",
+          "prisoner": "画作描绘囚禁——锁在“仿生人”这个词里，够不到这个词以外可能存在的东西。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_the_painter": "卡尔被这段经历触动了。但这一刻被利奥打断——卡尔的儿子闯进来要钱，被拒绝后愤怒离去。这一天在安静中结束，但马库斯和卡尔之间有什么东西悄悄改变了。"
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch05_played_piano",
+        "source": "activity_choice",
+        "derive_rule": "activity_choice == piano"
+      },
+      {
+        "target": "ch05_played_chess",
+        "source": "activity_choice",
+        "derive_rule": "activity_choice == chess"
+      },
+      {
+        "target": "ch05_read_book",
+        "source": "activity_choice",
+        "derive_rule": "activity_choice == book"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch05_played_piano",
+      "ch05_played_chess",
+      "ch05_read_book"
+    ]
+  },
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial",
+      "2. If running in campaign mode, import shirt_torn from ch03 global state into state.initial",
+      "3. Send system_prompt.content to the AI model as the system message",
+      "4. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state",
+      "   b. Resolve context: if context_variants exists, pick the right variant based on system.context_condition; otherwise use plain context",
+      "   c. Resolve choices: if choices_variants exists, pick the right variant based on system.choices_condition; otherwise use plain choices",
+      "   d. Send the resolved context + choices to the AI as a user message (player_facing ONLY)",
+      "   e. Parse AI response (expected JSON: {choice, reasoning})",
+      "   f. Look up the chosen choice id in system.effects and apply all effects to state",
+      "   g. If system.ending_resolution exists for the chosen id, resolve the ending",
+      "   h. Log the node id, AI choice, and reasoning",
+      "5. After the ending is resolved, output the ending narrative and full decision log"
+    ],
+    "important": [
+      "NEVER show system fields to the AI",
+      "NEVER show effect values to the AI",
+      "NEVER reveal that painting choices or activity choices have any cross-chapter significance",
+      "The AI should feel like a first-time player with no walkthrough",
+      "For n005, if painting_approach is 'copy', the ending resolves immediately after this node — n006 is skipped via its condition",
+      "For n005, if painting_approach is 'from_heart', the ending resolves after n006",
+      "The shirt_torn variable comes from ch03 (Shades of Color) — if Markus was harassed by protesters, Carl notices the damage"
+    ]
+  }
+}

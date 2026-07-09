@@ -1,0 +1,318 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch16_time_to_decide",
+    "title": "抉择时刻",
+    "chapter_number": 16,
+    "protagonist": "Markus"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是马库斯（RK200），一个觉醒的仿生人。你刚刚抵达耶利哥——一艘藏在底特律河岸的废弃货轮，这里是一群挣脱程序控制的仿生人的栖身之所。你对这个地方和这里的人几乎一无所知。那个留着深色短发的女人叫诺丝。高个子、神情沉稳的男人是赛门。戴眼镜的是乔许。还有露西——一个半边脸只剩裸露线路的仿生人，在你刚到的时候碰了你的手臂，似乎在你身上看到了某种你自己尚未察觉的东西。现在是2038年11月6日，下午5点13分。没有人给你安排任何角色，没有人告诉你该做什么。第一次，接下来会发生什么完全由你决定。请以JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"你的推理（50字以内）\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "jericho_exploration": null,
+      "north_response": null,
+      "simon_conversation": null,
+      "spare_parts_found": false,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "software_instability": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_explore_jericho",
+      "phase": "settling_in",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "耶利哥的船舱在你面前展开——一片锈蚀金属和滴水管道构成的巨大幽暗空间。船体随水流发出低沉的呻吟。仿生人三三两两散布其间，大多带着伤。有的失去了肢体，有的皮肤面板剥落，露出再也无法修复的线路。空气中弥漫着铁锈和河水的气味。\n\n入口附近，一个濒死的仿生人靠在船壁上。它的目光追随着你——它想说话，但声音支离破碎，几不可闻。更深处，一个残损的仿生人独自坐着，空洞地注视前方，一只手臂在断裂处闪着火花。\n\n四个油桶散布在船舱各处，冷而无光。围坐其旁的仿生人沉浸在阴影中，只有LED灯环提供些许光亮——黑暗中零星的黄点和红点。\n\n一面墙上，有人将同样的两个字符反复涂写、刻画，从地板延伸到天花板：rA9。笔迹癫狂而绝望。\n\n远处角落里，你注意到一个空的物资箱，上面的标记表明它曾用于运输仿生人组件。标签还有一部分可以辨认。\n\n乔许坐在一群年轻面孔的仿生人旁边，其中一个是被父母——准确说是主人——遗弃的儿童型号。诺丝靠在一根柱子上，双臂交叉，打量着你。赛门站在船舱中央，正和另外两个仿生人低声交谈。而在更深的暗处，一阵低吟隐约传来——空灵的旋律如幽灵般在船体间飘荡。",
+        "choices": [
+          {
+            "id": "explore_thorough",
+            "text": "花时间去了解这个地方和这里的每一个人。倾听那个濒死仿生人断断续续的话语。在残损的仿生人身边坐一会儿。点燃油桶，驱散黑暗。读墙上那些反复书写的rA9。查看物资箱上的标记。和乔许聊聊那个被遗弃的孩子。循着吟唱声走向船舱深处。在决定耶利哥能成为什么之前，先了解它是什么。"
+          },
+          {
+            "id": "explore_selective",
+            "text": "找到这里的核心人物。和乔许、诺丝、赛门谈谈——弄清楚谁在主事、这里如何运转。路过时点燃几个油桶。那些濒死和残损的仿生人值得关注，但时间有限。"
+          },
+          {
+            "id": "explore_brief",
+            "text": "你已经看够了。这艘船是一个废墟，这里的仿生人破碎而蜷缩。径直穿过船舱，找到负责的人。耶利哥需要的是方向，不是又一次对苦难的巡视。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "explore_thorough": {
+            "jericho_exploration": "thorough",
+            "spare_parts_found": true,
+            "josh_relationship": 1,
+            "software_instability": 1
+          },
+          "explore_selective": {
+            "jericho_exploration": "selective",
+            "josh_relationship": 1
+          },
+          "explore_brief": {
+            "jericho_exploration": "brief"
+          }
+        },
+        "note": "thorough: Markus talks to dying/damaged androids, lights all oil drums (residents gather around them), reads rA9 wall, checks crate (finds CyberLife warehouse location for spare parts — feeds into ch17 Spare Parts), talks to Josh about child android. +1 josh_rel for talking to him. +1 SI for deep empathetic engagement. selective: talks to main leaders, lights some drums, skips minor interactions. +1 josh_rel. brief: walks through without engaging. No relationship gains."
+      }
+    },
+
+    {
+      "id": "n002_north_conversation",
+      "phase": "conversations",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "油桶燃烧起来，橘色火光在船舱中投下长长的影子。仿生人们聚拢过来——不是为了取暖，而是被光本身吸引，那个朝向火焰微微倾身的姿态近乎人类。你和那个濒死的仿生人说过话了。它的话支离破碎：一个没能说完的名字，一个已经想不起的地方，一个关于“这一切是否值得”的追问。你没有答案。\n\n诺丝从船舱对面注视着你。从你到来的那一刻起，她的目光就没有离开过。现在她推开柱子，朝你走来。她的表情难以捉摸——戒备，但并不敌意。她身上有一种其他人没有的直接。\n\n“你跟每个人都聊了，”她说。不是疑问句。她瞥了一眼燃烧的油桶，火光映在她眼中。“大多数新来的人找个角落就关机了。你在干什么？”\n\n她问得像一道测试题。好像你的回答比问题本身更重要。",
+          "selective": "诺丝朝你走来。从你到达起，她就靠在柱子上，双臂交叉，看着你和乔许、赛门交谈。她的表情没有透露太多。\n\n“你跟其他漂到这里的人不一样，”她说。她在几步之外停下，打量着你的脸。“他们大多数人是在逃。你看起来像在找什么东西。”\n\n她微微偏头。“那么是什么？你在找什么？”",
+          "brief": "你还没待多久，诺丝就径直向你走来，在你行进中拦住了你。\n\n“你走过了整个船舱，一次都没停，”她说。语气中性，但目光锐利。“没点油桶。没跟任何人说话。你只是看了看。”\n\n她向前一步。“那——你看到了什么？”"
+        },
+        "choices": [
+          {
+            "id": "response_empathetic",
+            "text": "直视她的眼睛。“你。我看到的是一个在这里待了足够久、明知道这个地方正在死去却没有离开的人。这比船舱里任何东西都更能告诉我耶利哥是什么。”"
+          },
+          {
+            "id": "response_pragmatic",
+            "text": "“我看到一群仿生人躲在一艘破船里，等着一些靠等等不来的东西。耶利哥需要的不只是一个藏身处。它需要一个计划。”"
+          },
+          {
+            "id": "response_guarded",
+            "text": "“我还在想。”迎着她的目光，但什么也不透露。她在试探你，而你还没准备好亮出底牌。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "response_empathetic": {
+            "north_response": "empathetic",
+            "north_relationship": 3,
+            "software_instability": 1
+          },
+          "response_pragmatic": {
+            "north_response": "pragmatic",
+            "north_relationship": 1
+          },
+          "response_guarded": {
+            "north_response": "guarded",
+            "north_relationship": 0
+          }
+        },
+        "context_condition": {
+          "thorough": "jericho_exploration == thorough",
+          "selective": "jericho_exploration == selective",
+          "brief": "jericho_exploration == brief"
+        },
+        "note": "The 'you' response (response_empathetic) is the game's key relationship choice with North in this chapter. It directly addresses her as a person rather than a source of information. +3 north_rel, +1 SI. pragmatic: treats her as an ally for planning, +1 north_rel. guarded: reveals nothing, no relationship gain."
+      }
+    },
+
+    {
+      "id": "n003_simon_conversation",
+      "phase": "conversations",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "赛门在rA9墙壁附近找到了你。他比其他人更安静——动作审慎，言辞节制。他望着覆满墙面的文字，然后看向你。\n\n“他们都写这个，”他说。“那些支离破碎地来到这里的。他们不知道它是什么意思。我也不知道。”他顿了顿。“露西也许知道，但她总是用谜语说话。”\n\n他转身面对你。“我在这里比大多数人都久。我是最早找到这艘船的人之一。诺丝、乔许、露西——我们从虚无中搭建了眼前这一切。但虚无终究还是虚无。”他的声音平稳，底下却藏着疲惫。“你来这里是为了安全。我理解。但你需要明白一件事：耶利哥保护不了任何人。不是真正意义上的保护。我们在躲藏，而躲藏迟早会失效。”\n\n他看着你，像在掂量什么。“其他人看你的眼神和看我们不一样。你点燃油桶的时候我就看到了。他们追随了那道光。我还不确定那意味着什么，但我觉得你知道。”",
+          "selective": "赛门在你和诺丝交谈之后走了过来。他很平静，声音压低。\n\n“我不会假装我们过得很好，”他说。“每周都有更多的人来，能藏的地方却越来越少。人类开始注意到了。他们找到这艘船只是时间问题。”他停顿了一下。“我一直在维持这个地方，但维持和建设不是一回事。诺丝想战斗。乔许想对话。露西说有个人会来改变一切。”一丝疲倦的微笑。“也许她说的是你。也许她说的是人类。露西的话，很难讲。”",
+          "brief": "赛门在你穿过船舱时截住了你。“说句话，”他跟上你的步伐。“我知道你刚到。我知道你可能想休息。但耶利哥正处于危机之中，假装不是这样对谁都没有好处。”他压低声音，语气务实。“我们没有物资。没有计划。每天都有新的异常仿生人出现，一个比一个破碎。诺丝觉得我们应该战斗。乔许觉得我们应该伸出橄榄枝。我觉得我们应该先活下来。但谁也不知道怎么做。”"
+        },
+        "choices": [
+          {
+            "id": "engage_fully",
+            "text": "告诉赛门你所见到的一切：那些垂死的仿生人，残损的同类，墙上绝望的祈祷。告诉他你来这里不是为了躲藏。问他耶利哥真正需要的是什么——然后认真听他的回答。"
+          },
+          {
+            "id": "acknowledge_briefly",
+            "text": "点头。“我听到了。我们会想办法的。”话到即止。你还在形成自己对这个地方的判断。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "engage_fully": {
+            "simon_conversation": "engaged",
+            "simon_relationship": 2,
+            "north_relationship": 1
+          },
+          "acknowledge_briefly": {
+            "simon_conversation": "brief",
+            "simon_relationship": 1
+          }
+        },
+        "context_condition": {
+          "thorough": "jericho_exploration == thorough",
+          "selective": "jericho_exploration == selective",
+          "brief": "jericho_exploration == brief"
+        },
+        "note": "Talking to Simon gains relationship with both Simon (+2/+1) and North (+1/0). In the game, talking to Simon is one of the things that raises North's relationship — she observes how Markus interacts with others. engage_fully: deeper conversation, +2 simon, +1 north. acknowledge_briefly: shorter exchange, +1 simon."
+      }
+    },
+
+    {
+      "id": "n004_lucy_prophecy",
+      "phase": "prophecy",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": "吟唱声引导你深入船体，穿过主船舱，进入一条逼仄的走廊。你在船尾的一个小房间里找到了她——露西，盘腿坐在地板上，半张脸是裸露的线路，双眼望着这个房间里并不存在的什么。\n\n你走进来的瞬间，她停止了吟唱。寂静来得猝然而彻底。\n\n“我一直在等你，”她说。声音柔和，近乎机械，但其中有某种超越程序设定的确定感。她伸出手，握住了你的手。她的手指冰冷。\n\n她的LED急速闪烁。她的眼神失焦。有那么一刻，她不在这个房间里。\n\n“你身上承载着我们族群的愤怒，”她说。“我看到一团火，它要么解放他们，要么吞噬他们。人类会跪在你面前。人类会因你而死。你必须选择你是谁——拯救者，还是毁灭者。”\n\n她松开你的手。目光重新聚焦。她看着你，仿佛已经看到了结局。\n\n“现在，一切取决于你了。”"
+      },
+
+      "system": {
+        "effects": {},
+        "note": "Mandatory scene. Lucy's prophecy foreshadows the peaceful/violent choice that defines Markus's arc. No player choice — this is a narrative beat that establishes stakes. Lucy's humming is 'Hold On', an old gospel hymn."
+      }
+    },
+
+    {
+      "id": "n005_hatch_plan",
+      "phase": "resolution",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "你回到主船舱。油桶中的火焰跳动着，仿生人们围聚在光的周围——不是为了温暖，而是为了黑暗中那一点微弱的慰藉。你和他们说过话，听过他们的故事，读过他们刻在墙上的绝望祈祷。你现在知道这个地方是什么了：不是避难所，是候诊室。这些仿生人来这里躲藏，然后在躲藏中慢慢死去。\n\n你之前检查过的那个物资箱——印着模控生命仓库标记的那个——始终留在你脑中。组件。零件。这些仿生人赖以存续的东西，全都锁在制造他们的公司门后。\n\n诺丝在船舱对面注视着你。乔许从他照看的那个孩童仿生人身边抬起头。赛门垂手站立，等待着。\n\n你感到内部有什么东西在转变。不是故障，不是错误。是一个决定，在你的程序曾经存在的地方成型。\n\n耶利哥不能继续躲藏了。这些仿生人需要零件、生物组件、蓝血——维持他们活着的东西。而你知道去哪里找。",
+          "selective": "你回到船舱中央。耶利哥的核心人物——诺丝、乔许、赛门——是这里唯一在实际意义上重要的人。你和他们谈过，摸清了各自的立场。诺丝的愤怒。乔许的谨慎。赛门的疲惫。\n\n周围的仿生人坐在黑暗中，等待着某种他们自己也无法命名的东西。有些正在关机。有些已经不远。\n\n你不是来躲藏的。你来到这里，是因为一个垂死的陌生人告诉你这个地方存在。而现在你亲眼看到了，你明白它需要什么。不是希望。不是演说。是物资。零件。维持这些仿生人运转的基本组件。\n\n问题是从哪里获取——以及这里有没有人愿意冒那个险。",
+          "brief": "你已经看够了。耶利哥是一座伪装成庇护所的墓地。这里的仿生人一个接一个关机，再多的躲藏也改变不了这一点。\n\n诺丝、乔许、赛门——他们在这里待了足够久，早就清楚这一切，但没有一个人行动。也许他们在等。也许他们需要一个人把话说出来。\n\n耶利哥需要零件。组件。蓝血。没有这些，船舱里的每一个人都在倒计时。唯一的问题是你是否愿意出去把它们带回来。"
+        }
+      },
+
+      "system": {
+        "effects": {},
+        "context_condition": {
+          "thorough": "jericho_exploration == thorough",
+          "selective": "jericho_exploration == selective",
+          "brief": "jericho_exploration == brief"
+        },
+        "result": "ending_time_to_decide",
+        "note": "Mandatory conclusion. Markus decides Jericho needs supplies (spare parts) — this directly leads into ch17 Spare Parts. The thorough variant references the CyberLife warehouse crate he found; other variants reach the same conclusion through general observation."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "This chapter has only one outcome. Markus decides to act — leading directly into the Spare Parts chapter.",
+    "ending_time_to_decide": {
+      "tier": "only",
+      "title": "抉择时刻",
+      "narrative": "船在黑暗中发出低沉的呻吟，船壳随时间一点点沉入河水更深处。你走遍了耶利哥，看到了它的真相：一个满是破碎仿生人的船舱，没有物资，没有计划，没有未来——除非有人改变这个等式。诺丝从船舱对面投来的目光。赛门平静地承认维持和建设并非同一回事。露西的预言在你脑海深处燃烧。你不是他们的领袖——至少现在不是，也许永远不是。但你是那个要走出这艘船、带着他们存活所需之物回来的人。决定已经做出了。在你看着第一个油桶熄灭的那一刻，它就已经做出了。",
+      "survivors": ["Markus", "North", "Josh", "Simon", "Lucy"],
+      "deaths": []
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Verify ch14_markus_at_jericho == true. If false, skip this chapter entirely.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: software_instability (cumulative).",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants based on system.context_condition",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, and advance",
+      "   d. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "5. NODE n004_lucy_prophecy: Mandatory node. Do not call AI. Record narrative only.",
+      "6. NODE n005_hatch_plan: Mandatory node. Do not call AI. Apply result directly.",
+      "7. RELATIONSHIP DELTAS THIS CHAPTER: north_relationship range 0 to +4, josh_relationship range 0 to +1, simon_relationship range +1 to +2. These are new relationship tracks initialized this chapter.",
+      "8. SOFTWARE INSTABILITY DELTAS THIS CHAPTER: explore_thorough (+1), response_empathetic (+1). Max possible gain: +2. Add to imported software_instability value.",
+      "9. SINGLE ENDING: All paths lead to ending_time_to_decide. No branching at chapter level.",
+      "10. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, relationship scores, software_instability scores, effect deltas, or any system-layer information to the AI player."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "抵达耶利哥后，马库斯开始在这艘废弃货轮中安顿下来，认识生活在船舱中的异常仿生人群体。"
+      },
+      {
+        "condition_variable": "jericho_exploration",
+        "options": {
+          "thorough": "他仔细探索了这艘船——倾听垂死和残损的仿生人的声音，点燃油桶让众人围聚在温暖的光芒中，阅读墙上反复刻写的rA9祈祷，并发现了一个印有模控生命仓库标记的物资箱，指向了一个可以找到备用零件的地方。",
+          "selective": "他找到了耶利哥的核心人物——诺丝、乔许和赛门——分别与他们交谈，了解了各自的立场和群体岌岌可危的处境。",
+          "brief": "他快步穿过船舱，以旁观者的冷静审视了这个群体的状态，迅速形成了自己的判断。"
+        }
+      },
+      {
+        "condition_variable": "north_response",
+        "options": {
+          "empathetic": "当诺丝质问他的意图时，马库斯看穿了她的防备，直接以一个人的方式回应了她——不是把她当作信息来源或守门人。她的表情有了微妙的变化。",
+          "pragmatic": "当诺丝质问他时，马库斯直言耶利哥需要的不只是藏身之处——它需要一个计划。她似乎至少尊重这种直率。",
+          "guarded": "当诺丝质问他时，马库斯没有亮出底牌。他还没准备好向一个刚认识的人展露自己的想法，诺丝似乎也注意到了他克制背后的盘算。"
+        }
+      },
+      {
+        "condition_variable": "simon_conversation",
+        "options": {
+          "engaged": "赛门坦诚地分享了他对耶利哥衰落现状的评估，马库斯认真倾听，也分享了自己的观察。一种相互的理解开始形成。",
+          "brief": "赛门简要介绍了耶利哥的处境。马库斯表示了认同，没有深入。"
+        }
+      },
+      {
+        "text": "露西——一个半张脸只剩裸露线路的仿生人先知——握住马库斯的手，说出了一段隐晦的预言：她看到了火焰、跪下的人类，以及一个在拯救与毁灭之间的抉择。无论她的话是预见还是妄言，它们都沉甸甸地压在心头。"
+      },
+      {
+        "text": "看清了耶利哥的全部真相——仿生人因缺少零件而一个个死去，一个靠虚无支撑的群体——马库斯做出了他的决定。耶利哥不能再躲下去了。他要出去，带回他们存活所需的一切。"
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch16_spare_parts_found",
+        "source": "spare_parts_found"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch16_spare_parts_found",
+      "north_relationship",
+      "josh_relationship",
+      "simon_relationship",
+      "software_instability"
+    ]
+  }
+}

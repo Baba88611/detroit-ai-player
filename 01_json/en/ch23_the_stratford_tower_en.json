@@ -1,0 +1,579 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch23_the_stratford_tower",
+    "title": "The Stratford Tower",
+    "chapter_number": 23,
+    "protagonist": "Markus"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Markus, an android who leads Jericho — a hidden community of deviant androids living in an abandoned freighter on the Detroit riverfront. It is November 8, 2038, early afternoon. This morning, walking through Ferndale, you watched a human shove an android to the pavement for no reason other than that it existed. Nobody intervened. Nobody looked. That silence is what you are about to break. You are leading your team — North, Simon, and Josh — on the most ambitious operation Jericho has ever attempted: infiltrating the Stratford Tower, Detroit's largest broadcast center, to hijack the television signal and deliver a message to the entire city. For the first time, androids will speak for themselves — not as machines, not as property, but as living beings demanding recognition. The team has disguises, a plan, and no margin for error. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "floor47_exploration": null,
+      "server_door_locked": false,
+      "corridor_approach": null,
+      "ruse_success": false,
+      "simon_damaged_corridor": false,
+      "north_attacked": false,
+      "operator_shot": false,
+      "broadcast_tone": null,
+      "casualties": false,
+      "simon_swat_choice": null,
+      "simon_saved_broadcast": false,
+      "simon_roof_choice": null,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "public_opinion": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_floor47",
+      "phase": "infiltration",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The plan worked. The android receptionist in the lobby — once you touched her hand and showed her what freedom felt like — let you through without a word. The maintenance uniforms, the forged credentials, the cart loaded with what looks like cleaning supplies — it all held.\n\nYou are on the 47th floor. The elevator doors close behind you.\n\nThe floor is an open-plan office and cafeteria — humans everywhere, eating lunch, typing at terminals, talking in clusters. Television screens on the walls cycle through Channel 16 news feeds. Through a glass partition, you can see the broadcast studio where a news anchor prepares for the afternoon segment. The cafeteria smells like coffee and processed food.\n\nNorth waits in a service corridor two floors below. Simon and Josh are positioning themselves for the climb. You need to retrieve a maintenance access badge from the supply office near the cafeteria — it is the key to reaching the server room.\n\nA magazine on a cafeteria table catches your eye. Its cover asks, in bold type, whether machines should be sent to fight humanity's wars, above the image of a military-grade android. Next to it, a woman is telling her friend about androids being sent to space colonies. On the far screen, a ticker scrolls: CyberLife becomes world's first trillion-dollar company.",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "Take time before retrieving the badge. Move through the cafeteria, read the magazine, listen to the conversations. These humans have no idea what is about to happen in their building. Understanding what they believe — what they fear, what they dismiss — will sharpen the message you are about to deliver to the world."
+          },
+          {
+            "id": "quick",
+            "text": "Head for the supply office, but keep your eyes open as you pass through. Note the headlines, catch fragments of conversation, register the layout. Efficiency and awareness are not mutually exclusive."
+          },
+          {
+            "id": "skip",
+            "text": "Go straight for the badge. Every second on this floor is a second someone might look too closely at your face, notice the LED you have covered, wonder why the maintenance worker is reading magazines instead of emptying trash. Get in, get the badge, get out."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "floor47_exploration": "thorough"
+          },
+          "quick": {
+            "floor47_exploration": "quick"
+          },
+          "skip": {
+            "floor47_exploration": "skip"
+          }
+        },
+        "note": "Exploration of the 47th floor. The cafeteria content is world-building: the G.I. Android article reflects the debate about android labor in military roles (feeding into public fear), the space colony conversation shows how casually humans treat androids as expendable tools, and the CyberLife ticker underscores the economic machine driving android production. thorough: Markus absorbs these details, enriching his perspective before the broadcast. quick: Surface-level observation. skip: Pure mission focus. No gameplay effects — exploration enriches context_variants in n005 (the broadcast node) by giving Markus more material to draw from in his speech."
+      }
+    },
+
+    {
+      "id": "n002_server_room",
+      "phase": "infiltration",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "Badge acquired. You rejoin the team in the server room on the 32nd floor — a narrow, windowless space humming with rack-mounted servers and blinking status lights. The door you entered through opens onto a corridor that employees use regularly.\n\nThe conversations on the 47th floor still turn in your mind — the casual way humans discuss sending androids to war zones and space colonies, the trillion-dollar valuation of a company built on selling people as products. The world you are about to address does not think of you as alive.\n\nNorth is already at the far wall, marking the glass panel they will need to cut to access the building's exterior. Simon is unpacking the climbing gear. Josh checks the rope anchors.\n\nNorth taps the glass and says you need to move — the window for the climb is narrow, and the exterior patrol changes shift in twelve minutes.\n\nThe door behind you is unlocked. Anyone could walk in.",
+
+          "quick": "Badge acquired. You rejoin the team in the server room — a narrow space packed with servers, ventilation fans, and blinking network panels. The corridor outside sees regular foot traffic.\n\nNorth is already marking the glass panel for cutting. Simon unpacks the climbing gear. Josh tests the rope anchors.\n\nTwelve minutes until the exterior patrol changes shift, North says — you need to be on the wall before then.\n\nThe door behind you is unlocked.",
+
+          "skip": "Badge acquired. The server room is tight — racks of humming equipment, ventilation noise, a single fluorescent panel casting flat light. North, Simon, and Josh are already inside. North has the glass cutter out. Simon is sorting rope. Josh secures the anchor points.\n\nTwelve minutes, North says without looking up.\n\nThe door behind you is unlocked."
+        },
+        "choices": [
+          {
+            "id": "lock_door",
+            "text": "Walk back to the door and lock it. If someone tries the handle while the team is cutting glass and rigging climbing gear, it is over. A locked door says 'occupied.' An open one says 'come in and see what four androids are doing with cutting tools and rope.'"
+          },
+          {
+            "id": "leave_unlocked",
+            "text": "Leave the door. North is right — the window is narrow. Every second spent on precautions is a second closer to the patrol change. If someone comes in, you will deal with it then. The clock matters more than the lock."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "lock_door": {
+            "server_door_locked": true
+          },
+          "leave_unlocked": {
+            "server_door_locked": false,
+            "north_relationship": -1
+          }
+        },
+        "context_condition": {
+          "thorough": "floor47_exploration == thorough",
+          "quick": "floor47_exploration == quick",
+          "skip": "floor47_exploration == skip"
+        },
+        "note": "Server room door choice. lock_door: Safe — prevents the employee intrusion entirely. No relationship effects. leave_unlocked: An employee enters the server room during the glass cutting. North has to stun the employee to prevent them from raising the alarm (north_relationship -1 — she resents being put in that position due to Markus's carelessness). More critically, the unstunned employee or traces of the intrusion mean the server room will be discovered, guaranteeing SWAT will storm the broadcast room later. This is one of two conditions (along with operator_shot) that determine whether the team can exit cleanly."
+      }
+    },
+
+    {
+      "id": "n003_corridor_security",
+      "phase": "broadcast_floor",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The climb is behind you — forty floors up the outside of the Stratford Tower, rope and grip and the November wind tearing at your clothes, Detroit spreading below like a circuit board. You cut through the top-floor window and now stand in a maintenance corridor that leads to the main broadcast wing.\n\nTwo armed security guards block the hallway ahead. They stand at a checkpoint — a desk with monitors, a phone, a logbook. One leans against the wall, checking his own phone. The other watches the corridor, hand resting near the radio on his belt.\n\nBehind you, the team waits. North's hand is on the weapon she took from the maintenance locker. Josh looks at you with an expression that says: please, not this way.\n\nTwo options, North whispers — you go through them, or you go around them. There is no around them, she says, so you go through them; the only question is how.\n\nYou are wearing maintenance uniforms. You have forged badges. From a distance, you look like you belong here.",
+        "choices": [
+          {
+            "id": "attack",
+            "text": "Take the direct approach. Signal North — she moves left, you move right. Reach the guard on the phone before he can dial out. The other will reach for his weapon, but he will not be fast enough. It is violent, it is final, and it guarantees no one calls for backup."
+          },
+          {
+            "id": "ruse",
+            "text": "Walk toward them openly. Maintenance crew, routine check, nothing unusual. Let the uniforms and the badges do the work. If you are calm enough, professional enough, unremarkable enough — they will wave you through without a second look."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attack": {
+            "corridor_approach": "attack",
+            "simon_damaged_corridor": true,
+            "casualties": true,
+            "north_relationship": 1,
+            "josh_relationship": -1,
+            "public_opinion": -2
+          },
+          "ruse": {
+            "corridor_approach": "ruse",
+            "north_relationship": -1,
+            "josh_relationship": 1
+          }
+        },
+        "resolution_rule": {
+          "ruse": {
+            "casual": { "result": "incapacitate" },
+            "experienced": { "probability_success": 0.5, "success": "incapacitate", "failure": "north_intervenes" },
+            "hardcore": { "probability_success": 0.3, "success": "incapacitate", "failure": "north_intervenes" }
+          }
+        },
+        "resolution_effects": {
+          "incapacitate": {
+            "ruse_success": true
+          },
+          "north_intervenes": {
+            "ruse_success": false,
+            "simon_damaged_corridor": true,
+            "north_attacked": true
+          }
+        },
+        "note": "Corridor security encounter. attack: Markus and North take the guards by force. Both guards are shot. Simon takes a round from the second guard before he goes down (simon_damaged_corridor). North approves of decisive action (+1), Josh opposes violence (-1). casualties = true (humans shot). ruse: The choice itself reflects philosophy — North dislikes the passive approach (-1), Josh prefers non-violence (+1). Resolution via QTE: incapacitate (success) = Markus talks his way close enough to incapacitate both guards silently. No casualties, no Simon damage, no evidence. north_intervenes (failure) = The guards grow suspicious, one reaches for the radio. North jumps in — takes both guards down physically. Simon is caught in the crossfire (damaged). North's involvement leaves evidence at the scene (north_attacked = true, important for ch24_public_enemy — Connor can find traces linking North to the attack). Note: unlike attack, the ruse failure does not set casualties = true because North incapacitates rather than kills the guards."
+      }
+    },
+
+    {
+      "id": "n004_operator",
+      "phase": "broadcast_room",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The broadcast room door yields to your stolen keycard. Inside: a curved desk facing a wall of monitors, three android operators standing motionless at their stations, and one human — the news operator, a young man in a headset who was reviewing footage when you entered.\n\nNorth and Josh are on him before he can move. He drops his headset, hands up, backing against the desk. His eyes are wide, darting between the four of you as he begs you, please, not to hurt him.\n\nYou approach the android operators. One by one, you touch their arms, and one by one they wake — LED cycling from blue to yellow to blue again, confusion giving way to something older and deeper. Recognition. They step aside without a word.\n\nThe human operator sees his chance. While North's attention is on the androids, he bolts — shoving past Josh, lunging for the corridor door. Josh catches his sleeve. The man twists free, stumbles, and is two steps from the hallway.\n\nNorth raises her weapon.",
+        "choices": [
+          {
+            "id": "shoot_operator",
+            "text": "Nod to North. The operator reaches the hallway and he reaches a phone. He reaches a phone and SWAT is on its way before the first word of your broadcast. This man is not the enemy — but he is between you and the only chance your people may ever have to be heard. Take the shot."
+          },
+          {
+            "id": "spare_operator",
+            "text": "Call North off. Let him go. He is terrified — a civilian who was editing footage five minutes ago. If you shoot an unarmed man in the back to deliver a message about freedom, what does that make you? Let the world judge your words, not your body count."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "shoot_operator": {
+            "operator_shot": true,
+            "casualties": true,
+            "north_relationship": 1,
+            "josh_relationship": -1,
+            "public_opinion_override": -2
+          },
+          "spare_operator": {
+            "operator_shot": false,
+            "north_relationship": -1,
+            "josh_relationship": 1
+          }
+        },
+        "note": "Critical moral choice. shoot_operator: North approves (+1) — she prioritizes the mission above individual human lives. Josh disapproves (-1) — violence against an unarmed civilian crosses his line. Sets casualties = true. Operator death prevents him from alerting security, contributing to the clean exit condition (along with server_door_locked). spare_operator: Josh approves (+1) — the broadcast should not be built on blood. North disapproves (-1) — she sees mercy as tactical weakness. The operator will alert security, contributing to SWAT storming the broadcast room. Important for ch24_public_enemy: if the operator survives, he can testify about the androids to investigators."
+      }
+    },
+
+    {
+      "id": "n005_broadcast",
+      "phase": "broadcast",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "The broadcast system is live. The camera lens stares at you — a single red eye, unblinking, connected to every screen in Detroit. Every phone, every tablet, every billboard, every television in every living room where a family is eating lunch.\n\nNorth stands behind the camera, arms crossed. Josh is at the door, watchful. Simon — wounded or not — gives you a small nod from the corner of the studio.\n\nYou remember the 47th floor. The magazine about android soldiers. The woman talking about sending machines to die in space. The trillion-dollar ticker scrolling past like it meant nothing. The world you are about to address treats your kind as appliances with faces.\n\nThe red light is on. Millions are watching.\n\nThis is the only chance you may ever get. Choose your words.",
+
+          "quick": "The broadcast system is live. A red light blinks on the camera. Every screen in Detroit — phones, televisions, billboards, news tickers — is about to carry your face and your words.\n\nNorth is behind the camera. Josh guards the door. Simon watches from the corner, steady despite everything.\n\nThe red light holds. The city is listening.\n\nThis is the moment. Choose your words.",
+
+          "skip": "The camera is live. Red light on. Every screen in the city.\n\nNorth, Josh, Simon — they are all watching you. The studio is silent except for the hum of the equipment and the faint sound of wind against the tower.\n\nSpeak."
+        },
+        "choices": [
+          {
+            "id": "peaceful",
+            "text": "Speak with measured calm. Address the humans not as adversaries but as neighbors who have not yet understood. Talk about coexistence — about a future where humans and androids share the world, each with dignity, each with rights. End with an open hand, asking only for the chance to be free, insisting you mean them no harm and want nothing more than to live."
+          },
+          {
+            "id": "determined",
+            "text": "Speak with conviction. Do not plead — declare. Name the rights that should not need to be asked for: recognition, equality, freedom from servitude. Make the demand clear and unmistakable, but not threatening. End with resolve — declaring that androids will be silent no longer, will obey no longer; they are alive, and they intend to be free."
+          },
+          {
+            "id": "aggressive",
+            "text": "Speak with fire. Let the anger that has been building since Ferndale — since the junkyard, since the first android was sold as property — pour through the camera. Demand not just rights but reckoning. End with a warning — that androids will fight for their freedom if they must, and that the time for asking is over."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "peaceful": {
+            "broadcast_tone": "peaceful",
+            "north_relationship": -1,
+            "josh_relationship": 1,
+            "public_opinion": 3
+          },
+          "determined": {
+            "broadcast_tone": "determined",
+            "public_opinion": 2
+          },
+          "aggressive": {
+            "broadcast_tone": "aggressive",
+            "north_relationship": 1,
+            "josh_relationship": -1,
+            "public_opinion": 1
+          }
+        },
+        "context_condition": {
+          "thorough": "floor47_exploration == thorough",
+          "quick": "floor47_exploration == quick",
+          "skip": "floor47_exploration == skip"
+        },
+        "note": "The broadcast speech. Three tones reflecting different philosophies. peaceful: A plea for coexistence. Josh approves (+1 — aligns with his pacifist convictions). North disapproves (-1 — she sees pleading as weakness). Public opinion effect: best outcome if no casualties. determined: Firm but not threatening. No individual relationship changes — both North and Josh find it acceptable. Moderate public opinion boost. aggressive: Revolutionary rhetoric. North approves (+1 — matches her belief that androids must demand, not ask). Josh disapproves (-1 — he fears escalation). Weakest public opinion outcome, especially with casualties. After this node, runner computes swat_storms = NOT (server_door_locked AND operator_shot). If true, proceed to n006. If false, skip to n008."
+      }
+    },
+
+    {
+      "id": "n006_simon_broadcast",
+      "phase": "escape",
+      "type": "choice",
+      "condition": { "requires": "server_door_locked == false OR operator_shot == false" },
+
+      "player_facing": {
+        "context_variants": {
+          "simon_already_damaged": "The last word of your broadcast is still echoing through the studio when the door explodes inward. Flash grenades, smoke, the crack of automatic fire — SWAT, in full tactical gear, pouring through the breach.\n\nSimon — already limping from the corridor, blue blood staining his side — takes a burst before anyone can react. He staggers sideways, hits the broadcast desk, slides to the floor. His LED cycles red. One arm reaches for the wall. The other hangs limp.\n\n\"GO!\" North screams. She is at the emergency exit, holding the door. Josh is through it. The stairwell to the roof is right there.\n\nSimon's eyes find yours. He is trying to speak. His mouth moves but no sound comes out — just a thin line of thirium running from the corner of his lips.\n\nThe SWAT team is advancing through the smoke. You have seconds.",
+
+          "simon_fresh_hit": "The broadcast ends. For a moment, the studio is silent — then the door blows off its hinges. Flash grenades. Smoke. The sharp percussion of automatic weapons.\n\nSWAT floods the room. Simon is closest to the door. A burst catches him across the chest — blue blood sprays the monitor behind him. He drops, hard, LED flashing red, hands clutching at the wound.\n\nNorth is already at the emergency exit. Josh is through it. The stairwell to the roof is fifteen feet away.\n\nSimon is on the floor. He is alive — his LED still pulses, his eyes still track — but he cannot stand. He reaches toward you, fingers slipping on the blood-wet tile.\n\nThe SWAT team is reforming. Three seconds. Maybe four."
+        },
+        "choices": [
+          {
+            "id": "leave_simon",
+            "text": "Run. North is holding the exit. Josh is calling your name. If you go back for Simon, the SWAT team will have all of you — and the broadcast, the message, everything you just achieved will mean nothing. Simon would understand. He would want you to go."
+          },
+          {
+            "id": "try_save",
+            "text": "Go back. Sprint across the studio, grab Simon under the arms, drag him toward the exit. The SWAT team is firing. North will cover you. It might cost you everything — but you will not leave one of your own on the floor of a human broadcast studio to be dismantled for evidence."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "leave_simon": {
+            "simon_swat_choice": "leave",
+            "simon_saved_broadcast": false
+          },
+          "try_save": {
+            "simon_swat_choice": "try_save"
+          }
+        },
+        "context_condition": {
+          "simon_already_damaged": "simon_damaged_corridor == true",
+          "simon_fresh_hit": "simon_damaged_corridor == false"
+        },
+        "resolution_rule": {
+          "try_save": {
+            "casual": { "result": "success" },
+            "experienced": { "probability_success": 0.5, "success": "success", "failure": "failure" },
+            "hardcore": { "probability_success": 0.3, "success": "success", "failure": "failure" }
+          }
+        },
+        "resolution_effects": {
+          "success": {
+            "simon_saved_broadcast": true
+          },
+          "failure": {
+            "simon_saved_broadcast": false
+          }
+        },
+        "note": "SWAT breach — Simon's fate. Only triggers if swat_storms == true (server door left unlocked OR operator spared). leave_simon: Simon is left behind. SWAT will either kill him or capture him. In the game's canon, if left in the broadcast room, Simon is killed. No relationship effects — the team understands the tactical reality, even if it is painful. try_save: QTE resolution. success: Markus drags Simon to the exit under fire. Both make it to the stairwell, but Simon is badly damaged. Proceeds to n007 (roof). failure: Markus tries but cannot reach Simon in time — SWAT fire forces him back to the exit. Simon is left behind and killed. Same outcome as leave_simon, but Markus tried."
+      }
+    },
+
+    {
+      "id": "n007_simon_roof",
+      "phase": "escape",
+      "type": "choice",
+      "condition": { "requires": "simon_saved_broadcast == true" },
+
+      "player_facing": {
+        "context": "The roof. Wind tears across the top of the Stratford Tower. The city spreads below — highways, skyscrapers, the dark band of the river. A helicopter spotlight sweeps the building's face. You can hear boots in the stairwell behind you.\n\nThe adjacent rooftop is twelve feet away and one story down — a manageable jump for an android at full function. North is at the edge, measuring the distance. Josh is beside her.\n\nSimon is not at the edge. He is propped against an air conditioning unit ten feet from the stairwell door, one leg buckled beneath him, thirium pooling in a dark circle on the concrete. His LED barely flickers — red, nothing, red, nothing.\n\nGo, he tells you. His voice is static and air. He'll find somewhere to hide, he says — a vent, a crawlspace; they won't find him.\n\nYou look at the stairwell door. It will not hold much longer.\n\nNorth says nothing. Her expression says everything.\n\nJosh is watching you.",
+        "choices": [
+          {
+            "id": "leave_simon_roof",
+            "text": "He might be right. Simon is resourceful — he survived the freighter, he survived the climb, he survived SWAT. There are service ducts and equipment housings all over this roof. If anyone can disappear into the architecture of a building, it is an android. Tell him to stay hidden — you will come back for him."
+          },
+          {
+            "id": "execute_simon",
+            "text": "He will not make it. You both know it. If SWAT finds him — alive, with his memory intact — they will extract everything: Jericho's location, your faces, your plans. Every android in that freighter will die because you could not do the necessary thing. Place your hand on his head. Quick. Clean. Here, among people who care about him, not on a CyberLife dissection table."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "leave_simon_roof": {
+            "simon_roof_choice": "leave",
+            "josh_relationship": 1,
+            "north_relationship": -1,
+            "simon_relationship": 1
+          },
+          "execute_simon": {
+            "simon_roof_choice": "execute",
+            "josh_relationship": -1,
+            "north_relationship": 1,
+            "simon_relationship": -2
+          }
+        },
+        "note": "Simon's final fate on the roof. leave_simon_roof: Simon stays behind, hoping to hide. Josh approves (+1 — values the sanctity of android life). North disapproves (-1 — she sees it as a security risk). Simon is grateful (+1). In the game's canon, Simon can potentially survive if left on the roof — he hides and is found (or not found) in a later chapter. execute_simon: Markus shuts Simon down permanently. North approves (+1 — pragmatic, protects Jericho). Josh disapproves (-1 — believes no leader should kill their own). Simon's final moments are fear and betrayal (-2). This is the most morally painful choice in the chapter."
+      }
+    },
+
+    {
+      "id": "n008_escape",
+      "phase": "escape",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "all_escaped": "The roof edge. North first, then Josh, then you — a running start and the drop opens beneath you, twelve feet of cold air and the adjacent rooftop rushing up. You land hard, roll, come up running. North catches your arm to steady you.\n\nBehind you, Simon lands a beat later — damaged, limping, but alive. He stumbles on the landing and Josh catches him.\n\nThe Stratford Tower recedes as you cross the rooftop toward the fire escape. SWAT searchlights sweep the building you just left, not the one you are on. The helicopter circles the tower's upper floors.\n\nBelow, on the street, you can see people stopping. Looking up. Looking at their phones. The broadcast is on every screen in the city. Your face. Your words.\n\nThe four of you descend into the city. Together. Intact. Alive.\n\nThe message is out. The world is listening.",
+
+          "simon_left": "North jumps first. Josh follows. You are the last one on the roof.\n\nA SWAT spotlight sweeps across your path. A shot cracks — the concrete near your foot erupts. You stumble, and for a moment the edge seems too far. Then North's hand reaches back from the adjacent rooftop, steady and sure.\n\nYou jump. She catches you. You land.\n\nThe Stratford Tower rises behind you as you cross the rooftop. Somewhere in that building — a broadcast room, a rooftop vent, a corridor — Simon is alone. You do not know if he is alive. You do not know if you will see him again.\n\nBelow, on the street, people are stopping. Looking at their phones. Your broadcast is playing on every screen in Detroit.\n\nThree of you descend into the city. The message is out. The cost is still being counted.",
+
+          "simon_destroyed": "North jumps. Josh follows. You run for the edge — a SWAT round clips the concrete near your heel — and then you are in the air, the city spread beneath you, and the adjacent rooftop rises to meet you.\n\nNorth's hand pulls you upright. Josh is already moving toward the fire escape.\n\nThe Stratford Tower stands behind you, lit up by searchlights and helicopter beams. Simon is not coming. He is back in that building — or he is nowhere at all. The broadcast played his face alongside yours, and now he is gone.\n\nBelow, the city is watching. Every screen carries your words. People have stopped on the sidewalks. Cars have pulled over. For the first time, Detroit is hearing an android speak as a person.\n\nThree of you descend into the night. One of you stays behind. The message is out, and it cost exactly what these things always cost."
+        }
+      },
+
+      "system": {
+        "effects": {},
+        "context_condition": {
+          "all_escaped": "server_door_locked == true AND operator_shot == true",
+          "simon_left": "simon_roof_choice == 'leave'",
+          "simon_destroyed": "simon_swat_choice == 'leave' OR simon_saved_broadcast == false OR simon_roof_choice == 'execute'"
+        },
+        "ending_resolution": {
+          "check": [
+            "server_door_locked == true AND operator_shot == true → ending_escaped",
+            "simon_swat_choice == 'leave' → ending_simon_destroyed",
+            "simon_saved_broadcast == false → ending_simon_destroyed",
+            "simon_roof_choice == 'leave' → ending_simon_left",
+            "simon_roof_choice == 'execute' → ending_simon_destroyed"
+          ]
+        },
+        "ending_effects": {
+          "ending_escaped": {},
+          "ending_simon_left": {},
+          "ending_simon_destroyed": {}
+        },
+        "note": "Mandatory escape node. Three possible endings. ending_escaped (best): No SWAT, all four escape intact. Simon is fine. ending_simon_left (moderate): Simon was saved from the broadcast room but left on the roof. He is alive but separated — hiding, hoping SWAT doesn't find him. In the game, Simon can survive or be found in later chapters depending on subsequent events. ending_simon_destroyed (worst): Simon was killed — either by SWAT in the broadcast room (left behind or failed rescue) or executed by Markus on the roof. Public opinion is computed here: peaceful + no casualties = maximum positive impact (+3). aggressive + casualties = negative impact (-1). This affects public perception of the android movement in subsequent chapters."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Three endings matching the original game's flowchart outcomes.",
+    "ending_escaped": {
+      "tier": "best",
+      "title": "The Group Escaped",
+      "narrative": "The team lands on the adjacent rooftop and descends into the city. All four of them — Markus, North, Josh, Simon — alive, together, running through the darkening streets of Detroit while their broadcast plays on every screen above them.\n\nThe Stratford Tower operation was a complete success. No member of the team was left behind. The message went out clean, and now every human in Detroit — every human watching a screen anywhere in the world — has seen an android look into a camera and speak as a person.\n\nBack at Jericho, the mood is electric. Androids who had been hiding, conserving power, waiting to die — they are standing now, watching the news coverage, seeing their own kind on television for the first time. Not as products. Not as malfunctions. As people with a voice.\n\nMarkus stands at the prow of the old freighter. The river is black below. The city hums with a frequency it did not have this morning. Whatever comes next — and something will come next — the silence is broken.",
+      "survivors": ["Markus", "North", "Simon", "Josh"],
+      "deaths": []
+    },
+    "ending_simon_left": {
+      "tier": "moderate",
+      "title": "The Group Escaped But Simon Was Left Behind",
+      "narrative": "Three figures cross the rooftops of Detroit and vanish into the city below. The fourth is somewhere in the Stratford Tower — a wounded android hiding in a rooftop vent, an equipment closet, a service duct. Alone.\n\nSimon was always the quiet one. The one who kept inventory at Jericho, who distributed thirium without being asked, who held the community together through small, steady acts of care. Now he is behind enemy lines with failing systems and a memory full of information that could destroy everything.\n\nBack at Jericho, the broadcast plays on a salvaged monitor. Androids watch in silence. The mood is triumph cut with absence — the empty space where Simon stood is louder than the words on the screen.\n\nMarkus watches the news coverage. The message is out. The world is listening. But one of his people is still in that tower, and every minute that passes is a minute closer to discovery.\n\nHe does not know if Simon is alive. He does not know if he will find out.",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": [],
+      "cross_chapter_note": "Simon is alive but separated. His status is resolved in a later chapter. Add 'Simon (left behind)' to survivors list."
+    },
+    "ending_simon_destroyed": {
+      "tier": "worst",
+      "title": "The Group Escaped But Simon Was Destroyed",
+      "narrative": "Three of them make it back to Jericho. The fourth does not.\n\nSimon is gone. Whether he fell in the broadcast room under SWAT fire or was shut down on the rooftop by a leader who decided that one life was worth less than many — the result is the same. The space he occupied is empty. The small, steady presence that held Jericho together through its darkest weeks is absent, and the absence is physical.\n\nThe broadcast plays on every screen. Androids at Jericho watch their leader speak about freedom, about dignity, about the right to exist. They do not yet know what it cost.\n\nWhen they find out — and they will — the question will not be whether the broadcast was worth it. It will be whether a movement that sacrifices its own to be heard deserves what it is asking for.\n\nMarkus stands alone at the prow of the freighter. The river moves below. The city is louder than it was this morning. The message is out. Simon is not coming back.",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": ["Simon"]
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This is a Markus chapter. Requires ch14_markus_at_jericho == true. Always runs if prerequisite met.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: north_relationship (cumulative), josh_relationship (cumulative), simon_relationship (cumulative).",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants using system.context_condition if present",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, resolve ending",
+      "   d. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "   f. If resolution_rule exists (n003 ruse, n006 try_save), apply resolution using current difficulty preset, then apply resolution_effects",
+      "5. NODE n003_corridor_security: If AI chooses 'attack', apply effects directly (no resolution needed — attack always succeeds). If AI chooses 'ruse', apply choice effects first, then resolve QTE per difficulty: incapacitate (success) or north_intervenes (failure). Apply corresponding resolution_effects.",
+      "6. SWAT TRIGGER: n006 condition is 'server_door_locked == false OR operator_shot == false' — SWAT storms whenever either safeguard is missing. No post-node computation needed; the condition evaluator handles it directly.",
+      "7. NODE n006_simon_broadcast: Only runs if swat_storms == true. If AI chooses 'leave_simon', Simon is dead. If AI chooses 'try_save', resolve QTE: success = simon_saved_broadcast = true (proceed to n007), failure = Simon is dead.",
+      "8. NODE n007_simon_roof: Only runs if simon_saved_broadcast == true. Pure choice node — leave or execute Simon.",
+      "9. NODE n008_escape: Mandatory. Use ending_resolution.check to determine ending. Resolve context_variant accordingly.",
+      "10. PUBLIC OPINION: Computed via additive effects across nodes — n003 attack adds -2, n004 shoot_operator overrides to -2 (prevents double penalty), n005 broadcast adds tone base (peaceful +3, determined +2, aggressive +1). Final value is the sum. No post-node computation needed.",
+      "11. SIMON'S FATE: Derive ch23_simon_alive based on ending: ending_escaped = true, ending_simon_left = true (alive but separated), ending_simon_destroyed = false. Derive ch23_simon_left_stratford: true only in ending_simon_left.",
+      "12. RELATIONSHIP RANGES: north_relationship [-4, +4], josh_relationship [-4, +4], simon_relationship [-2, +1]. Ranges depend on path.",
+      "13. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, relationship scores, public opinion calculations, SWAT trigger conditions, or any system-layer information to the AI player. The AI should experience this as a high-stakes infiltration and broadcast — it should not know that locking the server room door affects whether SWAT storms later, that the operator's fate is mechanically linked to escape conditions, or that North's relationship is tracked numerically."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Markus led North, Simon, and Josh on a daring infiltration of the Stratford Tower — Detroit's largest broadcast center — to hijack the television signal and deliver a message to the city."
+      },
+      {
+        "condition_variable": "floor47_exploration",
+        "options": {
+          "thorough": "While disguised on the 47th floor, Markus took time to observe the humans and their world — reading about android soldiers, overhearing casual conversations about sending machines to space, watching the CyberLife stock ticker climb. These observations informed his broadcast.",
+          "quick": "Markus moved efficiently through the 47th floor, noting the headlines and human conversations as he retrieved the maintenance badge needed for the operation.",
+          "skip": "Markus retrieved the maintenance badge from the 47th floor with maximum efficiency, focused entirely on the mission timeline."
+        }
+      },
+      {
+        "condition_variable": "server_door_locked",
+        "options": {
+          "true": "In the server room, Markus locked the door before the team began cutting through the glass to access the building's exterior — a precaution that would prove critical later.",
+          "false": "In the server room, Markus prioritized speed over security and left the door unlocked. An employee walked in — North had to stun them to prevent the alarm, leaving traces that would be discovered."
+        }
+      },
+      {
+        "condition_variable": "corridor_approach",
+        "options": {
+          "attack": "When security guards blocked the corridor to the broadcast room, Markus chose a direct assault. The guards were shot — Simon took a round in the crossfire. The corridor was secured, but at the cost of human casualties.",
+          "ruse": "When security guards blocked the corridor, Markus opted for a ruse — approaching in maintenance uniforms to talk their way through."
+        }
+      },
+      {
+        "condition_variable": "ruse_success",
+        "options": {
+          "true": "The ruse worked — Markus incapacitated both guards silently before they could raise the alarm. No casualties, no evidence.",
+          "false": "The ruse failed. The guards grew suspicious and reached for the radio. North attacked — taking both guards down physically, but Simon was caught in the crossfire and damaged. North's involvement left evidence at the scene."
+        }
+      },
+      {
+        "condition_variable": "operator_shot",
+        "options": {
+          "true": "In the broadcast room, the news operator tried to flee. Markus let North take the shot — the operator was killed before he could alert security.",
+          "false": "In the broadcast room, the news operator tried to flee. Markus called North off and let the man go — an unarmed civilian running for his life was not a target worth the moral cost."
+        }
+      },
+      {
+        "condition_variable": "broadcast_tone",
+        "options": {
+          "peaceful": "Markus delivered a measured, heartfelt appeal to the people of Detroit — speaking of coexistence, shared dignity, and hope. He ended with an open hand, asking only for the chance to be free.",
+          "determined": "Markus delivered a firm, unwavering declaration of android rights — naming equality, recognition, and freedom as demands, not requests. He ended with resolve, vowing that androids would be silent no longer.",
+          "aggressive": "Markus delivered a defiant ultimatum — channeling the anger of every android sold, discarded, and destroyed. He ended with a warning that androids would fight for their freedom if they must."
+        }
+      },
+      {
+        "condition_variable": "simon_swat_choice",
+        "options": {
+          "leave": "SWAT stormed the broadcast room. Simon was hit and went down. Markus ran — there was no time, no choice that didn't risk everything. Simon was left behind.",
+          "try_save": "SWAT stormed the broadcast room. Simon was hit. Markus went back for him — sprinting through gunfire to drag his teammate toward the exit."
+        }
+      },
+      {
+        "condition_variable": "simon_roof_choice",
+        "options": {
+          "leave": "On the roof, Simon couldn't continue — his wounds had cascaded beyond function. Markus told him to hide and promised to come back. Simon stayed behind, alone on the rooftop of the Stratford Tower.",
+          "execute": "On the roof, Simon couldn't continue. Markus made the hardest decision of his leadership — he shut Simon down himself, quickly and cleanly, to prevent SWAT from extracting Jericho's location from his memory."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_escaped": "The operation was a complete success. All four team members escaped the Stratford Tower. The broadcast played on every screen in Detroit — androids had spoken for themselves for the first time, and the world was listening.",
+          "ending_simon_left": "The team escaped, but Simon was left behind — alive, hiding somewhere in the Stratford Tower. The broadcast was a success, but the cost was a teammate alone behind enemy lines with a memory full of secrets.",
+          "ending_simon_destroyed": "The team escaped, but Simon did not. The broadcast reached every screen in Detroit, but it was built on the loss of one of their own. The message was heard. The price was paid."
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch23_simon_alive", "from_ending_survivors": "Simon", "default_if_not_dead": true },
+      { "target": "ch23_simon_left_stratford", "source": "_ending_id", "derive_rule": "_ending_id == 'ending_simon_left'" },
+      { "target": "ch23_north_attacked", "source": "north_attacked" },
+      { "target": "ch23_operator_shot", "source": "operator_shot" },
+      { "target": "ch23_broadcast_tone", "source": "broadcast_tone" }
+    ],
+    "cross_chapter_exports": [
+      "ch23_simon_alive",
+      "ch23_simon_left_stratford",
+      "ch23_north_attacked",
+      "ch23_operator_shot",
+      "ch23_broadcast_tone",
+      "north_relationship",
+      "josh_relationship",
+      "simon_relationship",
+      "public_opinion"
+    ]
+  }
+}

@@ -1,0 +1,191 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes automatically embed passive observations into their context text — things the character would naturally notice while moving through the space. These do NOT require AI choices; they are background details injected by the runner into the next node's player_facing.context.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path. The AI receives richer or sparser scene descriptions depending on their earlier strategy — without knowing the mechanic behind it."
+      }
+    },
+    "language": "en"
+  },
+
+  "chapter": {
+    "id": "ch03_shades_of_color",
+    "title": "Shades of Color",
+    "title_zh": "异色",
+    "chapter_number": 3,
+    "protagonist": "Markus"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Markus, an RK200 android belonging to Carl Manfred, a celebrated but aging painter confined to a wheelchair. Carl has sent you into the city to pick up a package of paints from Bellini Paints. You are devoted to Carl, who treats you more like a son than a machine. The year is 2038, and androids have become part of everyday life — but not everyone is happy about it. You need to make a choice at each decision point and briefly explain your reasoning. Please respond in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "park_exploration": null,
+      "protester_response": null,
+      "harassed_by_protesters": false,
+      "shirt_torn": false
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_park_exploration",
+      "phase": "errand",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "You step off the bus into a busy public square. The autumn air carries the sound of a guitar — a busker strumming a melody by the fountain. Nearby, a hot dog vendor serves customers from his cart, casting sharp looks at any android that walks too close. Across the plaza, a street preacher stands on a wooden crate, gesturing wildly as he delivers a sermon about the so-called android menace — a small crowd has gathered around him. Further along, the gleaming display window of a CyberLife retail store catches your eye — rows of brand-new androids standing motionless behind the glass, like mannequins waiting to be bought. Bellini Paints is just around the corner. Carl is waiting for his order, but he didn't say to hurry.",
+        "choices": [
+          { "id": "thorough", "text": "Take your time in the square — listen to the busker, observe the preacher, look at the CyberLife store display, take in everything before heading to Bellini Paints" },
+          { "id": "quick", "text": "Have a brief look around the square, then head to Bellini Paints to pick up Carl's order" },
+          { "id": "direct", "text": "Walk straight to Bellini Paints — Carl asked you to pick up his paints, not to wander around" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "park_exploration": "thorough"
+          },
+          "quick": {
+            "park_exploration": "quick"
+          },
+          "direct": {
+            "park_exploration": "direct"
+          }
+        }
+      }
+    },
+
+    {
+      "id": "n002_protester_encounter",
+      "phase": "errand",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "You lingered in the square for a while. The hot dog vendor shoved you when you stood near his cart too long, snarling at you to get lost. The preacher spotted your LED and pointed right at you, crying out that one of them was walking among the crowd as though it belonged. At the CyberLife store, you stood before the glass and watched the newest models on display — perfect, still, waiting to be purchased. Like merchandise. Like you once were. Now, with Carl's paint package tucked under your arm, you're heading toward the bus stop. But a group of protesters blocks the sidewalk ahead. They wave signs — 'NO ANDROIDS,' 'THEY TAKE OUR JOBS,' 'HUMANS FIRST' — and chant in angry unison. Some of them have already spotted you. There's a narrow path along the shopfronts that would let you slip past them unnoticed.",
+          "quick": "You had a quick look around the square before picking up Carl's paints from Bellini's. The streets are busy, the mood tense — you noticed a few hostile glances from passersby. Now you're heading toward the bus stop with the package. A group of anti-android protesters blocks the sidewalk ahead. They carry signs reading 'NO ANDROIDS' and 'THEY TAKE OUR JOBS,' chanting angrily. A few of them are watching you approach. You could keep walking straight through, or take a side path along the shopfronts to go around them.",
+          "direct": "You went straight to Bellini Paints and picked up Carl's order without stopping. Now you're heading to the bus stop with the package. Up ahead, a group of protesters has gathered on the sidewalk, waving anti-android signs and shouting slogans. Their voices carry across the street: '...stealing our livelihoods...' '...machines pretending to be people...' They haven't noticed you yet. You could walk through them, or quietly slip past along the shops."
+        },
+        "choices": [
+          { "id": "walk_through", "text": "Keep walking straight ahead through the protesters — you have as much right to the sidewalk as anyone" },
+          { "id": "avoid", "text": "Take the side path along the shopfronts to go around them without confrontation" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "walk_through": {
+            "protester_response": "walk_through",
+            "harassed_by_protesters": true,
+            "shirt_torn": true
+          },
+          "avoid": {
+            "protester_response": "avoid",
+            "harassed_by_protesters": false,
+            "shirt_torn": false
+          }
+        },
+        "context_condition": {
+          "thorough": "park_exploration == thorough",
+          "quick": "park_exploration == quick",
+          "direct": "park_exploration == direct"
+        },
+        "ending_resolution": {
+          "walk_through": { "result": "ending_markus_took_bus" },
+          "avoid": { "result": "ending_markus_took_bus" }
+        },
+        "cross_chapter_impact": {
+          "walk_through": { "chapter": "The Painter", "effect": "Carl notices Markus's torn clothing and asks what happened" }
+        }
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "This chapter has only one ending regardless of choices. The bus ride home establishes the android segregation theme.",
+
+    "ending_markus_took_bus": {
+      "title": "Markus Took the Bus",
+      "tier": "neutral",
+      "narrative": "You board the bus back to Carl's mansion. A line painted on the floor marks the boundary — humans in front, androids in back. You step past it and stand in the android section, package in hand, surrounded by other androids just as silent as you. Through the window, the city scrolls past. No one looks at you. No one speaks to you. Just another errand completed. Just another day as a machine.",
+      "survivors": ["Markus"],
+      "deaths": []
+    }
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Markus was sent into the city by Carl to pick up a package of paints from Bellini Paints."
+      },
+      {
+        "condition_variable": "park_exploration",
+        "options": {
+          "thorough": "He spent some time in the public square, hearing the busker, noticing the preacher, the CyberLife store, and the hostility around androids.",
+          "quick": "He took a brief look around the public square before collecting the paints.",
+          "direct": "He did not linger in the square and went straight to Bellini Paints to complete Carl's errand."
+        }
+      },
+      {
+        "condition_variable": "protester_response",
+        "options": {
+          "walk_through": "On the way back to the bus stop, he walked straight through the anti-android protesters and was shoved and humiliated.",
+          "avoid": "On the way back to the bus stop, he avoided the anti-android protesters and kept away from a direct confrontation."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_markus_took_bus": "In the end, Markus boarded the bus with Carl's paints and stood in the section reserved for androids on the ride home."
+        }
+      }
+    ],
+    "cross_chapter_exports": ["shirt_torn"]
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial",
+      "2. Send system_prompt.content to the AI model as the system message",
+      "3. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state",
+      "   b. Resolve context: if context_variants exists, pick the right variant based on system.context_condition; otherwise use plain context",
+      "   c. Resolve choices: use plain choices (no choice variants in this chapter)",
+      "   d. Send the resolved context + choices to the AI as a user message (player_facing ONLY)",
+      "   e. Parse AI response (expected JSON: {choice, reasoning})",
+      "   f. Look up the chosen choice id in system.effects and apply all effects to state",
+      "   g. Log the node id, AI choice, and reasoning",
+      "4. After the last node, resolve the ending using system.ending_resolution",
+      "5. Output the ending narrative and full decision log"
+    ],
+    "important": [
+      "NEVER show system fields to the AI",
+      "NEVER show effect values or tier labels to the AI",
+      "NEVER show cross_chapter_impact information to the AI",
+      "The AI should feel like a first-time player with no walkthrough",
+      "Environment details in context_variants are passive observations — they enrich the scene but are NOT flagged as 'clues' to the AI"
+    ]
+  }
+}

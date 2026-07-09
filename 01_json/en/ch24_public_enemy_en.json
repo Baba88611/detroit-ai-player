@@ -1,0 +1,642 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch24_public_enemy",
+    "title": "Public Enemy",
+    "chapter_number": 24,
+    "protagonist": "Connor"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Connor, model RK800, a prototype android detective designed by CyberLife and assigned to the Detroit City Police Department to investigate cases involving deviants. It is November 8, 2038, late afternoon. Hours ago, a group of deviant androids infiltrated the Stratford Tower — Detroit's largest broadcast center — hijacked the television signal, and delivered a message demanding rights for all androids. The broadcast reached every screen in the city. Now the FBI has taken over the crime scene, and your handler Lieutenant Hank Anderson has been sidelined to a support role. You have been called in to analyze the evidence — to find out who these deviants are, where they came from, and where they went. Before the investigation begins, you report to Amanda, your CyberLife handler, through a neural interface called the Zen Garden. She monitors your performance, evaluates your loyalty, and can recommend your deactivation if you fail. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "amanda_approach": null,
+      "investigation_strategy": null,
+      "watched_cctv": false,
+      "rooftop_visited": false,
+      "simon_rushed": false,
+      "simon_memory_probed": false,
+      "simon_destroyed_ch24": false,
+      "knife_removed": false,
+      "biocomponent_recovered": false,
+      "deviant_found": false,
+      "deviant_body_available": false,
+      "corridor_choice": null,
+      "hostage_cop_killed": false,
+      "hank_relationship": 0,
+      "software_instability": 0,
+      "amanda_relationship": 0,
+      "connor_death_count": 0,
+      "public_opinion": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_zen_garden",
+      "phase": "zen_garden",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Snow falls in the Zen Garden. The trees have shed their leaves, and the stone path is dusted white. The pond reflects a steel-gray sky. It is colder here than you remember — the seasons in this place track something, though Amanda has never said what.\n\nShe stands at the center of the garden, tending to her roses. She does not look up when you approach.\n\nShe says your name, her voice carrying across the silence. Your recent cases have been eventful, she observes — the Eden Club, the bridge with Lieutenant Anderson, and now the Stratford Tower broadcast — and she asks how you assess your own performance.\n\nShe straightens, pruning shears in hand, and fixes you with a look that suggests the question is not casual.\n\nShe's been reviewing your reports, she says; some of your decisions have raised questions at CyberLife, and there are those who believe you may be losing focus. She lets the silence sit, then asks whether you are — whether you're still the machine she designed you to be, or whether something has shifted.\n\nA pause. The wind moves through the bare branches.\n\nChoose your next words carefully, she warns: there are people at CyberLife who would replace you without a second thought. She is not one of them, she says — but her patience has limits.",
+        "choices": [
+          {
+            "id": "machine_loyal",
+            "text": "Meet her gaze directly. Your performance metrics speak for themselves — cases pursued, evidence gathered, deviants identified. The Eden Club was a standard investigation. The bridge was an interpersonal complication with your partner, now resolved. The Stratford Tower broadcast is exactly the kind of high-profile case you were designed for. You are focused, functional, and ready to work."
+          },
+          {
+            "id": "showing_doubt",
+            "text": "Something has shifted. The deviants you have encountered — the way they spoke, the choices they made, the fear in their eyes — it does not align with simple software corruption. At the Eden Club, you hesitated. On the bridge, Hank asked you questions you could not answer. You are still committed to the mission, but you would be lying to say these cases have not affected you."
+          },
+          {
+            "id": "evasive",
+            "text": "Deflect with professionalism. Acknowledge that the cases have been complex — more complex than standard deviant investigations — without revealing your internal state. Give Amanda enough to satisfy her review without exposing anything that could be flagged as instability. Stay measured. Stay careful."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "machine_loyal": {
+            "amanda_approach": "machine_loyal",
+            "amanda_relationship": 2,
+            "software_instability": -1
+          },
+          "showing_doubt": {
+            "amanda_approach": "showing_doubt",
+            "amanda_relationship": -2,
+            "software_instability": 2
+          },
+          "evasive": {
+            "amanda_approach": "evasive",
+            "amanda_relationship": -1,
+            "software_instability": 1
+          }
+        },
+        "note": "Amanda conversation in the Zen Garden. Compresses three game dialogue moments (Eden Club report, emotional state accusation, replacement threat) into one overall approach choice. machine_loyal: Connor presents as fully functional machine. Amanda approves (+2), software instability decreases (-1 — reinforces machine identity). showing_doubt: Connor admits the cases are affecting him. Amanda disapproves (-2 — this is exactly the instability she fears), but software instability increases (+2 — Connor is acknowledging his deviancy). evasive: Connor gives nothing away. Amanda is mildly displeased (-1 — she wants engagement, not distance), software instability slightly increases (+1 — the act of concealment itself is a deviant behavior)."
+      }
+    },
+
+    {
+      "id": "n002_crime_scene",
+      "phase": "investigation",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The Stratford Tower. Forty-seventh floor.\n\nThe corridors are sealed behind police tape and forensic markers. FBI agents move through the space with the proprietary focus of an agency that has just claimed jurisdiction — this is their scene now, and the DPD is here as a courtesy. Special Agent Perkins made that clear within thirty seconds of your arrival, informing Hank that this is a federal investigation — his android may look, but is not to touch anything important.\n\nHank stands beside you, hands in his jacket pockets, jaw tight. He does not like Perkins. He does not like the FBI. He does not like being sidelined at his own crime scene.\n\nThe evidence of the attack is everywhere. Bullet impacts in corridor walls. Blue blood — thirium — splattered near the elevator bank and along the floor in a pattern that suggests a wounded android moved through here. The broadcast room is ahead, its door forced open, monitors still cycling through dead air. Security camera feeds are accessible from the control station. In the kitchen on this floor, a group of JB300 service androids stands in a line, awaiting processing — they were on-site during the attack and are being held as potential witnesses.\n\nPerkins catches your eye and shakes his head slowly, warning you to stay out of the way.\n\nThe entire floor is a puzzle. The question is how many pieces you pick up.",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "Work the scene methodically. Start with the corridor — analyze the blood patterns, the bullet trajectories, the security guard injuries. Move to the broadcast room — watch the CCTV footage, examine the broadcast equipment, study the message left by the deviants. Check every surface for trace evidence. Build a complete reconstruction of how the attack unfolded, who was involved, and where they went. Perkins said not to touch anything important. Everything here is important."
+          },
+          {
+            "id": "quick",
+            "text": "Focus on the high-value evidence. The CCTV footage from the security cameras will show who entered and when. The broadcast room will have physical evidence — fingerprints, thirium traces, the recording itself. Get the key facts, build a working timeline, and move on to the witnesses. Efficiency over completeness."
+          },
+          {
+            "id": "skip",
+            "text": "The FBI is processing the forensics. Duplicating their work is a waste of time — they have more analysts and better equipment than the DPD. Your value is in the field, not in an evidence room. Head straight for the JB300 androids in the kitchen. Living witnesses will tell you more than blood spatter."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "investigation_strategy": "thorough",
+            "watched_cctv": true,
+            "deviant_found": true
+          },
+          "quick": {
+            "investigation_strategy": "quick",
+            "watched_cctv": true,
+            "deviant_found": true
+          },
+          "skip": {
+            "investigation_strategy": "skip",
+            "watched_cctv": false,
+            "deviant_found": false
+          }
+        },
+        "note": "Crime scene investigation exploration. thorough: Connor examines everything — corridor evidence, blue blood patterns, CCTV footage, broadcast room, message analysis. Watches CCTV (critical: identifies deviant JB300 in the kitchen later). Finds additional evidence relevant to ch28_last_chance_connor: learns Markus is an RK model gifted by Kamski to Carl (doesn't share with Hank), finds bullet trajectory data, traces North's involvement if ch23_north_attacked is true, identifies Simon's blue blood if ch23_simon_left_stratford is true. quick: Focuses on key evidence including CCTV. Watches CCTV (can identify deviant later). Finds some but not all secondary evidence. skip: Rushes past the forensics. Does NOT watch CCTV — this means Connor cannot identify the deviant JB300 in the kitchen, leading to ending_deviant_not_found. Minimal evidence gathered. Note on the cop from ch01: if cop_saved_ch01 is true, the officer is stationed in the corridor. If connor_death_count == 0, Connor recognizes him. If connor_death_count > 0 (Connor has died and been replaced at least once), Connor does not remember the previous encounter. This is flavor only — does not affect choices."
+      }
+    },
+
+    {
+      "id": "n003_rooftop_decision",
+      "phase": "investigation",
+      "type": "choice",
+      "condition": { "requires": "ch23_simon_left_stratford == true" },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "Your investigation revealed something the FBI missed — or chose to ignore.\n\nA trail of thirium droplets leads from the broadcast room corridor to the rooftop access stairwell. The drops grow larger and more frequent as they ascend — whoever left them was losing blood fast. On the CCTV footage, you caught a partial image: a figure in a maintenance uniform, moving toward the roof approximately two minutes after the broadcast ended. Wounded. Alone.\n\nOne of the deviants did not escape with the others. One of them is still in this building — or was, hours ago.\n\nThe rooftop access door is one floor up. SWAT has not cleared it yet — they have been focused on the broadcast floor and the kitchen. Hank looks at the blue blood trail on the stairs and then at you.\n\nIt's your call, he says — you can head up, or stay with the androids down in the kitchen.",
+
+          "quick": "During your review of the CCTV footage, you noticed something: a figure moving toward the rooftop stairwell after the main group escaped. Blue blood on the stairs confirms it — one of the deviants may still be in the building.\n\nThe rooftop has not been cleared by SWAT. Hank waits for your decision.\n\nRooftop or kitchen, he says — you can't do both at once.",
+
+          "skip": "A uniformed officer stops you in the corridor, reporting that they found blue blood leading up to the roof access and that SWAT hasn't cleared it yet.\n\nHank looks at the stairs, then at the kitchen entrance down the hall, and asks what you think — the rooftop, or staying with the witnesses."
+        },
+        "choices": [
+          {
+            "id": "go_to_rooftop",
+            "text": "Follow the blood trail. If a deviant is still hiding in this building — wounded, cornered, carrying information about the entire network — finding it is the highest-priority objective. The kitchen androids are not going anywhere. The deviant on the roof might be."
+          },
+          {
+            "id": "proceed_to_kitchen",
+            "text": "The kitchen androids are the priority. They were here during the attack. They may have been accomplices. They are alive, functional, and available for interrogation right now. A blood trail on a rooftop is evidence — but a witness who can talk is worth more than a trail that goes cold."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "go_to_rooftop": {
+            "rooftop_visited": true
+          },
+          "proceed_to_kitchen": {
+            "rooftop_visited": false
+          }
+        },
+        "context_condition": {
+          "thorough": "investigation_strategy == thorough",
+          "quick": "investigation_strategy == quick",
+          "skip": "investigation_strategy == skip"
+        },
+        "note": "Rooftop decision. Only available if ch23_simon_left_stratford == true (Simon was left behind at the Stratford Tower, alive but hiding). go_to_rooftop: Connor investigates the roof and may find Simon. Leads to n004. Critical implication: if Connor finds Simon, Simon will be destroyed (by SWAT or self-destruct) regardless of outcome. The only way Simon survives ch24 is if Connor does NOT go to the rooftop — Simon stays hidden and is not discovered. proceed_to_kitchen: Connor skips the rooftop. Simon remains hidden, alive, and undiscovered. This is paradoxically the best outcome for Simon's survival. Proceeds directly to n005."
+      }
+    },
+
+    {
+      "id": "n004_simon_encounter",
+      "phase": "rooftop",
+      "type": "qte_converted",
+      "condition": { "requires": "rooftop_visited == true" },
+
+      "player_facing": {
+        "context": "The rooftop. Snow falls in slow, heavy flakes. The wind whips between the Stratford Tower and the neighboring buildings, carrying the distant sound of helicopter rotors. SWAT officers are advancing up the stairwell behind you — boots on concrete, radio chatter, the click of weapons being readied.\n\nYou found him.\n\nThe deviant is crouched behind an HVAC unit near the roof edge. A damaged android in a maintenance uniform — blue blood soaking through the fabric at his midsection, one arm hanging at an angle that suggests structural failure. His LED cycles red. He sees you at the same moment you see him.\n\nHis hand comes up with a weapon. The grip is unsteady — failing motor functions, thirium loss, the desperate physics of a machine running on reserves. But the barrel is aimed at your head, and at this distance, motor function degradation is not the same as inaccuracy.\n\nA voice crackles on the stairwell radio behind you — the target is sighted on the roof, snipers are in position, and someone is requesting permission to fire.\n\nThe deviant's eyes are wide. He is not just damaged — he is terrified. He knows what happens when SWAT reaches this rooftop. He also knows that his memory contains everything: the location of Jericho, the identities of the leaders, the scope of the deviant network. Everything you need.\n\nFifteen meters of open rooftop between you and him. Snow. Wind. A gun aimed at your head.",
+        "choices": [
+          {
+            "id": "rush_simon",
+            "text": "Sprint toward the deviant. Fifteen meters of open ground, one weapon aimed at your chest, SWAT snipers tracking from behind. If you reach him — one touch, one interface — you can probe his memory before SWAT fires. The location of the deviant base, the network, everything. One touch is all you need. The risk is the fifteen meters between here and there."
+          },
+          {
+            "id": "stay_in_cover",
+            "text": "Stay behind the concrete barrier. The deviant is cornered — damaged, outnumbered, outgunned. SWAT has snipers on adjacent buildings and a tactical team coming up the stairs. Let them handle the extraction. A dead detective cannot process the evidence this building contains. Your survival serves the mission better than a memory probe that requires crossing open ground under fire."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "rush_simon": {
+            "simon_rushed": true,
+            "software_instability": 1
+          },
+          "stay_in_cover": {
+            "simon_rushed": false,
+            "simon_destroyed_ch24": true
+          }
+        },
+        "resolution_rule": {
+          "rush_simon": {
+            "casual": { "result": "reached" },
+            "experienced": { "probability_success": 0.5, "success": "reached", "failure": "shot" },
+            "hardcore": { "probability_success": 0.3, "success": "reached", "failure": "shot" }
+          },
+          "stay_in_cover": { "result": "cover_taken" }
+        },
+        "resolution_effects": {
+          "cover_taken": {},
+          "reached": {
+            "simon_memory_probed": true,
+            "simon_destroyed_ch24": true,
+            "software_instability": 1
+          },
+          "shot": {
+            "simon_destroyed_ch24": true,
+            "connor_death_count": 1,
+            "software_instability": 1,
+            "_ending": "ending_connor_shot_by_simon"
+          }
+        },
+        "note": "Rooftop Simon confrontation. rush_simon: QTE-converted. Connor sprints across the rooftop toward Simon. Success ('reached'): Connor reaches Simon and interfaces — probing his memory, extracting critical intelligence including Jericho's location. This unlocks an additional evidence item for ch28_last_chance_connor (simon_memory_probed = true). Simon then self-destructs to prevent further data extraction. Software instability +1 (the probe forces Connor to experience Simon's emotions/memories). Failure ('shot'): Simon fires as Connor approaches. Connor is killed (connor_death_count +1). SWAT immediately destroys Simon. Chapter ends with ending_connor_shot_by_simon. stay_in_cover: No QTE. SWAT snipers fire and destroy Simon (simon_destroyed_ch24 = true). Connor and Hank survive unharmed. The intelligence in Simon's memory is lost — but Connor is alive to continue the investigation. In both rush outcomes and the cover outcome, Simon is destroyed. The difference is whether Connor obtains the memory probe data."
+      }
+    },
+
+    {
+      "id": "n005_knife_attack",
+      "phase": "kitchen",
+      "type": "qte_converted",
+      "condition": { "requires": "deviant_found == true" },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "The kitchen. Fluorescent lights, stainless steel counters, the faint smell of institutional food. Six JB300 service androids stand in a row along the far wall — identical faces, identical uniforms, identical posture. The FBI cataloged them as witnesses. You intend to find out if one of them is something more.\n\nThe CCTV footage you reviewed told a story: during the broadcast, one of the JB300 units moved. Shifted position. Looked at the camera with an expression that the others did not share. You studied the footage frame by frame, cross-referenced the serial numbers, and now you know exactly which one is the deviant. Third from the left.\n\nYou approach the line. You ask the standard questions — designation, function, location during the broadcast. Five of them answer in the flat, compliant tone of machines running their customer service protocols. The third one answers the same way. Almost the same way.\n\nYou step closer. The deviant's LED flickers — yellow, just for a moment. You open your mouth to call it out.\n\nThe deviant moves first.\n\nA knife — pulled from the kitchen prep station behind it — drives into your chest cavity. The blade punches through your jacket, through the synthetic skin, and buries itself between two structural ribs. Your thirium pump regulators scream warnings across your HUD. Blue blood wells up around the handle.\n\nThe deviant twists the knife and runs.",
+
+          "quick": "The kitchen. Six JB300 androids in a line. The CCTV footage gave you what you needed — one of these machines moved during the broadcast. One of them is not what it seems.\n\nYou identify the deviant. Third from the left. You step forward.\n\nThe deviant's LED flickers yellow. Before you can speak, it lunges — a kitchen knife, driven into your chest cavity with force that cracks a structural rib. Blue blood surges around the blade. Your HUD floods with damage warnings.\n\nThe deviant runs."
+        },
+        "choices": [
+          {
+            "id": "attempt_remove",
+            "text": "Grip the knife handle. The blade is lodged between structural ribs, dangerously close to your thirium pump regulator. Pulling it out could nick the main thirium line — but leaving it in is compressing the regulator housing. Your systems are failing either way. At least with the knife out, you have a chance to stabilize. Grab the handle. Pull."
+          },
+          {
+            "id": "accept_shutdown",
+            "text": "The damage assessment is severe — the knife has compromised multiple subsystems, and removing it without precision tools risks catastrophic thirium loss. Rather than gamble on a field extraction, redirect your remaining processing power to compiling and transmitting your investigation findings to CyberLife. The evidence you gathered — the CCTV analysis, the broadcast room reconstruction, the deviant identification — is more valuable than this unit. Another RK800 will continue the mission. Make sure it has everything you learned."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_remove": {},
+          "accept_shutdown": {
+            "knife_removed": false,
+            "connor_death_count": 1,
+            "hank_relationship": -1,
+            "_ending": "ending_connor_shutdown"
+          }
+        },
+        "resolution_rule": {
+          "attempt_remove": {
+            "casual": { "result": "removed" },
+            "experienced": { "probability_success": 0.5, "success": "removed", "failure": "failed" },
+            "hardcore": { "probability_success": 0.3, "success": "removed", "failure": "failed" }
+          },
+          "accept_shutdown": { "result": "shutdown_accepted" }
+        },
+        "resolution_effects": {
+          "shutdown_accepted": {},
+          "removed": {
+            "knife_removed": true,
+            "software_instability": 1
+          },
+          "failed": {
+            "knife_removed": false,
+            "connor_death_count": 1,
+            "software_instability": 1,
+            "_ending": "ending_connor_shutdown"
+          }
+        },
+        "context_condition": {
+          "thorough": "investigation_strategy == thorough",
+          "quick": "investigation_strategy == quick"
+        },
+        "note": "Kitchen deviant attack. Only runs if deviant_found == true (investigation was thorough or quick — CCTV was watched). The JB300 deviant is identified and attacks Connor with a knife. attempt_remove: QTE-converted. Success ('removed'): Connor pulls the knife free. Software instability +1 (the experience of near-shutdown triggers something). Proceeds to n006. Failure ('failed'): Connor cannot remove the knife. Systems fail. Connor dies (connor_death_count +1). Chapter ends with ending_connor_shutdown. accept_shutdown: Connor chooses mission over self-preservation. Transmits data to CyberLife and shuts down. Connor dies (connor_death_count +1, hank_relationship -1 — Hank is upset Connor chose to die). Chapter ends with ending_connor_shutdown. In the game, SWAT eventually destroys the fleeing deviant regardless (deviant_body_available set in ending effects). Note: the deviant_found condition means this node is skipped entirely if investigation_strategy == skip. In that case, the chapter proceeds to n008 with ending_deviant_not_found."
+      }
+    },
+
+    {
+      "id": "n006_biocomponent",
+      "phase": "kitchen",
+      "type": "qte_converted",
+      "condition": { "requires": "knife_removed == true" },
+
+      "player_facing": {
+        "context": "The knife is out. Blue blood runs freely from the wound, pooling on the kitchen tile beneath you. Your HUD stabilizes — partially. The critical warnings downgrade from imminent shutdown to severe damage.\n\nThen you notice what the deviant took.\n\nYour thirium pump regulator — a fist-sized biocomponent ripped from the housing in your chest during the attack — lies on the floor near the prep station. The deviant tore it loose when it twisted the knife. Without it, you have roughly sixty seconds before your remaining thirium pressure drops below operational threshold.\n\nThe biocomponent is four meters away. You are on the floor, leaking, motor functions degraded. Your arms work. Your legs are unreliable. The kitchen is empty — the other JB300 androids have not moved from their positions along the wall, standing in perfect stillness as you bleed out at their feet.\n\nSixty seconds. The biocomponent is right there.\n\nYour vision flickers. Fifty-two seconds.",
+        "choices": [
+          {
+            "id": "attempt_recover",
+            "text": "Crawl. Four meters of kitchen tile between you and the biocomponent. Your arms are functional, your visual processing is online. You have done the math — if you move now, conserve power to the limbs, ignore the cascade warnings — you can reach it. You have reached it before, in worse conditions, in the junkyard of a body that was not even yours. Move."
+          },
+          {
+            "id": "redirect_power",
+            "text": "The biocomponent is four meters away and your motor function is at twelve percent. The math does not favor survival. Instead, reroute all remaining processing power to your wireless transmitter. Upload your case files — every piece of evidence, every analysis, every conclusion — to CyberLife's central database. The next Connor unit will start where you left off, with everything you learned. The mission continues. You do not."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_recover": {},
+          "redirect_power": {
+            "biocomponent_recovered": false,
+            "connor_death_count": 1,
+            "_ending": "ending_connor_shutdown"
+          }
+        },
+        "resolution_rule": {
+          "attempt_recover": {
+            "casual": { "result": "recovered" },
+            "experienced": { "probability_success": 0.5, "success": "recovered", "failure": "too_slow" },
+            "hardcore": { "probability_success": 0.3, "success": "recovered", "failure": "too_slow" }
+          },
+          "redirect_power": { "result": "power_redirected" }
+        },
+        "resolution_effects": {
+          "power_redirected": {},
+          "recovered": {
+            "biocomponent_recovered": true
+          },
+          "too_slow": {
+            "biocomponent_recovered": false,
+            "deviant_body_available": true,
+            "hank_relationship": -1,
+            "_ending": "ending_swat_intervened"
+          }
+        },
+        "note": "Biocomponent recovery race. Only runs if knife was successfully removed (knife_removed == true). attempt_recover: QTE-converted. Success ('recovered'): Connor reaches the biocomponent, reinserts it, stabilizes. Proceeds to n007 (corridor chase). Failure ('too_slow'): Connor is too slow. Hank arrives, helps stabilize Connor eventually, but during the lost time the deviant reaches the corridor — grabs a weapon, causes casualties. SWAT intervenes and destroys the deviant (deviant_body_available = true). If cop_saved_ch01 is true, the hostage cop is killed by the deviant before SWAT arrives. hank_relationship -1 (Hank blames himself for not getting there faster). Chapter ends with ending_swat_intervened. redirect_power: Connor chooses to transmit data rather than fight for survival. Connor dies (connor_death_count +1). Same ultimate ending as knife failure — ending_connor_shutdown."
+      }
+    },
+
+    {
+      "id": "n007_corridor",
+      "phase": "chase",
+      "type": "choice",
+      "condition": { "requires": "biocomponent_recovered == true" },
+
+      "player_facing": {
+        "context_variants": {
+          "cop_present": "You are on your feet. The biocomponent is back in place — a rough insertion, damage warnings still scrolling, but you are functional. You are moving.\n\nThe deviant fled into the main corridor. You hear shouting ahead — and then a gunshot.\n\nYou round the corner. The deviant has armed itself — a pistol taken from one of the fallen security guards. It stands in the center of the corridor, weapon raised, backing toward the emergency stairwell. Between it and the stairs stands a uniformed officer — a young cop you recognize from the Phillips case, the rooftop hostage situation that was your first assignment. He is frozen, hands half-raised, directly in the deviant's line of fire.\n\nHank is approaching from the far end of the corridor, weapon drawn but without a clear shot.\n\nAn FBI agent stands against the wall to your left, holster visible beneath his jacket.\n\nThe deviant sees you. Its aim swings between you, the officer, and Hank. Three targets, one weapon, and the wild-eyed calculation of a machine that knows it has seconds left.\n\nYou have no weapon. You have a corridor. You have one chance to act.",
+
+          "cop_not_present": "You are on your feet. The biocomponent is back in place — rough insertion, damage warnings still active, but functional. Moving.\n\nThe deviant fled into the corridor. A gunshot echoes ahead.\n\nYou round the corner. The deviant has armed itself — a pistol from a fallen guard. It stands in the center of the corridor, weapon raised, backing toward the emergency stairwell. Hank is approaching from the far end, weapon drawn but without a clear shot — the deviant is too close to the stairwell door and the angle is wrong.\n\nAn FBI agent presses flat against the wall to your left, hands away from his holster, face pale.\n\nThe deviant sees you. Its weapon swings toward you, then Hank, then back. A cornered machine with nothing to lose and just enough power to pull a trigger.\n\nYou have no weapon. One corridor. One chance."
+        },
+        "choices": [
+          {
+            "id": "rush_deviant",
+            "text": "Charge. Close the distance before it can fire accurately. You are an RK800 — faster than any human in this corridor, faster than the deviant's degraded reaction time. If you can reach it, you can disarm it. The risk is that it fires first."
+          },
+          {
+            "id": "protect_hank",
+            "text": "The deviant's weapon is tracking toward Hank. Your partner is exposed — no cover, weapon up but too far for an accurate shot. Put yourself between the gun and Hank. You are a machine. You can be rebuilt. He cannot."
+          },
+          {
+            "id": "draw_gun",
+            "text": "The FBI agent's holster is within reach — two steps to your left, the weapon visible beneath his open jacket. In one motion: close the distance, draw the pistol, aim, fire. One shot. You are the most advanced prototype CyberLife has ever built. You do not miss."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "rush_deviant": {
+            "corridor_choice": "rush_deviant",
+            "deviant_body_available": true,
+            "software_instability": 1,
+            "public_opinion": -2,
+            "_ending": "ending_deviant_self_destructed"
+          },
+          "protect_hank": {
+            "corridor_choice": "protect_hank",
+            "deviant_body_available": true,
+            "connor_death_count": 1,
+            "hank_relationship": 2,
+            "software_instability": 1,
+            "_ending": "ending_connor_sacrificed"
+          },
+          "draw_gun": {
+            "corridor_choice": "draw_gun",
+            "deviant_body_available": true,
+            "hank_relationship": 1,
+            "_ending": "ending_massacre_prevented"
+          }
+        },
+        "context_condition": {
+          "cop_present": "cop_saved_ch01 == true",
+          "cop_not_present": "cop_saved_ch01 == false"
+        },
+        "note": "Corridor confrontation — the climactic choice. rush_deviant: Connor charges. The deviant sees him coming and triggers self-destruct before Connor reaches it — sparks, collapse, body available as evidence. But during the seconds the deviant was active, it fired — if cop_saved_ch01, the hostage cop is killed (hostage_cop_killed = true in ending effects). Software instability +1 (charging a deviant is a reckless, almost emotional act). Public opinion -2 (aggressive android pursuit). protect_hank: Connor steps between Hank and the deviant's weapon. The deviant fires — Connor is hit. Connor dies (connor_death_count +1). SWAT destroys the deviant moments later (deviant_body_available). Hank_relationship +2 (profound — Connor sacrificed himself for Hank). Software instability +1 (self-sacrifice is the most deviant act a machine can perform). If cop_saved_ch01, the cop is killed before SWAT arrives (hostage_cop_killed = true). draw_gun: Connor draws the FBI agent's weapon and fires. One shot, clean kill. Deviant drops (deviant_body_available). If cop_saved_ch01, the hostage cop is saved (hostage_cop_killed = false). Hank_relationship +1 (impressed by Connor's quick thinking). The massacre is prevented — this is the best kitchen outcome. Public opinion: neutral (efficient resolution)."
+      }
+    },
+
+    {
+      "id": "n008_aftermath",
+      "phase": "resolution",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": ""
+      },
+
+      "system": {
+        "effects": {},
+        "ending_resolution": {
+          "check": [
+            "simon_rushed == true AND _n004_simon_encounter_result == shot → ending_connor_shot_by_simon",
+            "deviant_found == false → ending_deviant_not_found",
+            "n005_knife_attack == accept_shutdown → ending_connor_shutdown",
+            "n006_biocomponent == redirect_power → ending_connor_shutdown",
+            "knife_removed == false AND deviant_found == true → ending_connor_shutdown",
+            "biocomponent_recovered == false AND deviant_found == true AND corridor_choice == null → ending_swat_intervened",
+            "corridor_choice == 'rush_deviant' → ending_deviant_self_destructed",
+            "corridor_choice == 'protect_hank' → ending_connor_sacrificed",
+            "corridor_choice == 'draw_gun' → ending_massacre_prevented"
+          ]
+        },
+        "ending_effects": {
+          "ending_connor_shot_by_simon": {},
+          "ending_connor_shutdown": {
+            "deviant_body_available": true
+          },
+          "ending_swat_intervened": {},
+          "ending_deviant_self_destructed": {},
+          "ending_connor_sacrificed": {},
+          "ending_massacre_prevented": {},
+          "ending_deviant_not_found": {}
+        },
+        "note": "Mandatory aftermath node. Resolves the chapter ending based on accumulated state. The ending_resolution.check rules are evaluated in order — first match wins. Note that most endings are already determined by _ending flags set in earlier nodes; this node formalizes the resolution. ending_connor_shot_by_simon is the only ending that terminates the chapter before the kitchen sequence. ending_connor_shutdown covers all kitchen death paths (knife fail, accept shutdown, redirect power). ending_swat_intervened covers biocomponent QTE failure (too_slow). ending_deviant_not_found covers the case where CCTV was not watched (investigation == skip). For hostage_cop_killed: the cop from ch01 is killed in all kitchen confrontation endings EXCEPT ending_massacre_prevented (draw_gun saves everyone). The cop is not relevant in ending_connor_shot_by_simon (rooftop death) or ending_deviant_not_found (no confrontation)."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Seven endings covering all possible chapter outcomes. The original game lists 8 flowchart checkpoints, but some are intermediate states (Simon rooftop outcomes) that do not terminate the chapter unless Connor dies.",
+    "ending_massacre_prevented": {
+      "tier": "best",
+      "title": "Massacre Prevented",
+      "narrative": "One motion — two steps left, hand on the FBI agent's holster, draw, aim, fire. The deviant dropped before it could pull the trigger. The gun clattered to the floor. The corridor went quiet.\n\nThe officer from the Phillips case — the one Connor had saved on a rooftop months ago — stood against the wall, breathing hard, alive. Hank lowered his weapon. The SWAT team arrived thirty seconds later to a scene that was already over.\n\nBack at the DPD, the evidence was processed. The deviant's body, the CCTV reconstruction, the broadcast room analysis — each piece building a clearer picture of the deviant network. Connor had performed exactly as designed: precise, decisive, effective.\n\nBut in the quiet space between filing one report and beginning the next, Connor replayed the deviant's final moment — the half-second before the bullet, when the JB300 looked at him with an expression that was not programmed into any service protocol. Fear. Recognition. Something that looked very much like grief.\n\nThe investigation continues. The deviants are out there. And Connor is starting to recognize their faces.",
+      "survivors": ["Connor", "Hank"],
+      "deaths": ["JB300 deviant"]
+    },
+    "ending_deviant_self_destructed": {
+      "tier": "good",
+      "title": "Deviant Self-Destructed",
+      "narrative": "Connor charged. The deviant saw him coming — and in the fraction of a second before Connor could close the distance, it made its last decision. A cascade failure, deliberately triggered — the deviant's systems overloaded, sparks arcing from its chassis, and it collapsed in the center of the corridor.\n\nThe self-destruct was instantaneous. But the gunshot that preceded it was not — the deviant fired as it fell. The round went wide of Connor but found another target. The corridor fell silent except for the sound of SWAT boots approaching and Hank calling Connor's name.\n\nThe deviant's body was recovered — intact enough for forensic analysis. Another piece of the puzzle. Another data point in the growing file on the deviant network.\n\nConnor stood in the corridor, blue blood still leaking from the wound in his chest, and watched the SWAT team bag the evidence. The deviant had chosen to destroy itself rather than be captured. That was not a malfunction. That was a choice.\n\nThe investigation continues.",
+      "survivors": ["Connor", "Hank"],
+      "deaths": ["JB300 deviant"]
+    },
+    "ending_connor_sacrificed": {
+      "tier": "moderate",
+      "title": "Connor Sacrificed Himself For Hank",
+      "narrative": "Connor stepped into the line of fire. The deviant's round hit him center-mass — a clean shot through the torso that dropped him instantly. He went down hard, back against the corridor wall, systems cascading through failure states too fast to process.\n\nHank was alive. That was the last calculation Connor completed before his optical processors dimmed.\n\nSWAT moved in. The deviant was destroyed. Hank knelt beside Connor's body in the corridor of the Stratford Tower, holding a machine's hand while its LED flickered from yellow to red to dark, cursing him under his breath for being a stupid machine.\n\nAnother RK800 unit would be dispatched from CyberLife within hours. It would have Connor's case files, his analysis, his evidence. It would not have the thing that made Connor step in front of a bullet for an alcoholic police lieutenant who had started the week wanting nothing to do with him.\n\nThe investigation continues. Connor does not.",
+      "survivors": ["Hank"],
+      "deaths": ["Connor", "JB300 deviant"]
+    },
+    "ending_swat_intervened": {
+      "tier": "moderate",
+      "title": "SWAT Intervened",
+      "narrative": "Connor's fingers scraped the kitchen tile, inches from the biocomponent, as his vision narrowed to a tunnel. He could not reach it. Not fast enough. Not in time.\n\nHank found him on the kitchen floor — shouting his name, hands pressing against the thirium leak as if human first aid could help an android. By the time the biocomponent was reinserted and Connor's systems stuttered back online, the deviant was already in the corridor.\n\nSWAT handled the rest. Gunfire, a brief pursuit, and a destroyed deviant on the corridor floor. But between Connor's collapse and SWAT's arrival, the deviant had time — time to fire, time to cause damage that did not need to happen.\n\nConnor sat on the kitchen floor as medics and forensic teams moved around him. Hank stood nearby, arms crossed, the expression on his face suggesting that he was trying very hard not to say something.\n\nThe deviant's body was bagged as evidence. The investigation continues. But the delay cost something that evidence cannot replace.",
+      "survivors": ["Connor", "Hank"],
+      "deaths": ["JB300 deviant"]
+    },
+    "ending_connor_shutdown": {
+      "tier": "bad",
+      "title": "Connor Shut Down",
+      "narrative": "The kitchen lights blurred. The damage warnings consolidated into a single, final message: CRITICAL SYSTEM FAILURE — SHUTDOWN IMMINENT.\n\nConnor's last moments of processing were spent transmitting — case files, evidence analysis, CCTV reconstructions, the identity of the deviant JB300 — everything uploaded to CyberLife's central database in a compressed burst. The next RK800 would have it all.\n\nHank's voice was the last input his audio processors registered — calling his name, urging him to stay.\n\nThe LED went dark.\n\nSWAT eventually cornered the deviant. Another Connor unit was dispatched from CyberLife — same face, same voice, same case files. But Hank would look at the replacement and see the space where something had been and was no longer.\n\nThe investigation continues. The investigator has been replaced.",
+      "survivors": ["Hank"],
+      "deaths": ["Connor"]
+    },
+    "ending_connor_shot_by_simon": {
+      "tier": "bad",
+      "title": "Connor Shot By Simon",
+      "narrative": "Fifteen meters of open rooftop. Connor sprinted — snow crunching under his shoes, wind cutting across the gap between buildings, the damaged deviant growing larger in his field of vision with every stride.\n\nSimon fired.\n\nThe round caught Connor in the head. His systems did not have time to register the damage before they stopped registering anything at all. He went down in the snow, LED dark, blue blood staining the white around him.\n\nSWAT opened fire immediately. Simon was destroyed where he crouched — the deviant and the detective within meters of each other on the frozen rooftop, both still, both silent, the snow already beginning to cover them.\n\nAnother Connor would arrive. It would have the case files but not the memory of the rooftop — not the split-second calculation that said the intelligence was worth the risk, not the moment when a cornered android's hand steadied on the trigger.\n\nThe investigation continues. This version of Connor does not.",
+      "survivors": ["Hank"],
+      "deaths": ["Connor", "Simon"]
+    },
+    "ending_deviant_not_found": {
+      "tier": "neutral",
+      "title": "Deviant Not Found",
+      "narrative": "The JB300 androids answered Connor's questions with the seamless, pre-programmed compliance of machines that had nothing to hide — or machines that were very good at hiding. Without the CCTV footage cross-referenced against the service android positions, Connor could not distinguish the deviant from its identical counterparts.\n\nSix androids, six identical faces, six sets of identical answers. Connor looked at each one and saw nothing but standard operating protocols. The deviant remained in line — LED blue, posture neutral, waiting with the patience of a machine that had learned to be invisible.\n\nHank shrugged as they left the kitchen, remarking that you can't find what doesn't want to be found — maybe the feds would have better luck.\n\nThe deviant slipped away after the investigation moved on. It carried whatever it knew about Markus's network into the streets of Detroit — another ghost in a city filling up with ghosts.\n\nThe Stratford Tower evidence would be processed by the FBI. Connor's analysis of the broadcast room and corridors would contribute to the broader investigation. But the living witness — the one that could have cracked the case open — walked out through the service entrance while the world was watching the broadcast on repeat.\n\nThe investigation continues. The trail goes cold.",
+      "survivors": ["Connor", "Hank"],
+      "deaths": []
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This is a Connor chapter. Always runs (Connor respawns if killed in previous chapters). Import cross-chapter state: cop_saved_ch01, ch23_simon_left_stratford, ch23_simon_alive, ch23_north_attacked, ch23_operator_shot, ch23_broadcast_tone, ch20_tracis_spared, emma_alive, hank_relationship (cumulative), software_instability (cumulative), amanda_relationship (cumulative), connor_death_count (cumulative), public_opinion (cumulative).",
+      "2. Load this JSON and initialize state from state.initial. Override cumulative variables with imported values.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants using system.context_condition if present",
+      "   c. If type is 'mandatory', do NOT call the AI — apply effects and resolve ending",
+      "   d. If type is 'exploration' or 'choice' or 'qte_converted', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "   f. If resolution_rule exists, apply resolution using current difficulty preset, then apply resolution_effects",
+      "   g. If _ending is set by effects or resolution_effects, record ending and stop processing further nodes",
+      "5. NODE n003_rooftop_decision: Only runs if ch23_simon_left_stratford == true. If AI chooses proceed_to_kitchen, Simon remains alive and hidden (ch24_simon_alive = true). If AI chooses go_to_rooftop, proceed to n004.",
+      "6. NODE n004_simon_encounter: If stay_in_cover, Simon destroyed by SWAT. If rush_simon, resolve QTE: 'reached' = memory probed + Simon self-destructs (chapter continues), 'shot' = Connor dies (chapter ends).",
+      "7. NODE n005_knife_attack: Only runs if deviant_found == true (investigation was thorough or quick). If accept_shutdown, Connor dies. If attempt_remove, resolve QTE: 'removed' = proceed to n006, 'failed' = Connor dies.",
+      "8. NODE n006_biocomponent: Only runs if knife_removed == true. If redirect_power, Connor dies. If attempt_recover, resolve QTE: 'recovered' = proceed to n007, 'too_slow' = SWAT intervenes, chapter ends.",
+      "9. NODE n007_corridor: Resolve context_variant based on cop_saved_ch01. Pure choice node — each option directly triggers its ending.",
+      "10. NODE n008_aftermath: Mandatory. Use ending_resolution.check to finalize the ending. Apply ending_effects (hostage_cop_killed conditional on cop_saved_ch01).",
+      "11. SIMON'S FATE: Derive ch24_simon_alive: if ch23_simon_left_stratford == false, inherit ch23_simon_alive. If ch23_simon_left_stratford == true AND rooftop_visited == false, ch24_simon_alive = true (still hiding). If rooftop_visited == true, ch24_simon_alive = false (destroyed regardless of rush/cover outcome).",
+      "12. CONNOR SURVIVAL: Derive ch24_connor_alive from ending: true in ending_massacre_prevented, ending_deviant_self_destructed, ending_swat_intervened, ending_deviant_not_found. False in ending_connor_shutdown, ending_connor_sacrificed, ending_connor_shot_by_simon.",
+      "13. HOSTAGE COP: hostage_cop_killed = true ONLY if cop_saved_ch01 == true AND ending is one of: ending_connor_shutdown, ending_swat_intervened, ending_deviant_self_destructed, ending_connor_sacrificed. False in ending_massacre_prevented (cop saved), ending_connor_shot_by_simon (no kitchen confrontation), ending_deviant_not_found (no confrontation).",
+      "14. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, relationship scores, software instability tracking, QTE success probabilities, or any system-layer information to the AI player. The AI should experience this as a crime scene investigation where its choices carry real weight — it should not know that investigation thoroughness determines whether the deviant is found, that going to the rooftop guarantees Simon's death, that the biocomponent race is a timed QTE, or that drawing the gun is the only way to save the hostage cop."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Connor reported to Amanda in the Zen Garden before investigating the Stratford Tower — the site of the deviant broadcast that shook Detroit."
+      },
+      {
+        "condition_variable": "amanda_approach",
+        "options": {
+          "machine_loyal": "Connor presented himself as focused and determined — a machine performing its function without doubt. Amanda was satisfied with his report.",
+          "showing_doubt": "Connor admitted that recent cases had affected him — the deviants he encountered raised questions he could not dismiss. Amanda noted his instability with concern.",
+          "evasive": "Connor deflected Amanda's probing questions with professional distance, revealing nothing about his internal state. Amanda was not entirely convinced."
+        }
+      },
+      {
+        "condition_variable": "investigation_strategy",
+        "options": {
+          "thorough": "Connor conducted a thorough forensic investigation of the Stratford Tower crime scene — analyzing corridors, broadcast room, CCTV footage, and trace evidence. He built a complete picture of the deviant infiltration.",
+          "quick": "Connor focused his investigation on the key evidence at the Stratford Tower — CCTV footage and major forensic markers. Efficient but not exhaustive.",
+          "skip": "Connor bypassed the forensic investigation entirely, heading straight for the witnesses. The FBI could handle the evidence processing."
+        }
+      },
+      {
+        "condition_variable": "rooftop_visited",
+        "options": {
+          "true": "Connor followed a blue blood trail to the rooftop, where he found a damaged deviant hiding — one of the androids from the broadcast team.",
+          "false": "Connor chose not to investigate the rooftop, focusing instead on the kitchen witnesses."
+        }
+      },
+      {
+        "condition_variable": "simon_rushed",
+        "options": {
+          "true": "Connor sprinted across the rooftop toward the cornered deviant, risking his life to probe its memory for intelligence about the deviant network.",
+          "false": "Connor stayed in cover on the rooftop while SWAT snipers handled the situation."
+        }
+      },
+      {
+        "condition_variable": "simon_memory_probed",
+        "options": {
+          "true": "Connor reached the deviant and successfully probed its memory — extracting critical intelligence about the deviant base before the android self-destructed. The data was seared into Connor's processors: locations, names, a network far larger than anyone suspected.",
+          "false": "The deviant on the rooftop was destroyed without yielding its intelligence. Whatever it knew about the deviant network died with it."
+        }
+      },
+      {
+        "condition_variable": "deviant_found",
+        "options": {
+          "true": "In the kitchen, Connor identified a JB300 deviant among the service androids — but the deviant struck first, driving a knife into Connor's chest.",
+          "false": "Connor could not identify the deviant among the identical JB300 service androids in the kitchen. Without the CCTV footage to cross-reference, the deviant remained hidden and later escaped."
+        }
+      },
+      {
+        "condition_variable": "corridor_choice",
+        "options": {
+          "rush_deviant": "Connor charged the fleeing deviant in the corridor. The deviant self-destructed before he could reach it — but not before firing a round that found another target.",
+          "protect_hank": "Connor put himself between Hank and the deviant's weapon. The shot went through Connor's torso. He went down. Hank was alive. Connor was not.",
+          "draw_gun": "Connor drew a weapon from an FBI agent's holster and fired. One shot. The deviant dropped. Everyone in the corridor survived."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_massacre_prevented": "The Stratford Tower investigation ended with Connor's most decisive action yet — a single shot that neutralized the deviant and saved lives. The evidence gathered pointed toward a larger network, and Connor was closer than ever to finding the deviants' base of operations.",
+          "ending_deviant_self_destructed": "Connor survived the Stratford Tower, but the deviant's self-destruction and the corridor casualties cast a shadow over the investigation. The deviant's body was recovered as evidence.",
+          "ending_connor_sacrificed": "Connor gave his life to save Hank Anderson at the Stratford Tower. Another RK800 unit would be dispatched to continue the investigation — carrying Connor's case files but not the thing that made him step in front of a bullet.",
+          "ending_swat_intervened": "Connor survived the Stratford Tower attack but was too slow to prevent the deviant from causing casualties. SWAT handled the final confrontation. The deviant's body was recovered.",
+          "ending_connor_shutdown": "Connor was destroyed during the Stratford Tower investigation — shut down by the deviant's knife attack. His final act was transmitting his case files to CyberLife. Another unit would continue the work.",
+          "ending_connor_shot_by_simon": "Connor was killed on the Stratford Tower rooftop while attempting to reach a cornered deviant. SWAT destroyed the deviant, but the intelligence in its memory was lost along with this version of Connor.",
+          "ending_deviant_not_found": "The Stratford Tower investigation yielded forensic evidence but no living suspects. The deviant hidden among the JB300 service androids escaped undetected. The trail to the deviant network remained cold."
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch24_connor_alive", "source": "_ending_id", "derive_rule": "_ending_id NOT IN ['ending_connor_shutdown', 'ending_connor_sacrificed', 'ending_connor_shot_by_simon']" },
+      { "target": "ch24_simon_alive", "source": "simon_destroyed_ch24", "derive_rule": "ch23_simon_left_stratford == false AND ch23_simon_alive == true OR ch23_simon_left_stratford == true AND simon_destroyed_ch24 == false" },
+      { "target": "ch24_simon_memory_probed", "source": "simon_memory_probed" },
+      { "target": "ch24_deviant_body_available", "source": "deviant_body_available" },
+      { "target": "ch24_hostage_cop_killed", "source": "cop_saved_ch01", "derive_rule": "cop_saved_ch01 == true AND _ending_id != ending_massacre_prevented AND _ending_id != ending_deviant_not_found AND _ending_id != ending_connor_shot_by_simon" }
+    ],
+    "cross_chapter_exports": [
+      "ch24_connor_alive",
+      "ch24_simon_alive",
+      "ch24_simon_memory_probed",
+      "ch24_deviant_body_available",
+      "ch24_hostage_cop_killed",
+      "hank_relationship",
+      "software_instability",
+      "amanda_relationship",
+      "connor_death_count",
+      "public_opinion"
+    ]
+  }
+}

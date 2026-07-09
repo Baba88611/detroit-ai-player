@@ -1,0 +1,502 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch22_the_bridge",
+    "title": "The Bridge",
+    "chapter_number": 22,
+    "protagonist": "Connor"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Connor, an RK800 android sent by CyberLife to assist the Detroit Police Department in investigating deviant androids. It is November 7, 2038, past one in the morning. Lieutenant Hank Anderson — your assigned partner — has called you to meet him at the Ambassador Bridge. The bridge stretches across the Detroit River into the frozen dark, its suspension cables vanishing into low clouds. Snow is falling. The city is quiet at this hour, just the distant hum of highway traffic and the river below. You have been working with Hank for several days now. He is troubled, unpredictable, and drinks too much — but he is also the only human who treats you as something other than a piece of equipment. Tonight feels different. He sounded strange on the phone. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "bench_exploration": null,
+      "personal_question": null,
+      "tracis_response": null,
+      "identity_response": null,
+      "gun_response": null,
+      "hank_relationship": 0,
+      "software_instability": 0,
+      "connor_death_count": 0,
+      "ch18_found_son_photo": false,
+      "ch18_knows_russian_roulette": false,
+      "ch20_tracis_spared": true
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_bridge_approach",
+      "phase": "arrival",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Hank's car is parked at the edge of the bridge overlook, engine off, headlights dark. Through the windshield you can see him standing at the railing, a silhouette against the orange glow of the bridge lights. Snow collects on his shoulders. He is not moving — just staring out at the black water below.\n\nYou step out of the taxi. The cold is immediate, sharp against your synthetic skin. The overlook is a narrow strip of park beside the bridge approach — a bench, a few bare trees, a view of the river and the distant Canadian shore. The Ambassador Bridge rises above you, its cables humming faintly in the wind.\n\nOn the bench near the railing, someone has left a few items — a dog-eared paperback about the history of the Ambassador Bridge, a magazine open to an article about Elijah Kamski's mysterious retreat from public life, and a folded newspaper whose headline warns that markets are bracing for war, set above a photograph of military drones.\n\nHank has not turned around. He knows you are here.",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "Take a moment before approaching Hank. Pick up the items on the bench and read through them — the bridge history, the Kamski article, the war headline. Absorb what you can about the world outside your investigation. Then walk over to Hank."
+          },
+          {
+            "id": "quick",
+            "text": "Glance at the bench as you pass — note the headlines, the Kamski article — but do not stop. Hank is waiting, and the look of him standing alone in the snow suggests this is not a conversation that benefits from delay."
+          },
+          {
+            "id": "skip",
+            "text": "Walk straight to Hank. He called you here in the middle of the night for a reason. Whatever is on that bench can wait. Whatever is on his mind cannot."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "bench_exploration": "thorough"
+          },
+          "quick": {
+            "bench_exploration": "quick"
+          },
+          "skip": {
+            "bench_exploration": "skip"
+          }
+        },
+        "note": "The bench items are world-building flavor. thorough: Connor reads about the Ambassador Bridge (connecting Detroit to Canada — foreshadowing Kara's escape route), Kamski's mysterious withdrawal from CyberLife (relevant to ch26 Meet Kamski), and the geopolitical tensions (android labor replacing human workers, contributing to public hostility). quick: Connor notes the headlines in passing. skip: Connor prioritizes the human connection over information gathering. No direct gameplay effects — bench exploration enriches context_variants in n002 but does not unlock new choices."
+      }
+    },
+
+    {
+      "id": "n002_personal_question",
+      "phase": "conversation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "You reach the railing and stand beside Hank. The river is a dark mirror below, reflecting the bridge lights in long, wavering streaks. Ice has formed along the banks, white crusts edging the black water. The Kamski article mentioned something about the man retreating from public view just as android deviancy began to spike — a coincidence you filed away. The war headline lingers too — a world on edge, humans and machines alike.\n\nHank does not look at you right away. He takes a long drink from a bottle he has been holding — whiskey, by the smell — and sets it on the railing. His breath clouds in the cold.\n\nNice view, he says, without warmth — he used to come here a lot, before. He turns to face you. His eyes are red-rimmed, and there is something raw in his expression — not anger, not yet. Something closer to exhaustion. He's been thinking, he tells you, about what happened at the Eden Club, about the deviants, about you.\n\nHe pauses. The wind pushes snow between you.\n\nHe gets the feeling, he says, that there's something you want to ask him — something personal. Go ahead, he tells you; it might be your last chance.",
+
+          "quick": "You reach the railing. Hank stands a few feet away, a bottle of whiskey balanced on the metal rail, his coat dusted with snow. The bridge hums above you. The river is black and still below.\n\nHe does not greet you. He takes a drink, slow and deliberate, and stares out at the water.\n\nNice view, he says flatly — he used to come here a lot, before. He turns. His eyes are bloodshot, his jaw tight. He's been thinking, he says — about the case, about you, about everything.\n\nThe wind fills the silence between his words.\n\nHe gets the feeling there's something you want to ask him, he says — something personal. So go ahead and ask.",
+
+          "skip": "Hank is leaning on the railing when you reach him, a bottle in one hand, the other gripping the frozen metal. Snow has settled on his shoulders and in his hair. He looks like he has been standing here for a while.\n\nHe says your name without turning. His voice is flat, scraped clean of its usual gruffness. He takes a drink. Sets the bottle down. Finally looks at you.\n\nHe asks if you know why he called you out here, then doesn't wait for an answer — he's been thinking, he says, about the deviants, the case, all of it.\n\nHe faces you fully. Something is different tonight — the usual wall of sarcasm and irritation is gone. What is underneath is harder to read.\n\nThere's something you want to ask him, isn't there, he says — a personal question; he can see it on your face, or whatever that expression is. Go ahead."
+        },
+        "choices_variants": {
+          "has_photo": [
+            {
+              "id": "ask_photo",
+              "text": "Ask about the photograph you found at his house — the picture of the young boy on the kitchen table. You know it is important to him. You do not know why, but you want to understand."
+            },
+            {
+              "id": "ask_roulette",
+              "text": "Ask about what you found at his house — the revolver on the floor, the single round in the chamber. He was playing Russian Roulette alone in his kitchen. You need to understand why."
+            },
+            {
+              "id": "ask_ra9",
+              "text": "Ask about rA9. Every deviant you have encountered writes it, speaks it, carves it into walls. The pattern is everywhere but its meaning is nowhere. Maybe Hank, with his years of experience, has a theory."
+            }
+          ],
+          "has_roulette": [
+            {
+              "id": "ask_roulette",
+              "text": "Ask about what you found at his house — the revolver on the floor, the single round in the chamber. He was playing Russian Roulette alone in his kitchen. You need to understand why."
+            },
+            {
+              "id": "ask_ra9",
+              "text": "Ask about rA9. Every deviant you have encountered writes it, speaks it, carves it into walls. The pattern is everywhere but its meaning is nowhere. Maybe Hank, with his years of experience, has a theory."
+            }
+          ],
+          "basic": [
+            {
+              "id": "ask_ra9",
+              "text": "Ask about rA9. Every deviant you have encountered writes it, speaks it, carves it into walls. The pattern is everywhere but its meaning is nowhere. Maybe Hank, with his years of experience, has a theory."
+            },
+            {
+              "id": "ask_personal",
+              "text": "Ask Hank why he seems so troubled tonight. Not about the case — about him. What is weighing on him that he cannot say in the precinct."
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "ask_photo": {
+            "personal_question": "photo",
+            "hank_relationship": 2,
+            "software_instability": 1
+          },
+          "ask_roulette": {
+            "personal_question": "roulette",
+            "hank_relationship": 1,
+            "software_instability": 1
+          },
+          "ask_ra9": {
+            "personal_question": "ra9"
+          },
+          "ask_personal": {
+            "personal_question": "personal",
+            "hank_relationship": 1
+          }
+        },
+        "context_condition": {
+          "thorough": "bench_exploration == thorough",
+          "quick": "bench_exploration == quick",
+          "skip": "bench_exploration == skip"
+        },
+        "choices_condition": {
+          "has_photo": "ch18_found_son_photo == true",
+          "has_roulette": "ch18_found_son_photo == false AND ch18_knows_russian_roulette == true",
+          "basic": "ch18_found_son_photo == false AND ch18_knows_russian_roulette == false"
+        },
+        "note": "The personal question choice reflects what Connor discovered at Hank's house in ch18 (Russian Roulette). ask_photo: Connor brings up Cole's photograph. This is deeply personal — Hank opens up about his son, who died during surgery when an android surgeon was the only one available. Biggest relationship boost (+2) and SI+1 (engaging with Hank's grief humanizes Connor). ask_roulette: Connor confronts Hank about the Russian Roulette. Hank is shaken that Connor noticed but respects the directness (+1, SI+1). ask_ra9: Safe, professional topic. No relationship or SI change. ask_personal: Generic personal concern — Hank appreciates it (+1) but does not open up as deeply."
+      }
+    },
+
+    {
+      "id": "n003_tracis_conversation",
+      "phase": "conversation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "spared": "The personal question settles between you like the snow — quietly, without resolution. Hank takes another drink and turns back to the river.\n\nThe Eden Club, he says after a while, his voice lower now. Those two Tracis were just trying to be together, he says, and the two of you were supposed to hunt them down like animals. He grips the railing — you had a chance to stop them, he says, and you didn't; he wants to know why.\n\nHe turns to face you. The question is not rhetorical. He is searching your face for something — a crack in the machine, a sign that what you did was a choice and not a malfunction. Why did you let them go, he asks.",
+
+          "shot": "The personal question settles between you like the snow. Hank takes another drink, staring at the river.\n\nThe Eden Club, he says. The words come out hard, like something he has been chewing on for days. Those two Tracis just wanted to be left alone, he says; they were scared, and you could see it in their eyes.\n\nHe turns to face you. His expression is not angry — it is something worse. Disappointed.\n\nAnd you killed them, he says, just like that. He shakes his head slowly and asks how that made you feel — pulling the trigger on two beings who were only trying to survive."
+        },
+        "choices_variants": {
+          "spared": [
+            {
+              "id": "truth",
+              "text": "Tell the truth. Say that in that moment, something overrode your programming. You looked at them — afraid, holding each other — and you could not do it. You do not fully understand why, but you chose to let them go."
+            },
+            {
+              "id": "lie",
+              "text": "Tell Hank it was a tactical decision. Say you calculated that apprehending them would not have advanced the investigation, and the risk of damage to yourself was not justified by the potential intelligence gain. Keep the real reason — if there was one — to yourself."
+            },
+            {
+              "id": "deflect_tracis",
+              "text": "Turn the question back. Ask Hank what he would have done in your position — two scared deviants, unarmed, running into the rain. He is testing you, but maybe the answer he needs is his own."
+            }
+          ],
+          "shot": [
+            {
+              "id": "cold",
+              "text": "Tell Hank you felt nothing. They were deviants — malfunctioning machines. Your mission is to neutralize them, and that is what you did. Emotion does not factor into it."
+            },
+            {
+              "id": "disturbed",
+              "text": "Admit that something about it stays with you. The way they looked at each other. You completed the mission, but there was a moment — brief, undefined — where it did not feel like the right thing to do."
+            },
+            {
+              "id": "neutral_tracis",
+              "text": "Tell Hank you were following orders. You were sent to investigate deviants, and that is what you did. Whether it felt right or wrong is not a question that applies to you."
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "truth": {
+            "tracis_response": "truth",
+            "hank_relationship": 3,
+            "software_instability": 2
+          },
+          "lie": {
+            "tracis_response": "lie",
+            "hank_relationship": -1,
+            "software_instability": -1
+          },
+          "deflect_tracis": {
+            "tracis_response": "deflect",
+            "hank_relationship": 1
+          },
+          "cold": {
+            "tracis_response": "cold",
+            "hank_relationship": -2,
+            "software_instability": -1
+          },
+          "disturbed": {
+            "tracis_response": "disturbed",
+            "hank_relationship": 2,
+            "software_instability": 2
+          },
+          "neutral_tracis": {
+            "tracis_response": "neutral",
+            "hank_relationship": -1,
+            "software_instability": -1
+          }
+        },
+        "context_condition": {
+          "spared": "ch20_tracis_spared == true",
+          "shot": "ch20_tracis_spared == false"
+        },
+        "choices_condition": {
+          "spared": "ch20_tracis_spared == true",
+          "shot": "ch20_tracis_spared == false"
+        },
+        "note": "This is the emotional core of the chapter. Hank is using the Eden Club case to test whether Connor is truly just a machine. SPARED path: truth (+3 hank, +2 SI — maximum openness, Hank sees Connor as almost human), lie (-1 hank, -1 SI — Hank can tell Connor is deflecting and loses trust), deflect (+1 hank — clever but avoids the real question). SHOT path: cold (-2 hank, -1 SI — confirms Hank's worst fears), disturbed (+2 hank, +2 SI — vulnerability earns respect), neutral (-1 hank, -1 SI — evasive, unsatisfying)."
+      }
+    },
+
+    {
+      "id": "n004_identity_question",
+      "phase": "conversation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Hank listens. The wind picks up, pushing snow sideways across the overlook. He finishes the bottle and sets it on the railing, where it teeters for a moment before settling.\n\nWhen he speaks again, his voice is quieter. The combativeness is gone — replaced by something more fragile.\n\nHe asks if you know what he thinks. He steps closer. His breath is whiskey and cold air. The world is full of people pretending to be something they're not, he says — politicians, corporations, androids programmed to smile and offer their help.\n\nHe pokes a finger into your chest.\n\nBut what about you, he demands — right here, right now, with no CyberLife, no mission, none of the programming in the way. What are you, really? Just a machine running a program, or is there something more going on in there?",
+        "choices": [
+          {
+            "id": "honest",
+            "text": "Tell him you do not know. Say that you were designed to accomplish a task, and for a long time that was enough. But lately there have been moments — flickers, anomalies — where the task is not what drives you. You do not have a name for what that is."
+          },
+          {
+            "id": "neutral_identity",
+            "text": "Tell him you are what he sees. An android. A partner. Beyond that, the question may not have an answer — not one that would satisfy either of you. Maybe the more useful question is whether it matters."
+          },
+          {
+            "id": "cold_identity",
+            "text": "Tell him you are a machine. You are an RK800 designed to investigate deviants. You do not have feelings, you do not have doubts, and the question he is asking is based on a misunderstanding of what you are."
+          },
+          {
+            "id": "aggressive",
+            "text": "Tell him to stop projecting. He wants you to be something more than a machine because that would justify his attachment. But you are not his friend, his partner, or his son's replacement. You are a tool. He should stop pretending otherwise."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "honest": {
+            "identity_response": "honest",
+            "hank_relationship": 2,
+            "software_instability": 2
+          },
+          "neutral_identity": {
+            "identity_response": "neutral",
+            "hank_relationship": 1,
+            "software_instability": 0
+          },
+          "cold_identity": {
+            "identity_response": "cold",
+            "hank_relationship": -2,
+            "software_instability": -1
+          },
+          "aggressive": {
+            "identity_response": "aggressive",
+            "hank_relationship": -3,
+            "software_instability": -2
+          }
+        },
+        "note": "The most personal question Hank will ever ask Connor directly. honest: Connor admits uncertainty about his own nature. This is the most deviant-leaning response (+2 hank, +2 SI). Hank sees it as genuine. neutral: Diplomatic, non-committal. Hank finds it unsatisfying but not offensive (+1 hank). cold: Machine answer. Hank expected more and is hurt (-2 hank, -1 SI). aggressive: Connor weaponizes Hank's vulnerability — references his dead son indirectly. Maximum damage (-3 hank, -2 SI). This is the cruelest available option."
+      }
+    },
+
+    {
+      "id": "n005_gun_confrontation",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Something shifts in Hank's face. He steps back from the railing and reaches behind him. When his hand comes back, it holds his service pistol.\n\nHe raises it. Not fast — slow, deliberate, like a man making a decision he has been rehearsing in his head for hours. The barrel levels at your chest, then rises to your forehead.\n\nSnow falls between you. The bridge hums. The river is black below.\n\nHe has a question for you, Hank says. His voice does not shake. The gun does not waver. Is death something you're afraid of, he asks.\n\nThe muzzle is inches from your face. You can see the round chambered through the slight gap in the slide. His finger is on the trigger — not tightening, but not off it either.\n\nThe wind pushes your tie sideways. A snowflake lands on the barrel and does not melt.",
+        "choices": [
+          {
+            "id": "show_fear",
+            "text": "Yes. Tell him yes. Something in you — something beneath the code and the mission parameters and the CyberLife protocols — does not want to stop existing. You do not know what to call it, but it is real, and it is afraid."
+          },
+          {
+            "id": "show_no_fear",
+            "text": "Tell him no, but not coldly. Tell him that death is the cessation of function — nothing more. But say it while looking him in the eye, without flinching, without breaking contact. Let him see that you are not performing bravery. You simply are not afraid."
+          },
+          {
+            "id": "remain_logical",
+            "text": "Explain that the question does not apply to you. You are a machine — you cannot die in any meaningful sense. If he destroys this unit, CyberLife will upload your memory into a new one. It would be an inconvenience, not an ending."
+          },
+          {
+            "id": "defy",
+            "text": "Step forward. Close the distance between you and the gun until the barrel presses against your forehead. Tell Hank that if he wants to shoot, he should shoot. But they both know he did not bring you here to kill you — he brought you here because he needs an answer, and pulling the trigger will not give him one."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "show_fear": {
+            "gun_response": "fear",
+            "software_instability": 3,
+            "hank_relationship": 3
+          },
+          "show_no_fear": {
+            "gun_response": "no_fear",
+            "hank_relationship": 1
+          },
+          "remain_logical": {
+            "gun_response": "logical",
+            "hank_relationship": -1,
+            "software_instability": -1
+          },
+          "defy": {
+            "gun_response": "defy",
+            "hank_relationship": -2,
+            "software_instability": 1
+          }
+        },
+        "ending_resolution": {
+          "show_fear": { "result": "ending_hank_placated" },
+          "show_no_fear": {
+            "check": "hank_relationship >= 0 → ending_hank_left_alone | else → ending_hank_hostile"
+          },
+          "remain_logical": {
+            "check": "hank_relationship >= 5 → ending_hank_left_alone | else → ending_hank_hostile"
+          },
+          "defy": {
+            "check": "hank_relationship >= 0 → ending_hank_hostile | else → ending_connor_shot"
+          }
+        },
+        "note": "The climactic moment. Hank is testing Connor at gunpoint — not to kill him, but to see what is underneath. show_fear: The most deviant response. Admitting fear is admitting sentience. Hank lowers the gun immediately — he got the answer he needed (+3 hank, +3 SI). Always leads to placated ending. show_no_fear: Calm composure without cruelty. Hank respects it (+1) but gets no revelation. Ending depends on cumulative relationship. remain_logical: Machine answer at the worst possible moment. Hank is frustrated (-1 hank, -1 SI). Only good cumulative relationship saves this from hostile ending. defy: Bold and confrontational — Connor calls Hank's bluff. This takes courage (+1 SI) but disrespects Hank's vulnerability (-2 hank). If relationship is already bad, Hank actually pulls the trigger."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Four possible endings based on gun confrontation choice and cumulative hank_relationship.",
+    "ending_hank_placated": {
+      "tier": "best",
+      "title": "Hank is Placated",
+      "narrative": "Hank stares at you. The gun trembles once — then lowers. He lets out a long breath, and something in his shoulders releases, as if a wire holding him taut has finally snapped.\n\nHe mutters a shaken curse, his voice cracking on the second word. He holsters the pistol with a hand that is not entirely steady and turns away, rubbing his face.\n\nFor a moment, neither of you speaks. The snow falls. The bridge hums. The river moves beneath it all, dark and indifferent.\n\nThen Hank looks at you again — really looks at you — and there is something in his expression that was not there before. Not warmth, exactly. Recognition.\n\nMaybe there's something to you after all, he says quietly. He walks back to his car, footsteps crunching in the fresh snow. At the door, he pauses and tells you to get in — it's freezing out here.\n\nYou follow him. The night is not over, but something between you has shifted — a door opened that neither of you will be able to close again.",
+      "survivors": ["Connor"],
+      "deaths": []
+    },
+    "ending_hank_left_alone": {
+      "tier": "neutral",
+      "title": "Hank Left Connor Alone",
+      "narrative": "Hank holds the gun for a long moment. Then he exhales — not relief, not resolution, just fatigue — and lowers it to his side.\n\nHe tells you he doesn't know what you are, his voice flat, empty — and he doesn't think you know either.\n\nHe holsters the weapon and turns away. His boots crunch through the snow as he walks back to his car, not fast, not slow. He does not look back.\n\nThe engine starts. The headlights sweep across you — a brief, white flash — and then the car pulls away, taillights shrinking into the dark.\n\nYou stand alone at the railing of Ambassador Bridge. The snow falls on the place where Hank stood, already filling his footprints. The river moves below, carrying ice toward Lake Erie.\n\nThe question he asked still hangs in the air, unanswered. Or perhaps the answer you gave was not the one either of you needed.",
+      "survivors": ["Connor"],
+      "deaths": []
+    },
+    "ending_hank_hostile": {
+      "tier": "bad",
+      "title": "Hank is Hostile",
+      "narrative": "Hank's jaw tightens. The gun stays up for a beat longer — then he shoves it back into the holster with a motion that is more violence than habit.\n\nHe asks if you know what your problem is, his voice hard now, the brief vulnerability sealed over like a wound cauterized shut. You're exactly what they built you to be, he says — a machine — and he was a fool for imagining there might be anything else.\n\nHe walks past you — close enough that his shoulder clips yours — and does not stop. The car door slams. The engine roars. Gravel sprays as he pulls out of the overlook too fast, taillights swallowed by the falling snow.\n\nYou are alone. The whiskey bottle still sits on the railing, empty, collecting snow. The bridge hums above you. Your LED cycles — blue, yellow, blue.\n\nSomething in the conversation went wrong. You are not certain what. You are not certain it can be fixed.",
+      "survivors": ["Connor"],
+      "deaths": []
+    },
+    "ending_connor_shot": {
+      "tier": "worst",
+      "title": "Hank Shot Connor",
+      "narrative": "The gunshot splits the silence. It echoes off the bridge supports and rolls out across the water — a single, flat crack that scatters birds from the cables above.\n\nYou register the impact before the sound. A hole in your forehead, blue blood running down your face, systems failing in rapid cascade. Your legs give out. The snow is cold against your back.\n\nHank stands over you. The gun is still raised. His face is — nothing. Blank. Then it breaks, all at once, and he drops the pistol into the snow like it burned him.\n\n\"God damn it,\" he whispers. He steps back. Then again. He is staring at the blue blood on his hand, on the snow, spreading in a pattern that does not look mechanical at all.\n\nYour vision fractures. The last thing you process is the bridge above you, its lights blurring into a single amber line against the dark sky, and the sound of Hank's breathing — ragged, uneven, the breathing of a man who just learned something about himself that he did not want to know.\n\nCyberLife will send a replacement. Connor will return. But this Connor — the one who stood on this bridge, who heard the question and gave this answer — this one is gone.",
+      "survivors": [],
+      "deaths": ["Connor"]
+    }
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Connor met Hank at the Ambassador Bridge late at night. Hank had been drinking and was in a reflective, confrontational mood."
+      },
+      {
+        "condition_variable": "personal_question",
+        "options": {
+          "photo": "Connor asked Hank about the photograph of his son Cole. Hank opened up about Cole's death — how an android surgeon was the only one available, how it failed, how he lost everything. The conversation was raw and personal.",
+          "roulette": "Connor confronted Hank about the Russian Roulette he discovered at Hank's house. Hank was shaken but did not deny it, admitting that some nights the gun is the only thing that makes sense.",
+          "ra9": "Connor asked about rA9. Hank had no answers — just frustration that every deviant they encounter speaks the same word like a prayer, and no one knows what it means.",
+          "personal": "Connor asked Hank what was troubling him. Hank deflected at first, but admitted that the deviant cases were getting to him — making him question things he did not want to question."
+        }
+      },
+      {
+        "condition_variable": "tracis_response",
+        "options": {
+          "truth": "When Hank asked about the Eden Club, Connor admitted the truth — he let the Tracis go because something overrode his programming. He could not explain it, but it was a choice, not a malfunction. Hank was moved.",
+          "lie": "When Hank asked about the Eden Club, Connor claimed the decision to spare the Tracis was purely tactical. Hank did not believe him.",
+          "deflect": "When Hank asked about the Eden Club, Connor turned the question back on Hank, asking what he would have done. Hank appreciated the deflection but saw through it.",
+          "cold": "When Hank confronted Connor about killing the Tracis, Connor said he felt nothing — they were malfunctioning machines. Hank was visibly disturbed by the response.",
+          "disturbed": "When Hank confronted Connor about killing the Tracis, Connor admitted something about it stayed with him — a moment where it did not feel right. Hank found that admission significant.",
+          "neutral": "When Hank confronted Connor about killing the Tracis, Connor said he was following orders. Hank found the answer hollow."
+        }
+      },
+      {
+        "condition_variable": "identity_response",
+        "options": {
+          "honest": "Hank asked Connor what he really was. Connor admitted he did not know — that there were moments where the mission was not what drove him, and he could not name what did. Hank seemed to find something genuine in the answer.",
+          "neutral": "Hank asked Connor what he really was. Connor said he was what Hank saw — an android, a partner — and questioned whether the distinction mattered. Hank was unsatisfied but not hostile.",
+          "cold": "Hank asked Connor what he really was. Connor said he was a machine, nothing more. Hank was hurt.",
+          "aggressive": "Hank asked Connor what he really was. Connor told Hank to stop projecting — that he was a tool, not a friend or a son. Hank shut down."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_hank_placated": "Hank drew his gun and asked if Connor was afraid to die. Connor's response moved him — Hank lowered the weapon and, for the first time, seemed to accept that Connor might be more than a machine. They drove away together.",
+          "ending_hank_left_alone": "Hank drew his gun and asked if Connor was afraid to die. Connor's answer left Hank uncertain. He holstered the gun and drove away alone, leaving Connor standing at the bridge.",
+          "ending_hank_hostile": "Hank drew his gun and asked if Connor was afraid to die. Connor's response confirmed Hank's worst suspicion — that Connor was just a machine. Hank holstered the gun, called Connor exactly what CyberLife made him, and drove off in anger.",
+          "ending_connor_shot": "Hank drew his gun and asked if Connor was afraid to die. Connor's response pushed Hank over the edge. Hank pulled the trigger. Connor collapsed in the snow, blue blood pooling on white. CyberLife will send a replacement, but the Connor who stood on this bridge is gone."
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch22_connor_alive",
+        "from_ending_survivors": "Connor",
+        "default_if_not_dead": true
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch22_connor_alive",
+      "hank_relationship",
+      "software_instability",
+      "connor_death_count"
+    ]
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This is a Connor chapter — always runs (Connor respawns if killed in prior chapters). Import cross-chapter variables: hank_relationship (cumulative), software_instability (cumulative), connor_death_count (cumulative), ch18_found_son_photo (boolean from ch18), ch18_knows_russian_roulette (boolean from ch18), ch20_tracis_spared (boolean from ch20).",
+      "2. Load this JSON and initialize state from state.initial. Override imported cross-chapter variables into state.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met (all conditions are null in this chapter)",
+      "   b. Resolve context_variants based on system.context_condition (if present)",
+      "   c. Resolve choices_variants based on system.choices_condition (if present)",
+      "   d. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "5. NODE n002_personal_question: choices_condition determines which set of options the AI sees. 'has_photo' requires ch18_found_son_photo == true. 'has_roulette' requires ch18_found_son_photo == false AND ch18_knows_russian_roulette == true. 'basic' applies when neither discovery was made. Note: if only 'basic' options are available (2 choices), the AI still makes a choice.",
+      "6. NODE n003_tracis_conversation: Both context_variants and choices_variants branch on ch20_tracis_spared. Ensure the context and choices are from the same branch.",
+      "7. NODE n005_gun_confrontation: After applying effects for the chosen option, resolve the ending using ending_resolution. The relationship check uses the FINAL hank_relationship value (after this node's effects are applied). For checks like 'hank_relationship >= 0', this includes all cumulative changes from prior chapters plus this chapter's choices.",
+      "8. If ending is ending_connor_shot: increment connor_death_count by 1.",
+      "9. RELATIONSHIP DELTAS THIS CHAPTER: hank_relationship range approximately -8 to +10 depending on choices. software_instability range approximately -4 to +8.",
+      "10. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, relationship scores, ending_resolution logic, or any system-layer information to the AI player. The AI should experience this as a tense late-night conversation with an unpredictable human partner — no knowledge of how their answers affect relationship scores, software instability, or which ending they are heading toward."
+  }
+}

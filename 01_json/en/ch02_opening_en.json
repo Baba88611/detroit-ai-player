@@ -1,0 +1,88 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "narrative_only": "This chapter is a pure cinematic cutscene with no player choices. All nodes are type 'mandatory' — the runner records them, applies effects, and advances without calling the AI."
+    },
+    "language": "en"
+  },
+
+  "chapter": {
+    "id": "ch02_opening",
+    "title": "Opening",
+    "title_zh": "开场",
+    "chapter_number": 2,
+    "protagonist": "Kara"
+  },
+
+  "system_prompt": {
+    "description": "Narrative-only chapter. system_prompt is provided for structural consistency but will not be sent to an AI player since there are no choices.",
+    "content": "You are Kara, an AX400 domestic android. You have just been repaired at an android repair shop — previously damaged beyond recognition for unknown reasons, your memory wiped clean. Your owner, Todd Williams, has come to take you home. You remember nothing of your past."
+  },
+
+  "state": {
+    "_note": "Minimal state for a narrative-only chapter.",
+    "initial": {
+      "kara_repaired": true,
+      "kara_memory_wiped": true,
+      "kara_arrived_home": false
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_repair_shop",
+      "phase": "opening",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The android repair shop smells of antiseptic and warm plastic. You stand at the counter, freshly reactivated — brought back online moments ago. The technician addresses the man behind you, telling him your memory has been wiped completely — good as new. The man is Todd Williams, apparently your owner. He looks worn out, irritable. He pays without a word, then turns to you and tells you it's time to go. Outside, it's raining."
+      },
+
+      "system": {
+        "effects": {}
+      }
+    },
+    {
+      "id": "n002_drive_home",
+      "phase": "opening",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Rain streaks down the car window, smearing Detroit's streetlights into long trails of amber. You sit in the passenger seat while Todd drives in silence. The air inside the car feels heavy, stale. The radio drifts in and out — another wave of androids replacing human workers, unemployment at a record high. Todd switches it off. The car finally stops in front of a two-story house. The yard is overgrown, and a dim yellow glow seeps through the curtains. You follow Todd inside. A small girl stands at the foot of the stairs — she watches you, says nothing. Todd nods toward her: 'That's Alice. From now on, you take care of her and this house.'"
+      },
+
+      "system": {
+        "effects": {
+          "kara_arrived_home": true
+        },
+        "result": "ending_kara_arrived_home"
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Pure narrative chapter — only one ending.",
+    "ending_kara_arrived_home": {
+      "title": "Kara Arrived Home",
+      "title_zh": "卡拉回到托德家",
+      "narrative": "Todd brought the newly repaired Kara home. With her memory wiped, everything felt foreign — the cluttered house, the sullen man who owned her, and the quiet girl at the stairs who watched her with wary eyes.",
+      "survivors": ["Kara", "Alice", "Todd"],
+      "deaths": []
+    }
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Kara, an AX400 domestic android, was repaired at a shop with her memory fully wiped. Her owner Todd Williams picked her up and drove her home. The house was run-down and neglected, and Todd seemed exhausted and short-tempered. At the foot of the stairs, Kara met Alice for the first time — Todd's daughter, a quiet little girl. From now on, Kara is responsible for taking care of Alice and the household."
+      }
+    ],
+    "cross_chapter_exports": [
+      "kara_arrived_home",
+      "kara_memory_wiped"
+    ]
+  }
+}

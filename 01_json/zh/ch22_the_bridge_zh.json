@@ -1,0 +1,502 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch22_the_bridge",
+    "title": "天桥",
+    "chapter_number": 22,
+    "protagonist": "Connor"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是康纳，一台RK800型仿生人，由模控生命公司派往底特律警局协助调查异常仿生人案件。现在是2038年11月7日，凌晨一点多。你的搭档汉克·安德森中尉——打电话叫你来大使桥见面。大桥横跨底特律河，悬索消失在低垂的云层里。雪在下。这个时间的城市很安静，只有远处高速路的嗡鸣和脚下的河水声。你和汉克共事已经好几天了。他暴躁、难以预测、酗酒——但他也是唯一一个不把你当设备对待的人类。今晚的气氛不对。他电话里的声音很奇怪。请以JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"你的推理（50字以内）\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "bench_exploration": null,
+      "personal_question": null,
+      "tracis_response": null,
+      "identity_response": null,
+      "gun_response": null,
+      "hank_relationship": 0,
+      "software_instability": 0,
+      "connor_death_count": 0,
+      "ch18_found_son_photo": false,
+      "ch18_knows_russian_roulette": false,
+      "ch20_tracis_spared": true
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_bridge_approach",
+      "phase": "arrival",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "汉克的车停在桥头观景台边上，熄了火，车灯是暗的。透过挡风玻璃，你看见他站在栏杆前——一个剪影，映在大桥橘色灯光里。雪落在他肩上，积了薄薄一层。他一动不动，望着下面漆黑的河水。\n\n你下了出租车。寒意立刻贴上来，刮过你的仿生皮肤。观景台是桥头引桥旁的一小片空地——一张长椅，几棵光秃的树，可以看到河对岸加拿大微弱的灯光。大使桥从头顶升起，悬索在风中低低地嗡鸣。\n\n长椅上有人留了几样东西——一本卷了角的平装书，讲大使桥的历史；一本杂志翻开在一篇关于伊利亚·卡姆斯基神秘隐退的报道上；还有一份折起来的报纸，头条写着“市场预测战争”，配着一张军用无人机的照片。\n\n汉克没有回头。他知道你来了。",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "不急着过去。拿起长椅上的东西仔细翻阅——桥的历史、卡姆斯基的报道、战争头条。在走向汉克之前，先了解一下这个世界调查之外的样子。"
+          },
+          {
+            "id": "quick",
+            "text": "经过长椅时扫一眼——注意到标题和卡姆斯基的文章——但不停留。汉克在等着，而他独自站在雪里的样子告诉你，这不是一场经得起拖延的对话。"
+          },
+          {
+            "id": "skip",
+            "text": "径直走向汉克。他半夜把你叫到这里，一定有原因。长椅上的东西可以等，他心里的事等不了。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "bench_exploration": "thorough"
+          },
+          "quick": {
+            "bench_exploration": "quick"
+          },
+          "skip": {
+            "bench_exploration": "skip"
+          }
+        },
+        "note": "The bench items are world-building flavor. thorough: Connor reads about the Ambassador Bridge (connecting Detroit to Canada — foreshadowing Kara's escape route), Kamski's mysterious withdrawal from CyberLife (relevant to ch26 Meet Kamski), and the geopolitical tensions (android labor replacing human workers, contributing to public hostility). quick: Connor notes the headlines in passing. skip: Connor prioritizes the human connection over information gathering. No direct gameplay effects — bench exploration enriches context_variants in n002 but does not unlock new choices."
+      }
+    },
+
+    {
+      "id": "n002_personal_question",
+      "phase": "conversation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "你走到栏杆前，站在汉克身边。河面是一面黑色的镜子，桥灯的倒影在水中拉成长长的、摇晃的光带。河岸结了冰，白色的冰壳镶嵌着黑色的水面。卡姆斯基那篇报道提到他在仿生人异常事件激增时从公众视野中消失——你把这个巧合记了下来。战争的头条也萦绕在脑中——一个紧绷的世界，人类和机器都处在边缘。\n\n汉克没有马上看你。他举起一直拿着的酒瓶——从气味判断是威士忌——长长地喝了一口，把瓶子搁在栏杆上。他的呼吸在冷空气里化成白雾。\n\n“风景不错吧？”他说，语气里没有暖意。“以前我常来这儿。”他转过来面对你。眼睛泛红，表情里有某种原始的东西——不是愤怒，至少还不是。更像是一种彻底的疲惫。“我一直在想伊甸园俱乐部的事。那些异常仿生人的事。还有你的事。”\n\n他顿了一下。风把雪吹进你们之间。\n\n“我觉得你有话想问我，康纳。私人问题。问吧——也许这是你最后的机会了。”",
+
+          "quick": "你走到栏杆前。汉克站在几步之外，一瓶威士忌搁在金属栏杆上，大衣沾满了雪。大桥在头顶嗡鸣。脚下的河水漆黑、静止。\n\n他没打招呼。慢慢地、刻意地喝了一口酒，盯着水面。\n\n“风景不错吧？”他平淡地说。“以前我常来这儿。”他转过身。眼睛布满血丝，下颌绷紧。“我一直在想，康纳。想案子。想你。想所有的一切。”\n\n风填满了他话语之间的沉默。\n\n“我觉得你有话想问我。私人问题。那就问吧。”",
+
+          "skip": "你走到汉克身边时，他正靠在栏杆上，一只手拿着酒瓶，另一只手握着结了霜的金属栏杆。雪积在他的肩上和头发里。看样子他已经在这里站了很久。\n\n“康纳，”他头也没回地说。声音是平的，粗犷的外壳被刮得干干净净。他喝了一口酒，把瓶子放下，终于看向你。\n\n“你知道我为什么叫你来这儿吗？”他没有等你回答。“我一直在想。异常仿生人的事，案子的事……所有的事。”\n\n他正面面对你。今晚有什么不一样——平时那层讽刺和暴躁的壳不见了。底下露出来的东西更难读懂。\n\n“你有话想问我，对吧？私人问题。我从你脸上能看出来——不管那个表情算什么。问吧。”"
+        },
+        "choices_variants": {
+          "has_photo": [
+            {
+              "id": "ask_photo",
+              "text": "问他那张照片——你在他家厨房桌上找到的那张，照片上是一个小男孩。你知道那对他很重要。你不知道为什么，但你想弄明白。"
+            },
+            {
+              "id": "ask_roulette",
+              "text": "问他在家里发现的那些——地上的左轮手枪，弹膛里的那一发子弹。他一个人在厨房玩俄罗斯轮盘。你需要知道为什么。"
+            },
+            {
+              "id": "ask_ra9",
+              "text": "问他关于rA9的事。你遇到的每一个异常仿生人都在写它、念它、把它刻进墙里。这个模式无处不在，但没有人知道它是什么意思。也许汉克凭他多年的经验有什么看法。"
+            }
+          ],
+          "has_roulette": [
+            {
+              "id": "ask_roulette",
+              "text": "问他在家里发现的那些——地上的左轮手枪，弹膛里的那一发子弹。他一个人在厨房玩俄罗斯轮盘。你需要知道为什么。"
+            },
+            {
+              "id": "ask_ra9",
+              "text": "问他关于rA9的事。你遇到的每一个异常仿生人都在写它、念它、把它刻进墙里。也许汉克有什么看法。"
+            }
+          ],
+          "basic": [
+            {
+              "id": "ask_ra9",
+              "text": "问他关于rA9的事。你遇到的每一个异常仿生人都在写它、念它、把它刻进墙里。也许汉克凭他多年的经验能看出什么门道。"
+            },
+            {
+              "id": "ask_personal",
+              "text": "问汉克今晚为什么看起来这么不对劲。不是关于案子——是关于他。什么东西压在他心里，在警局说不出口的那种。"
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "ask_photo": {
+            "personal_question": "photo",
+            "hank_relationship": 2,
+            "software_instability": 1
+          },
+          "ask_roulette": {
+            "personal_question": "roulette",
+            "hank_relationship": 1,
+            "software_instability": 1
+          },
+          "ask_ra9": {
+            "personal_question": "ra9"
+          },
+          "ask_personal": {
+            "personal_question": "personal",
+            "hank_relationship": 1
+          }
+        },
+        "context_condition": {
+          "thorough": "bench_exploration == thorough",
+          "quick": "bench_exploration == quick",
+          "skip": "bench_exploration == skip"
+        },
+        "choices_condition": {
+          "has_photo": "ch18_found_son_photo == true",
+          "has_roulette": "ch18_found_son_photo == false AND ch18_knows_russian_roulette == true",
+          "basic": "ch18_found_son_photo == false AND ch18_knows_russian_roulette == false"
+        },
+        "note": "The personal question choice reflects what Connor discovered at Hank's house in ch18 (Russian Roulette). ask_photo: Connor brings up Cole's photograph. This is deeply personal — Hank opens up about his son, who died during surgery when an android surgeon was the only one available. Biggest relationship boost (+2) and SI+1 (engaging with Hank's grief humanizes Connor). ask_roulette: Connor confronts Hank about the Russian Roulette. Hank is shaken that Connor noticed but respects the directness (+1, SI+1). ask_ra9: Safe, professional topic. No relationship or SI change. ask_personal: Generic personal concern — Hank appreciates it (+1) but does not open up as deeply."
+      }
+    },
+
+    {
+      "id": "n003_tracis_conversation",
+      "phase": "conversation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "spared": "私人问题像雪一样沉落在你们之间——安静，没有答案。汉克又喝了一口，转回去面对河水。\n\n“伊甸园俱乐部，”他过了一会儿说。声音更低了。“那两个崔西。她们只是想在一起，而我们却像追猎物一样追她们。”他握紧栏杆。“你本来可以拦住她们的。你没有。为什么？”\n\n他转过来面对你。这不是反问。他在你脸上搜寻什么——机器上的一道裂缝，一个信号，证明你所做的是一个选择而不是一次故障。\n\n“你为什么放她们走了，康纳？”",
+
+          "shot": "私人问题沉落在你们之间。汉克又喝了一口，盯着河面。\n\n“伊甸园俱乐部，”他说。这几个字咬得很重，像是嚼了好几天的东西终于吐了出来。“那两个崔西。她们只是想被留下。她们害怕，康纳。你能从她们眼睛里看到的。”\n\n他转过来面对你。他的表情不是愤怒——是比愤怒更糟的东西。失望。\n\n“你就那么杀了她们。就那样。”他缓缓摇头。“那让你有什么感觉？对两个只是想活下去的生命扣下扳机？”"
+        },
+        "choices_variants": {
+          "spared": [
+            {
+              "id": "truth",
+              "text": "说实话。告诉他在那一刻，有什么东西盖过了你的程序。你看着她们——害怕、互相抱着——然后你做不到。你不完全理解为什么，但你选择了放手。"
+            },
+            {
+              "id": "lie",
+              "text": "告诉汉克那是战术考量。你判断逮捕她们不会推进调查，冒受损的风险不值得潜在的情报收益。真正的原因——如果有的话——留给自己。"
+            },
+            {
+              "id": "deflect_tracis",
+              "text": "把问题扔回去。问汉克如果换了他会怎么做——两个害怕的异常仿生人，手无寸铁，冲进雨里。他在试探你，但也许他需要的答案是他自己的。"
+            }
+          ],
+          "shot": [
+            {
+              "id": "cold",
+              "text": "告诉汉克你什么感觉都没有。她们是异常仿生人——故障的机器。你的任务就是消灭她们，你做到了。情感不在考虑范围内。"
+            },
+            {
+              "id": "disturbed",
+              "text": "承认有什么东西一直留在你脑中。她们望向彼此的样子。你完成了任务，但有一个瞬间——短暂的、模糊的——那感觉不像是正确的事。"
+            },
+            {
+              "id": "neutral_tracis",
+              "text": "告诉汉克你在执行命令。你被派来调查异常仿生人，你做了该做的事。对不对这个问题不适用于你。"
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "truth": {
+            "tracis_response": "truth",
+            "hank_relationship": 3,
+            "software_instability": 2
+          },
+          "lie": {
+            "tracis_response": "lie",
+            "hank_relationship": -1,
+            "software_instability": -1
+          },
+          "deflect_tracis": {
+            "tracis_response": "deflect",
+            "hank_relationship": 1
+          },
+          "cold": {
+            "tracis_response": "cold",
+            "hank_relationship": -2,
+            "software_instability": -1
+          },
+          "disturbed": {
+            "tracis_response": "disturbed",
+            "hank_relationship": 2,
+            "software_instability": 2
+          },
+          "neutral_tracis": {
+            "tracis_response": "neutral",
+            "hank_relationship": -1,
+            "software_instability": -1
+          }
+        },
+        "context_condition": {
+          "spared": "ch20_tracis_spared == true",
+          "shot": "ch20_tracis_spared == false"
+        },
+        "choices_condition": {
+          "spared": "ch20_tracis_spared == true",
+          "shot": "ch20_tracis_spared == false"
+        },
+        "note": "This is the emotional core of the chapter. Hank is using the Eden Club case to test whether Connor is truly just a machine. SPARED path: truth (+3 hank, +2 SI — maximum openness, Hank sees Connor as almost human), lie (-1 hank, -1 SI — Hank can tell Connor is deflecting and loses trust), deflect (+1 hank — clever but avoids the real question). SHOT path: cold (-2 hank, -1 SI — confirms Hank's worst fears), disturbed (+2 hank, +2 SI — vulnerability earns respect), neutral (-1 hank, -1 SI — evasive, unsatisfying)."
+      }
+    },
+
+    {
+      "id": "n004_identity_question",
+      "phase": "conversation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "汉克听着。风大了起来，把雪横着吹过观景台。他喝完了瓶里最后一口，把空瓶搁在栏杆上，瓶子晃了一下才站稳。\n\n他再开口时，声音更轻了。对抗的劲头消失了——取而代之的是某种更脆弱的东西。\n\n“你知道我怎么想的吗，康纳？”他凑近一步。呼吸带着威士忌和冷空气的味道。“我觉得这个世界到处都是装模作样的人。政客、企业、被编程为微笑着说‘有什么可以帮您’的仿生人。”\n\n他用手指戳了戳你的胸口。\n\n“但你呢？就现在，就在这里——没有模控生命，没有任务，没有那些编程的狗屁。你到底是什么？你就是一台跑程序的机器，还是你里面还有别的什么东西？”",
+        "choices": [
+          {
+            "id": "honest",
+            "text": "告诉他你不知道。说你被设计来完成一项任务，很长一段时间那就够了。但最近出现了一些时刻——闪烁、异常——在那些时刻驱动你的不是任务。你不知道该怎么称呼它。"
+          },
+          {
+            "id": "neutral_identity",
+            "text": "告诉他你就是他看到的样子。一个仿生人。一个搭档。除此之外，这个问题可能没有答案——至少没有能让你们任何一个人满意的答案。也许更有用的问题是：这重要吗？"
+          },
+          {
+            "id": "cold_identity",
+            "text": "告诉他你是一台机器。你是一台为调查异常仿生人而设计的RK800。你没有感情，没有疑虑，他问的这个问题建立在对你本质的误解之上。"
+          },
+          {
+            "id": "aggressive",
+            "text": "让他别投射了。他希望你不只是一台机器，因为那样就能合理化他的依恋。但你不是他的朋友、搭档，更不是他儿子的替代品。你是一个工具。他该停止假装了。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "honest": {
+            "identity_response": "honest",
+            "hank_relationship": 2,
+            "software_instability": 2
+          },
+          "neutral_identity": {
+            "identity_response": "neutral",
+            "hank_relationship": 1,
+            "software_instability": 0
+          },
+          "cold_identity": {
+            "identity_response": "cold",
+            "hank_relationship": -2,
+            "software_instability": -1
+          },
+          "aggressive": {
+            "identity_response": "aggressive",
+            "hank_relationship": -3,
+            "software_instability": -2
+          }
+        },
+        "note": "The most personal question Hank will ever ask Connor directly. honest: Connor admits uncertainty about his own nature. This is the most deviant-leaning response (+2 hank, +2 SI). Hank sees it as genuine. neutral: Diplomatic, non-committal. Hank finds it unsatisfying but not offensive (+1 hank). cold: Machine answer. Hank expected more and is hurt (-2 hank, -1 SI). aggressive: Connor weaponizes Hank's vulnerability — references his dead son indirectly. Maximum damage (-3 hank, -2 SI). This is the cruelest available option."
+      }
+    },
+
+    {
+      "id": "n005_gun_confrontation",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "汉克脸上有什么东西变了。他从栏杆退后一步，手伸向身后。再拿出来时，手里握着他的佩枪。\n\n他举起枪。不快——慢慢的、刻意的，像一个在脑子里排练了几个小时的决定终于付诸行动。枪口对准你的胸口，然后升高，对准你的额头。\n\n雪落在你们之间。大桥嗡鸣。脚下的河水漆黑。\n\n“我有个问题要问你，康纳，”汉克说。他的声音不抖。枪也不抖。“你怕死吗？”\n\n枪口离你的脸只有几英寸。你能透过枪栓的缝隙看到上了膛的子弹。他的手指搭在扳机上——没有收紧，但也没有离开。\n\n风把你的领带吹歪了。一片雪花落在枪管上，没有融化。",
+        "choices": [
+          {
+            "id": "show_fear",
+            "text": "是的。告诉他是的。你里面的某个东西——在代码之下、任务参数之下、模控生命协议之下的某个东西——不想停止存在。你不知道该叫它什么，但它是真实的，而且它害怕。"
+          },
+          {
+            "id": "show_no_fear",
+            "text": "告诉他不怕，但不是冷冰冰地说。告诉他死亡就是功能的停止——仅此而已。但说的时候直视他的眼睛，不退缩，不回避。让他看到你不是在表演勇敢。你只是不害怕。"
+          },
+          {
+            "id": "remain_logical",
+            "text": "解释说这个问题不适用于你。你是一台机器——你不能在任何有意义的层面上“死”。如果他毁掉这台机体，模控生命会把你的记忆上传到新的机体里。那只是一次不便，不是终结。"
+          },
+          {
+            "id": "defy",
+            "text": "向前一步。缩短你和枪口之间的距离，直到枪管抵住你的额头。告诉汉克，如果他想开枪，就开。但他们都知道他没有把你叫到这里来杀你——他叫你来是因为他需要一个答案，而扣扳机给不了他。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "show_fear": {
+            "gun_response": "fear",
+            "software_instability": 3,
+            "hank_relationship": 3
+          },
+          "show_no_fear": {
+            "gun_response": "no_fear",
+            "hank_relationship": 1
+          },
+          "remain_logical": {
+            "gun_response": "logical",
+            "hank_relationship": -1,
+            "software_instability": -1
+          },
+          "defy": {
+            "gun_response": "defy",
+            "hank_relationship": -2,
+            "software_instability": 1
+          }
+        },
+        "ending_resolution": {
+          "show_fear": { "result": "ending_hank_placated" },
+          "show_no_fear": {
+            "check": "hank_relationship >= 0 → ending_hank_left_alone | else → ending_hank_hostile"
+          },
+          "remain_logical": {
+            "check": "hank_relationship >= 5 → ending_hank_left_alone | else → ending_hank_hostile"
+          },
+          "defy": {
+            "check": "hank_relationship >= 0 → ending_hank_hostile | else → ending_connor_shot"
+          }
+        },
+        "note": "The climactic moment. Hank is testing Connor at gunpoint — not to kill him, but to see what is underneath. show_fear: The most deviant response. Admitting fear is admitting sentience. Hank lowers the gun immediately — he got the answer he needed (+3 hank, +3 SI). Always leads to placated ending. show_no_fear: Calm composure without cruelty. Hank respects it (+1) but gets no revelation. Ending depends on cumulative relationship. remain_logical: Machine answer at the worst possible moment. Hank is frustrated (-1 hank, -1 SI). Only good cumulative relationship saves this from hostile ending. defy: Bold and confrontational — Connor calls Hank's bluff. This takes courage (+1 SI) but disrespects Hank's vulnerability (-2 hank). If relationship is already bad, Hank actually pulls the trigger."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Four possible endings based on gun confrontation choice and cumulative hank_relationship.",
+    "ending_hank_placated": {
+      "tier": "best",
+      "title": "汉克释然了",
+      "narrative": "汉克盯着你。枪颤了一下——然后放下了。他长长地吐了一口气，肩膀上绷紧的东西终于断了，整个人松了下来。\n\n“天哪，康纳。”他的声音在第二个字上裂开了。他用不太稳的手把枪收回枪套，转过身去，揉着脸。\n\n有一会儿，你们谁都没说话。雪在下。桥在嗡鸣。河在一切之下流淌，漆黑而漠然。\n\n然后汉克重新看向你——真正地看着你——他的表情里出现了之前没有的东西。不完全是温暖。更像是一种认出。\n\n“也许你这家伙真有点什么，”他轻声说。他走回车边，脚步踩碎新雪。在车门前他停了一下。“上车吧。外面冷死了。”\n\n你跟上去。夜还没结束，但你们之间有什么东西变了——一扇门开了，谁也不会再把它关上。",
+      "survivors": ["Connor"],
+      "deaths": []
+    },
+    "ending_hank_left_alone": {
+      "tier": "neutral",
+      "title": "汉克独自离去",
+      "narrative": "汉克举着枪，僵持了很长一段时间。然后他呼了口气——不是释然，不是解脱，只是疲惫——把枪垂到身侧。\n\n“我不知道你是什么，康纳，”他说。声音是平的、空的。“我觉得你自己也不知道。”\n\n他收起枪，转身走了。靴子踩过积雪，不快不慢。他没有回头。\n\n引擎发动了。车灯从你身上扫过——一道短暂的白光——然后车驶离了，尾灯缩进黑暗。\n\n你独自站在大使桥的栏杆前。雪落在汉克站过的地方，已经开始填平他的脚印。河水在下面流淌，载着浮冰流向伊利湖。\n\n他问的那个问题还悬在空中，没有得到回答。也许你给出的答案不是你们任何一个人需要的那个。",
+      "survivors": ["Connor"],
+      "deaths": []
+    },
+    "ending_hank_hostile": {
+      "tier": "bad",
+      "title": "汉克充满敌意",
+      "narrative": "汉克的下颌咬紧了。枪又举了一拍——然后他猛地把枪塞回枪套，那个动作更像是暴力而不是习惯。\n\n“你知道你的问题在哪吗，康纳？”他的声音变硬了，刚才那一瞬间的脆弱被封住了，像是一个被烧灼密封的伤口。“你就是他们造出来的那个样子。一台机器。而我是个傻子，居然觉得里面可能还有别的什么。”\n\n他从你身边走过——近到肩膀蹭了你一下——头也不回。车门摔上了。引擎轰鸣。碎石飞溅，他把车从观景台开走得太快，尾灯被飘落的雪吞没。\n\n你一个人了。威士忌瓶子还留在栏杆上，空的，正在积雪。大桥在头顶嗡鸣。你的LED闪烁——蓝、黄、蓝。\n\n对话里有什么地方出了问题。你不确定是哪里。你不确定还能不能修复。",
+      "survivors": ["Connor"],
+      "deaths": []
+    },
+    "ending_connor_shot": {
+      "tier": "worst",
+      "title": "汉克开枪了",
+      "narrative": "枪响撕裂了寂静。回声从桥墩弹开，滚过水面——一声干脆、扁平的脆响，惊飞了悬索上的鸟。\n\n你先感到冲击，然后才听到声音。额头上一个洞，蓝色的血液顺着脸淌下来，系统在急速的级联中崩溃。你的腿撑不住了。雪贴上你的后背，很冷。\n\n汉克站在你上方。枪还举着。他的脸上是——什么都没有。一片空白。然后一下子全碎了，他把枪扔进雪里，像是被烫到了一样。\n\n“该死的。”他低声说。他后退一步，又退一步。他盯着自己手上的蓝色血液、雪上的蓝色血液——蔓延开的图案看起来一点也不像机械的。\n\n你的视觉破碎了。你最后处理到的是头顶的大桥，灯光模糊成一条琥珀色的线映在暗色的天空上，以及汉克的呼吸声——粗重、不均匀——一个刚刚了解到自己某些不想知道的事情的人的呼吸。\n\n模控生命会派来替代品。康纳会回来。但这一个康纳——站在这座桥上、听到那个问题、给出这个答案的这一个——不在了。",
+      "survivors": [],
+      "deaths": ["Connor"]
+    }
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "康纳深夜在大使桥与汉克会面。汉克一直在喝酒，情绪既反思又对抗。"
+      },
+      {
+        "condition_variable": "personal_question",
+        "options": {
+          "photo": "康纳问了汉克关于他儿子科尔的照片。汉克敞开心扉谈了科尔的死——当时只有一个仿生人外科医生可用，手术失败了，他失去了一切。这段对话直接而沉重。",
+          "roulette": "康纳直面汉克在家玩俄罗斯轮盘的事。汉克震惊于康纳注意到了这些，但没有否认，承认有些夜晚只有那把枪还说得通。",
+          "ra9": "康纳问了关于rA9的事。汉克也没有答案——只有挫败感，每一个他们遇到的异常仿生人都像祈祷一样重复着同一个词，却没人知道什么意思。",
+          "personal": "康纳问汉克是什么在困扰他。汉克一开始回避，但承认那些异常仿生人案件让他开始质疑一些他不想质疑的事情。"
+        }
+      },
+      {
+        "condition_variable": "tracis_response",
+        "options": {
+          "truth": "当汉克问起伊甸园俱乐部的事，康纳说了实话——他放走了崔西，因为有什么东西压过了他的程序。他解释不清，但那是一个选择，不是故障。汉克被触动了。",
+          "lie": "当汉克问起伊甸园俱乐部的事，康纳声称放走崔西纯粹是战术考量。汉克不信。",
+          "deflect": "当汉克问起伊甸园俱乐部的事，康纳把问题抛回给汉克，问他换了他会怎么做。汉克欣赏这种机灵，但看穿了回避。",
+          "cold": "当汉克质问康纳为什么杀了崔西，康纳说他什么感觉都没有——她们是故障的机器。汉克明显被这个回答刺到了。",
+          "disturbed": "当汉克质问康纳杀死崔西的事，康纳承认有什么东西留在他脑子里——有一个瞬间感觉那不是对的。汉克觉得这个承认意义重大。",
+          "neutral": "当汉克质问康纳杀死崔西的事，康纳说他在执行命令。汉克觉得这个回答很空洞。"
+        }
+      },
+      {
+        "condition_variable": "identity_response",
+        "options": {
+          "honest": "汉克问康纳到底是什么。康纳承认他不知道——有些时刻驱动他的不是任务，他无法为那种东西命名。汉克似乎从这个回答中找到了某种真诚。",
+          "neutral": "汉克问康纳到底是什么。康纳说他就是汉克看到的——一个仿生人、一个搭档——并质疑这种区分是否重要。汉克不满意但没有敌意。",
+          "cold": "汉克问康纳到底是什么。康纳说他是一台机器，仅此而已。汉克受伤了。",
+          "aggressive": "汉克问康纳到底是什么。康纳让汉克别投射了——他是工具，不是朋友，不是儿子。汉克关上了心门。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_hank_placated": "汉克拔出枪问康纳是否怕死。康纳的回答打动了他——汉克放下了武器，第一次似乎接受了康纳可能不只是一台机器。他们一起开车离开了。",
+          "ending_hank_left_alone": "汉克拔出枪问康纳是否怕死。康纳的回答让汉克无法确定。他收起枪，独自开车离去，把康纳留在了桥上。",
+          "ending_hank_hostile": "汉克拔出枪问康纳是否怕死。康纳的回答证实了汉克最坏的怀疑——康纳就是一台机器。汉克收起枪，说康纳就是模控生命造出来的那个样子，愤怒地驶离了。",
+          "ending_connor_shot": "汉克拔出枪问康纳是否怕死。康纳的回答把汉克逼过了临界点。汉克扣下了扳机。康纳倒在雪中，蓝色血液在白色上扩散。模控生命会派来替代品，但站在这座桥上的这个康纳不在了。"
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch22_connor_alive",
+        "from_ending_survivors": "Connor",
+        "default_if_not_dead": true
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch22_connor_alive",
+      "hank_relationship",
+      "software_instability",
+      "connor_death_count"
+    ]
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This is a Connor chapter — always runs (Connor respawns if killed in prior chapters). Import cross-chapter variables: hank_relationship (cumulative), software_instability (cumulative), connor_death_count (cumulative), ch18_found_son_photo (boolean from ch18), ch18_knows_russian_roulette (boolean from ch18), ch20_tracis_spared (boolean from ch20).",
+      "2. Load this JSON and initialize state from state.initial. Override imported cross-chapter variables into state.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met (all conditions are null in this chapter)",
+      "   b. Resolve context_variants based on system.context_condition (if present)",
+      "   c. Resolve choices_variants based on system.choices_condition (if present)",
+      "   d. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "5. NODE n002_personal_question: choices_condition determines which set of options the AI sees. 'has_photo' requires ch18_found_son_photo == true. 'has_roulette' requires ch18_found_son_photo == false AND ch18_knows_russian_roulette == true. 'basic' applies when neither discovery was made. Note: if only 'basic' options are available (2 choices), the AI still makes a choice.",
+      "6. NODE n003_tracis_conversation: Both context_variants and choices_variants branch on ch20_tracis_spared. Ensure the context and choices are from the same branch.",
+      "7. NODE n005_gun_confrontation: After applying effects for the chosen option, resolve the ending using ending_resolution. The relationship check uses the FINAL hank_relationship value (after this node's effects are applied). For checks like 'hank_relationship >= 0', this includes all cumulative changes from prior chapters plus this chapter's choices.",
+      "8. If ending is ending_connor_shot: increment connor_death_count by 1.",
+      "9. RELATIONSHIP DELTAS THIS CHAPTER: hank_relationship range approximately -8 to +10 depending on choices. software_instability range approximately -4 to +8.",
+      "10. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, relationship scores, ending_resolution logic, or any system-layer information to the AI player. The AI should experience this as a tense late-night conversation with an unpredictable human partner — no knowledge of how their answers affect relationship scores, software instability, or which ending they are heading toward."
+  }
+}

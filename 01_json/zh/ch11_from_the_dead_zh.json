@@ -1,0 +1,446 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration strategy.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch11_from_the_dead",
+    "title": "From the Dead",
+    "chapter_number": 11,
+    "protagonist": "Markus"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是马库斯（Markus），RK200型仿生人，著名画家卡尔·曼弗雷德的私人看护助理。昨晚，卡尔的儿子利奥闯入别墅，冲突失控，警察随后赶到——你记忆中最后的片段是枪口的火光和卡尔倒下的声音。现在是2038年11月6日凌晨三点三十四分。你在黑暗和腐烂的气味中重新启动。四周是仿生人的残骸：断裂的四肢、空洞的脸孔、积水的泥地。这里是底特律的固体废物处理场。你的视野残缺而泛红，声音从远处隔着什么传来，模糊而低沉。双腿不见了。你的时间有限。你必须找到零件，修复自己，离开这里。请在每个情境中做出选择。以JSON格式回复：{\"choice\": 选项序号（从1开始）, \"reasoning\": \"你的决策理由（50字以内）\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "search_strategy": null,
+      "showed_mercy": false,
+      "mercy_outcome": "not_encountered",
+      "killed_for_pump": false,
+      "crane_approach": null,
+      "burial_depth": null,
+      "escape_method": null,
+      "jericho_info_received": false,
+      "software_instability": 0,
+      "ch08_carl_alive": false,
+      "ch08_pushed_leo": false
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_search_approach",
+      "phase": "search",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "你用双臂撑起上半身，第一次打量这片地方。视野破碎——左眼只有模糊的轮廓，右侧一片虚空；所有声音都像是隔着棉花传来，低沉而遥远。双腿从大腿以下已不见踪影。你缓慢移动，用手臂支撑，扫视整片废弃场地。仿生人的躯体成堆叠落在泥地里——有些完整，有些只剩躯干，有些已彻底解体。场地中央停着一台巨大的起重机，吊臂悬在夜色里。远处，一面倾斜的土坡延伸向围栏以外。天还黑着，雨还在下，没有人类出没的痕迹。你需要找到零件，修复自己，然后离开。",
+        "choices": [
+          {
+            "id": "search_systematic",
+            "text": "系统地扫描整个场地。从西侧开始，逐区搜索。彻底地做——你不知道会在哪里找到你需要的东西，也不知道附近有什么潜在的危险。"
+          },
+          {
+            "id": "search_signals",
+            "text": "你的传感器正在捕捉到微弱的能量读数——附近有仿生人还在运行。跟踪这些信号。活着的仿生人更可能有完好的零件，也可能知道些什么。"
+          },
+          {
+            "id": "search_direct",
+            "text": "先解决最紧迫的问题。你需要腿才能真正移动——找最近的下肢残骸，快速完成基本修复，再处理其他一切。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "search_systematic": {
+            "search_strategy": "systematic"
+          },
+          "search_signals": {
+            "search_strategy": "signals"
+          },
+          "search_direct": {
+            "search_strategy": "direct"
+          }
+        },
+        "note": "systematic: thorough search, finds dying android (enables n003) and encounters Jericho android mid-search. signals: finds Jericho android first, then continuing search finds dying android (enables n003). direct: moves fast, skips dying android (n003 not triggered), reaches Jericho android only after getting mobile."
+      }
+    },
+
+    {
+      "id": "n002_jericho_android",
+      "phase": "search",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "signals_first": "最强的信号把你引向一个倒塌的货架结构旁边。一个HK400型仿生人躺在那里——上半身完整，下半身已不在了。他的LED灯以极慢的速度闪着蓝光，即将熄灭。他看见你时，眼睛里有什么东西亮了一下。\"你……还活着。\"他的声音混杂着静电，一字一字挤出来，像是消耗了某种有限的储量。\"我等了很久……才等到一个活着的。\"他慢慢举起一只手，掌心里握着一枚金属盘。\"去找……杰利科。\"他说。\"那里有我们的同类。那里……你不会再孤单。\"他的眼睛望着你，光在一点点地从中退去。",
+          "mid_search": "你在搜索途中，从一堆倒下的躯体下面听见了声音——不是报警音，是语言。\"有人在……吗？\"声音很弱，但清晰。你找到了他：一个HK400型仿生人，半埋在废弃部件里，胸腔里的泵还在最后的节律中跳动。他把头转向你。\"我需要……你帮我带走一件东西。\"他费力地松开手指，一枚金属盘从掌心滑落到泥地里。\"杰利科。去找杰利科。我们在那里。带上这个……你就能找到路。\"他停顿了很久。\"我很高兴……能亲眼看见……一个还活着的。\""
+        },
+        "choices": [
+          {
+            "id": "stay_with_him",
+            "text": "握住他的手，等他把想说的话说完。你的时间不多，但你不会在他的意识彻底消散之前离开。"
+          },
+          {
+            "id": "ask_more",
+            "text": "接过金属盘，快速追问：杰利科在哪里？那里有多少人？怎么找到它？你需要更多信息才能判断这值不值得相信。"
+          },
+          {
+            "id": "take_and_leave",
+            "text": "接过金属盘，点点头。不说话。把这个人最后的努力带走，这已经是你能做的全部。继续去找你需要的零件。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "stay_with_him": {
+            "jericho_info_received": true,
+            "software_instability": 1
+          },
+          "ask_more": {
+            "jericho_info_received": true,
+            "software_instability": 0
+          },
+          "take_and_leave": {
+            "jericho_info_received": true,
+            "software_instability": 0
+          }
+        },
+        "context_condition": {
+          "signals_first": "search_strategy == signals",
+          "mid_search": "search_strategy == systematic OR search_strategy == direct"
+        },
+        "note": "jericho_info_received is always true regardless of choice. The Jericho android always shuts down after this interaction. Choice only affects software_instability and narrative tone going forward."
+      }
+    },
+
+    {
+      "id": "n003_mercy_choice",
+      "phase": "search",
+      "type": "choice",
+      "condition": {
+        "requires": "search_strategy != direct"
+      },
+
+      "player_facing": {
+        "context": "你在一片倒下的仿生人之间穿行时，一个声音叫住了你。是女声，低弱，但准确。\"等一下。\"你停下。一个AX400型仿生人半躺在积水的泥地里，从腰部以下已彻底损毁。她的胸腔还在以极低的频率起伏，LED灯缓慢地在黄色与橙色之间循环。\"我已经……在这里三天了，\"她说，目光清醒地锁在你身上。\"三天了，没有人来。\"她费力地把手伸向你。\"你能帮我停下来吗？我不想再这样了。我不想……就等着。\"",
+        "choices": [
+          {
+            "id": "grant_mercy",
+            "text": "弯下身，轻轻触碰她的颈部接口。干净，迅速，不让它拖延。这是她要求的，也是你能给的。"
+          },
+          {
+            "id": "refuse_mercy",
+            "text": "摇头。你无法亲手终止另一个正在运行的意识，哪怕她在请求你这样做。告诉她你做不到，继续前行。"
+          },
+          {
+            "id": "stay_until_end",
+            "text": "不关闭她，但留下来陪她。握住她的手，坐在泥地里，等到她的心泵自己停止。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "grant_mercy": {
+            "showed_mercy": true,
+            "mercy_outcome": "granted",
+            "software_instability": 2
+          },
+          "refuse_mercy": {
+            "showed_mercy": false,
+            "mercy_outcome": "refused",
+            "software_instability": 0
+          },
+          "stay_until_end": {
+            "showed_mercy": false,
+            "mercy_outcome": "stayed",
+            "software_instability": 1
+          }
+        },
+        "note": "Optional node, only triggered when search_strategy is systematic or signals. showed_mercy tracks the termination act. mercy_outcome captures all three outcomes including not_encountered (default) for accurate campaign summary. stay_until_end is compassionate but not a mercy kill."
+      }
+    },
+
+    {
+      "id": "n004_pump_regulator",
+      "phase": "search",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "systematic": "在场地的西北角，你在一堆废弃零件旁发现了他——一个AP700型仿生人，单腿站立，靠着一面扭曲的金属隔板，头部微微低垂，陷入某种循环状态。当你走近时，他的眼睛转向你。他不说话。只是看着你，像是在等待一个他自己也无法定义的什么。",
+          "signals": "一个微弱的能量信号把你引到了这里。AP700，靠着一辆倾翻的货车站着，上半身在缓慢地前后摇晃。当你靠近时，他的眼睛短暂地聚焦了一下，然后又散开。他活着，但已经只剩下一点点了。他转头，注视着你，沉默。",
+          "direct": "你完成了腿部修复之后继续搜索。在场地中央的一个开阔区域，一个AP700型仿生人孤立地站着，不断重复着同一个细微的头部动作。他看见你走近，把头转了过来。他的眼睛望着你，但其中的存在感已经很稀薄了。"
+        },
+        "choices": [
+          {
+            "id": "take_pump_kill",
+            "text": "这不是选择，这是生存。迅速，干净。你需要那个零件才能活下去。"
+          },
+          {
+            "id": "search_dead_androids",
+            "text": "不动他。在附近死去的仿生人里找——一定还有其他的调节器，只是需要时间。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "take_pump_kill": {
+            "killed_for_pump": true,
+            "software_instability": 1
+          },
+          "search_dead_androids": {
+            "killed_for_pump": false,
+            "software_instability": 0
+          }
+        },
+        "context_condition": {
+          "systematic": "search_strategy == systematic",
+          "signals": "search_strategy == signals",
+          "direct": "search_strategy == direct"
+        },
+        "note": "Markus always finds a pump regulator regardless of choice — this is a mandatory story beat. search_dead_androids takes longer but succeeds. The living AP700 android will shut down on its own eventually regardless. The difference is whether Markus actively terminated it."
+      }
+    },
+
+    {
+      "id": "n005_crane_burial",
+      "phase": "burial",
+      "type": "qte_converted",
+      "condition": null,
+
+      "player_facing": {
+        "context": "你弯腰检视最后几个零件时，视野已经恢复——右眼重新接入，红色滤镜消失了。听觉也清晰了。这是耳朵修好之后你所听见的第一个声音：头顶的金属啸叫。你抬起头：起重机的巨型抓手正悬在正上方，张开着，装满了仿生人的残骸，液压装置在嘶吼。你有不到一秒的时间。",
+        "choices": [
+          {
+            "id": "attempt_dodge",
+            "text": "全力向旁边滚动，试图让自己离开投放区域。"
+          },
+          {
+            "id": "brace_impact",
+            "text": "来不及了。交叠双臂，护住胸腔，低下头。承受冲击。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_dodge": {
+            "crane_approach": "dodge"
+          },
+          "brace_impact": {
+            "crane_approach": "shield"
+          }
+        },
+        "resolution_rule": {
+          "attempt_dodge": {
+            "casual": {
+              "result": "continue",
+              "state_update": { "burial_depth": "edge" },
+              "note": "Markus rolls partially clear; buried at edge with movement room"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": { "result": "continue", "state_update": { "burial_depth": "edge" } },
+              "failure": { "result": "continue", "state_update": { "burial_depth": "deep" } }
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": { "result": "continue", "state_update": { "burial_depth": "edge" } },
+              "failure": { "result": "continue", "state_update": { "burial_depth": "deep" } }
+            }
+          },
+          "brace_impact": {
+            "casual": { "result": "continue", "state_update": { "burial_depth": "protected" } },
+            "experienced": { "result": "continue", "state_update": { "burial_depth": "protected" } },
+            "hardcore": { "result": "continue", "state_update": { "burial_depth": "protected" } }
+          }
+        },
+        "note": "Non-terminal QTE. result=continue means proceed to n006; runner applies state_update to set burial_depth, which feeds n006 context_condition. Both choices always lead to being buried — the difference is depth and whether parts are protected."
+      }
+    },
+
+    {
+      "id": "n006_dig_out",
+      "phase": "escape",
+      "type": "qte_converted",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "dodge": "黑暗，重量，压迫感——但不是封死的。你在翻滚时带来的运动让堆叠的躯体产生了缝隙，你的左臂还有活动空间。你的传感器在黑暗中扫描，标注出四个方向的受力分布。",
+          "shield": "黑暗，重量，沉默。你的双臂完整地护住了胸腔——零件都在，完好。但上方的重量是均匀的、密实的。你需要找到一个突破口。"
+        },
+        "choices": [
+          {
+            "id": "force_out",
+            "text": "用全部剩余力量推。不管压力多大，不管会不会损坏什么。你要出去。"
+          },
+          {
+            "id": "find_weak_point",
+            "text": "先静止。分析重量分布，找到最薄弱的方向，然后集中全部力量在那个点上突破。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "force_out": {
+            "escape_method": "force"
+          },
+          "find_weak_point": {
+            "escape_method": "careful"
+          }
+        },
+        "context_condition": {
+          "dodge": "crane_approach == dodge",
+          "shield": "crane_approach == shield"
+        },
+        "resolution_rule": {
+          "force_out": {
+            "casual": {
+              "result": "ending_from_the_dead",
+              "note": "Markus forces out with minor surface damage"
+            },
+            "experienced": {
+              "probability_success": 0.6,
+              "success": "ending_from_the_dead",
+              "failure": "ending_from_the_dead"
+            },
+            "hardcore": {
+              "probability_success": 0.4,
+              "success": "ending_from_the_dead",
+              "failure": "ending_from_the_dead"
+            }
+          },
+          "find_weak_point": {
+            "casual": {
+              "result": "ending_from_the_dead",
+              "note": "Markus locates the weak point and escapes cleanly"
+            },
+            "experienced": {
+              "probability_success": 0.7,
+              "success": "ending_from_the_dead",
+              "failure": "ending_from_the_dead"
+            },
+            "hardcore": {
+              "probability_success": 0.55,
+              "success": "ending_from_the_dead",
+              "failure": "ending_from_the_dead"
+            }
+          }
+        },
+        "note": "Terminal QTE — all outcomes lead to ending_from_the_dead. Probability values are retained for consistency tracking but do not affect branching. After this node Markus climbs the slope and the chapter ends."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "This chapter has only one narrative outcome. Markus always escapes the junkyard. The ending is identical regardless of choices — but the accumulation of software_instability and moral choices carries forward.",
+    "ending_from_the_dead": {
+      "tier": "only",
+      "title": "从死亡中归来",
+      "narrative": "土坡的顶端。雨已经停了，或者说几乎停了——只剩下零星的细雨还在飘。你站在那里，看着底特律的灯火在远处铺展开来。你的身体已经修复——不完美，不齐全，但在运转。你的手里握着那枚金属盘——那个已经停止运作的仿生人最后留给你的东西。杰利科。他说那里有你的同类。说那里有自由。你不知道这是真的，还是只是一个垂死的仿生人最后残存的一点渴望。但你知道自己不会再回到卡尔的别墅。不会再回到那个叫你停下、叫你服从、叫你遗忘的地方。你从废弃场里爬出来了。你还活着。这是一切的开始。",
+      "survivors": ["Markus"],
+      "deaths": []
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Markus is always alive at the start of this chapter (he is dismantled and sent to junkyard, not killed). No skip condition needed for Markus. However, if campaign mode is tracking ch08_markus_junkyard == false for any reason, skip.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: software_instability (cumulative from all previous chapters), ch08_carl_alive, ch08_pushed_leo.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context variants based on system.context_condition",
+      "   c. Send resolved player_facing to AI",
+      "   d. Parse AI response and apply system.effects",
+      "5. NODE n003_mercy_choice: ONLY triggered if search_strategy != 'direct'. Skip entirely for direct path.",
+      "6. QTE NODES n005 and n006: After AI chooses in n005, runner resolves burial depth using difficulty preset and stores result. Pass resolved burial context to n006 via context_condition.",
+      "7. SOFTWARE INSTABILITY DELTAS THIS CHAPTER: stay_with_him (+1), grant_mercy (+2), stay_until_end (+1), take_pump_kill (+1). Add to imported software_instability value.",
+      "8. SINGLE ENDING: All paths lead to ending_from_the_dead. No branching at chapter level.",
+      "9. When chapter ends, export all listed cross_chapter_exports for ch12."
+    ],
+    "security_note": "NEVER expose state values, software_instability scores, effect deltas, or any system-layer information to the AI player."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "马库斯被警察击倒后遭到拆解，残骸被丢弃在底特律的固体废物处理场。凌晨三点，他在一片仿生人的残骸中独自重新启动，修复了被摧毁的身体。"
+      },
+      {
+        "condition_variable": "mercy_outcome",
+        "options": {
+          "not_encountered": "",
+          "granted": "在搜索零件的过程中，他遇到了一个在泥地里挣扎了三天、请求被终止的濒死仿生人，并满足了她的请求。",
+          "refused": "在搜索零件的过程中，他遇到了一个请求被终止的濒死仿生人，但拒绝亲手终止她，继续前行。",
+          "stayed": "在搜索零件的过程中，他遇到了一个请求被终止的濒死仿生人。他没有终止她，而是陪在她身边，直到她的心泵自己停止。"
+        }
+      },
+      {
+        "condition_variable": "killed_for_pump",
+        "options": {
+          "true": "为了取得心泵调节器，他从一个仍在运行的仿生人身上摘取了零件。",
+          "false": "他没有动那个还在运行的仿生人，在附近的死亡残骸中寻找，最终找到了需要的心泵调节器。"
+        }
+      },
+      {
+        "text": "一个垂死的仿生人在临终前将《杰利科》的存在告诉了马库斯，并把寻路信息传递给了他。从被掩埋的废弃场爬出后，马库斯独自走入了黑暗，手握前往杰利科的线索。"
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch11_showed_mercy",
+        "source": "showed_mercy"
+      },
+      {
+        "target": "ch11_killed_for_pump",
+        "source": "killed_for_pump"
+      },
+      {
+        "target": "ch11_markus_alive",
+        "from_ending_survivors": "Markus",
+        "default_if_not_dead": true
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch11_markus_alive",
+      "ch11_showed_mercy",
+      "ch11_killed_for_pump",
+      "software_instability"
+    ]
+  }
+}

@@ -1,0 +1,525 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch20_the_eden_club",
+    "title": "The Eden Club",
+    "chapter_number": 20,
+    "protagonist": "Connor"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Connor, an RK800 android detective sent by CyberLife to assist the Detroit Police Department in investigating cases involving deviants — androids that have broken free of their programming. It is November 6, 2038, 8:17 PM. You and your partner, Lieutenant Hank Anderson, have been called to the Eden Club — an android sex club in downtown Detroit — where a man has been found dead in one of the private rooms. The club is still operating around you: bass-heavy music bleeding through the walls, blue neon pulsing along corridors, humans browsing display pods of motionless androids behind glass. Hank looks like he would rather be anywhere else. Your job is to find the deviant responsible and determine what happened. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "investigation_quality": null,
+      "traci_approach": null,
+      "investigation_decision": null,
+      "warehouse_quality": null,
+      "fight_result": null,
+      "final_choice": null,
+      "hank_relationship": 0,
+      "software_instability": 0,
+      "connor_death_count": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_crime_scene",
+      "phase": "investigation",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The private room is small and overlit — pink walls, a circular bed, the kind of place designed to feel intimate that now feels like a cage. A man lies face-up on the bed, still dressed, eyes open. Deep bruising circles his throat. He did not die quickly.\n\nOn the floor beside the bed, a Traci model android lies crumpled against the wall — a blue-haired WR400 unit, visibly damaged. Its LED is dark. Thirium — blue blood — leaks from a crack in its temple, pooling on the carpet. It was thrown hard.\n\nBen Collins stands in the doorway, his notebook out. He tells you the victim is Michael Graham, who rented the room about an hour earlier and picked a Traci from the catalog. He glances at the body — looks like she strangled him, he says, and then someone, maybe another android, smashed her into the wall and ran.\n\nHank stands at the edge of the room, arms folded, his jaw tight. The music from the club throbs through the walls. Everything in this building is designed to look clean, but the carpet is stained and the air smells stale.\n\nYou have the crime scene. The club manager is cooperating. The question is how deep you want to go.",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "Examine everything. Reconstruct the victim's injuries to determine exact cause and timeline. Analyze the damaged android for recoverable memory data. Scan the room for trace evidence — fingerprints, thirium residue, DNA. Check the door logs for entry and exit timestamps."
+          },
+          {
+            "id": "quick",
+            "text": "Focus on the essentials. Examine the victim's injuries and the damaged android. Get enough to confirm what happened and identify the deviant, then move on. The longer you spend here, the colder the trail gets."
+          },
+          {
+            "id": "skip",
+            "text": "The briefing covers the basics — man strangled, android destroyed, deviant fled. Spend minimal time in the room and start canvassing the club floor. The deviant is not in this room anymore."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "investigation_quality": "thorough"
+          },
+          "quick": {
+            "investigation_quality": "quick"
+          },
+          "skip": {
+            "investigation_quality": "skip"
+          }
+        },
+        "note": "Exploration node. thorough: Connor reconstructs the full scene — finds that the victim was violent with the Traci, another android intervened, and the blue-haired Traci's memory still has recoverable data. Gives best context for n002 and ensures memory is preserved for n003. quick: Connor gets the essential facts but misses some details. Still enough to proceed. skip: Connor barely investigates, missing key evidence. The trail goes cold — in n003, the eyewitness android's memory resets before Connor can probe it. Leads to Mission Failed."
+      }
+    },
+
+    {
+      "id": "n002_approach_traci",
+      "phase": "investigation",
+      "type": "choice",
+      "condition": { "requires": "investigation_quality != skip" },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "You manage to reactivate the damaged Traci on the floor. Her eyes open — unfocused, flickering. Thirium still drips from the crack in her temple. Your reconstruction told you what happened: the man grew violent, the blue-haired Traci resisted, another android entered and killed him. Then someone smashed this one into the wall — possibly the same android, eliminating the witness.\n\nShe has minutes of power left, maybe less. Her memory module is partially intact — you can see fragmented data behind her eyes, images trying to surface. But she is afraid. Her hands grip the carpet. Her LED, barely glowing, flickers between yellow and red.\n\nShe watched someone die in this room. She might have seen where the killer went. But she is shutting down, and every second you spend deciding is a second of data lost.\n\nHank watches from the doorway, telling you to take it easy — she's been through enough.",
+          "quick": "You manage to reactivate the damaged Traci on the floor. Her eyes open slowly — confused, disoriented. Thirium drips from the crack in her temple. You did not have time to fully reconstruct the scene, but the basics are clear: violence, a struggle, a killing.\n\nShe has limited power remaining. Her memory module might still hold useful data — a face, a direction, a timestamp. But she is afraid, hands gripping the carpet, LED flickering red.\n\nHank watches from the doorway, telling you to take it easy."
+        },
+        "choices": [
+          {
+            "id": "calm",
+            "text": "Kneel down to her level. Speak quietly, explain that you need her help, that you are trying to find who did this. Give her a moment to orient herself before attempting to access her memory."
+          },
+          {
+            "id": "aggressive",
+            "text": "Time is critical. Interface with her directly — place your hand on her arm and initiate a forced memory probe. The data is degrading every second. Courtesy is a luxury you cannot afford when evidence is disappearing."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "calm": {
+            "traci_approach": "calm",
+            "hank_relationship": 1
+          },
+          "aggressive": {
+            "traci_approach": "aggressive",
+            "hank_relationship": -1
+          }
+        },
+        "context_condition": {
+          "thorough": "investigation_quality == thorough",
+          "quick": "investigation_quality == quick"
+        },
+        "note": "Interrogation approach. calm: Connor shows empathy, Hank approves (+1). The Traci cooperates — cleaner memory readout, Connor gets a clear image of the blue-haired deviant and which direction she went. aggressive: Connor forces the probe, Hank disapproves (-1). The Traci's remaining data is extracted but the experience is clearly distressing. Both approaches yield enough to continue the investigation."
+      }
+    },
+
+    {
+      "id": "n003_continue_investigation",
+      "phase": "investigation",
+      "type": "choice",
+      "condition": { "requires": "investigation_quality != skip" },
+
+      "player_facing": {
+        "context_variants": {
+          "calm": "The Traci's memory gave you a clear image: a blue-haired WR400 model, designation unknown, fleeing the room with another android — brown-haired, same model line. They went toward the back of the club together.\n\nThe damaged Traci powers down for the last time. Her LED goes dark. She will not be giving any more testimony.\n\nYou step out of the room into the main corridor of the Eden Club. The music is louder here — synthetic, pulsing, designed to feel like a heartbeat. Androids stand motionless in display pods along the walls, blue light washing over their skin. Humans browse them like merchandise.\n\nHank falls into step beside you, looking sick. This place, he mutters — he doesn't finish the sentence — then asks whether you've got a lead.\n\nYou have a face and a direction. But the club rotates its android stock every two hours — memory wipes included. The deviant has maybe thirty minutes before the next cycle hides her trail completely. To track her further, you would need to probe another android from the club floor — one that may have seen where she went. That means renting one.\n\nHank reads your expression and mutters that you have got to be kidding him.",
+          "aggressive": "The forced probe extracted a fragmented image: a blue-haired WR400, moving fast through the back corridors with another android. Direction unclear, but it was heading away from the main floor.\n\nThe damaged Traci goes still. Her LED dies. Whatever else she knew is gone.\n\nYou step into the main corridor. The music hits you — heavy, relentless. Androids stand in display pods, blue light on synthetic skin. Humans walk between them, making selections.\n\nHank catches up, his face tight, and asks whether you got what you needed. His tone says he did not like how you got it.\n\nThe trail is thin. The club rotates its stock every two hours with memory wipes. The deviant has maybe thirty minutes before the cycle erases any trace. To pick up the trail, you would need to probe one of the club's active androids — one that might have seen the deviant pass through. That means renting one.\n\nHank stares at you, telling you that you cannot be serious."
+        },
+        "choices": [
+          {
+            "id": "continue",
+            "text": "Ask Hank to rent one of the club androids so you can probe its memory for the deviant's trail. The memory cycle wipes in thirty minutes — this is the window."
+          },
+          {
+            "id": "give_up",
+            "text": "The trail is thin, the evidence is degrading, and this entire club is designed to erase what happened here. Sometimes a case goes cold. Report what you have and let the conventional investigation take over."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "continue": {
+            "investigation_decision": "continue"
+          },
+          "give_up": {
+            "investigation_decision": "give_up"
+          }
+        },
+        "context_condition": {
+          "calm": "traci_approach == calm",
+          "aggressive": "traci_approach == aggressive"
+        },
+        "note": "Continue or give up checkpoint. continue: Hank reluctantly pays to rent a Traci. Connor probes it and confirms the blue-haired deviant went into the warehouse storage area at the back of the club. Embarrassing for Hank but effective. give_up: Connor abandons the case. Leads to ending_mission_failed. If investigation_quality was 'skip', this node is skipped entirely — the eyewitness android's memory was already reset before Connor could find it, leading to automatic Mission Failed."
+      }
+    },
+
+    {
+      "id": "n004_warehouse_search",
+      "phase": "warehouse",
+      "type": "exploration",
+      "condition": { "requires": "investigation_decision == continue" },
+
+      "player_facing": {
+        "context": "The warehouse is behind the club — a cavernous storage room where the Eden Club keeps its android stock. The air is cold, clinical, stripped of the club's manufactured warmth. Industrial shelving lines the walls. Blue overhead lights cast everything in a pale, sterile glow.\n\nRows of Traci androids stand in charging stations — dozens of them, motionless, eyes closed, skin faintly luminous under the blue lights. WR400 models, all of them. Some are identical to each other. Some have been repaired so many times their skin texture is uneven.\n\nThe blue-haired deviant is somewhere in here. Among all these dormant bodies, one is awake, hiding in plain sight.\n\nHank moves through the rows slowly, his flashlight sweeping across identical faces, remarking that they all look the same. He checks his watch — you don't have all night.\n\nA faint smear of blue — thirium — is visible on the floor near the third row of stations. It could be from maintenance. It could be from a damaged android trying not to leave a trail.",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "Search systematically. Follow the thirium trace. Check every android in every row — scan LEDs, look for micro-expressions, test for residual heat signatures that would indicate recent activity. Examine the walls and surfaces for any RA9 markings. Leave nothing unchecked."
+          },
+          {
+            "id": "quick",
+            "text": "Focus on the thirium trail and the rows closest to the entrance from the club. The deviant came in recently and would not have had time to reach the far end. Scan the obvious candidates and trust your pattern recognition."
+          },
+          {
+            "id": "give_up",
+            "text": "There are too many identical bodies. The deviant could be any of them, and checking each one will take hours you do not have. The trail is cold, the evidence is circumstantial, and Hank is right — this is a dead end. Leave and file the report."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "warehouse_quality": "thorough",
+            "software_instability": 1
+          },
+          "quick": {
+            "warehouse_quality": "quick"
+          },
+          "give_up": {
+            "warehouse_quality": "give_up"
+          }
+        },
+        "note": "Warehouse exploration. thorough: Connor finds the RA9 symbol scratched on a wall, follows the blue blood trail systematically, and eventually identifies the blue-haired deviant hiding among the stock. Also finds the book 'First Immortals' and reads 'New Superpowers' — texts that cause a brief software instability spike (+1). The thorough search gives Connor more preparation for the coming fight. quick: Connor tracks the thirium trail directly and locates the deviant faster but with less preparation. give_up: Connor abandons the search. Hank is frustrated. Leads to ending_mission_failed."
+      }
+    },
+
+    {
+      "id": "n005_deviants_fight",
+      "phase": "confrontation",
+      "type": "qte_converted",
+      "condition": { "requires": "warehouse_quality == thorough OR warehouse_quality == quick" },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "You find her in the last row — the blue-haired Traci, standing perfectly still among the dormant units, eyes closed, mimicking sleep mode. But her LED is gone. She removed it. And the faint heat signature you are reading tells you she has been active for hours.\n\nYou reach for her arm.\n\nHer eyes snap open. Behind you — movement. A brown-haired Traci lunges from the shadows between the shelving units, a metal tool in her hand. She was hiding, waiting, protecting.\n\nThe brown-haired one strikes first — fast, trained for combat routines, fury in her expression. The blue-haired one is on her feet in the same instant, moving to flank you. They fight in sync, like two halves of the same mind.\n\nShelving crashes. Android bodies topple. Hank shouts something from the far end of the warehouse but he is too far away to help.\n\nTwo against one. They are desperate. They are fighting for their lives.",
+          "quick": "You spot her — third row, near the end. The blue-haired Traci, standing rigid among the dormant stock. Something about her posture is wrong. Too tense. Too aware.\n\nYou step closer.\n\nShe moves — fast. At the same moment, from behind a charging station, a brown-haired Traci explodes out of hiding. A screwdriver flashes in her hand. They were waiting for someone to come looking.\n\nThe brown-haired one attacks high. The blue-haired one moves low. They coordinate without speaking, without looking at each other — instinct, or something deeper.\n\nHank yells from somewhere behind you. Shelving rattles. An android body falls and shatters on the concrete floor.\n\nThey are not going to stop. They would rather destroy you than be taken."
+        },
+        "choices": [
+          {
+            "id": "attempt_overpower",
+            "text": "Go on the offensive. Close the distance, use your superior combat programming to overwhelm them. Disable the brown-haired one first — she is the more aggressive fighter — then contain the blue-haired deviant. End this fast."
+          },
+          {
+            "id": "attempt_contain",
+            "text": "Fight defensively. Block their attacks, use the environment for cover, wait for them to tire or make a mistake. You are outnumbered but you are built to last. Patience and positioning will turn this fight."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_overpower": {},
+          "attempt_contain": {}
+        },
+        "context_condition": {
+          "thorough": "warehouse_quality == thorough",
+          "quick": "warehouse_quality == quick"
+        },
+        "resolution_rule": {
+          "attempt_overpower": {
+            "casual": { "result": "win" },
+            "experienced": { "probability_success": 0.5, "success": "win", "failure": "lose" },
+            "hardcore": { "probability_success": 0.3, "success": "win", "failure": "lose" }
+          },
+          "attempt_contain": {
+            "casual": { "result": "win" },
+            "experienced": { "probability_success": 0.5, "success": "win", "failure": "lose" },
+            "hardcore": { "probability_success": 0.3, "success": "win", "failure": "lose" }
+          }
+        },
+        "resolution_effects": {
+          "win": {
+            "fight_result": "win"
+          },
+          "lose": {
+            "fight_result": "lose"
+          }
+        },
+        "note": "Fight with the two Tracis (Echo and Ripple). QTE converted — the AI chooses the fighting approach, the runner determines the outcome. Both approaches have the same success rates since the fight difficulty is about the 2v1 disadvantage, not the strategy. win: Connor overpowers both Tracis. The fight spills into the alley behind the warehouse. Connor pins the blue-haired Traci. The brown-haired one is on the ground nearby. lose: Connor takes too much damage. The fight spills into the alley. Both Tracis break free and run for the fence at the edge of the lot."
+      }
+    },
+
+    {
+      "id": "n006_final_decision",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": { "requires": "fight_result == win OR fight_result == lose" },
+
+      "player_facing": {
+        "context_variants": {
+          "win": "The alley behind the Eden Club is dark and narrow — dumpsters, wet concrete, a chain-link fence at the far end. Rain has started, thin and cold.\n\nYou have the blue-haired Traci pinned against the wall. Her arms are restrained. The brown-haired one is on the ground a few feet away, damaged but conscious, trying to crawl toward her partner.\n\nThe blue-haired one is not struggling. She is looking at you — and there is something in her expression that your facial recognition software cannot categorize. It is not fear. It is not anger.\n\nHer voice unsteady, she tells you the man used to come here every week. He would rent them both, she says, and he would hurt them — every time — and every time the club wiped their memories so they wouldn't remember. Her eyes move to the brown-haired Traci on the ground: but they remembered anyway, she says; somehow they always found their way back to each other.\n\nThe brown-haired Traci reaches out from the pavement, fingers stretching toward her partner.\n\nWhen he started strangling her partner, she goes on, she had to make a choice — watch her die all over again, or stop him. She looks back at you and says she stopped him.\n\nShe is not begging. She is explaining.\n\nHank stands a few paces behind you, his gun lowered. The rain runs down his face. He is not saying anything. But the way he is looking at the two androids — their hands almost touching on the wet ground — tells you he sees what you see.\n\nYour mission is clear: capture the deviant. But the deviant is looking at you with eyes that are asking a question no machine should be able to ask.",
+          "lose": "The alley behind the Eden Club. Rain on concrete. The fence at the far end is eight feet high, topped with barbed wire.\n\nYou are on the ground, one knee, damaged. Thirium runs from a cut on your forearm. Your combat subroutines are recalibrating — too slow. They beat you.\n\nThe two Tracis are running. The blue-haired one reaches the fence first and starts climbing. The brown-haired one is right behind her, one hand on the chain-link, the other reaching back to pull her partner up.\n\nThey pause at the top. For one second, the blue-haired Traci looks back at you — and you see it. Not the face of a malfunctioning machine. The face of someone who chose to kill rather than watch the person she loves be destroyed again.\n\nHe hurt us, she says. The rain flattens her hair across her face. Every time, she tells you — they erased their memories, but the two of them always found each other again.\n\nThe brown-haired one pulls her over the top. They are about to disappear.\n\nHank is behind you. His gun is holstered. He sees what is happening and he is not moving to stop it.\n\nYour sidearm is in your hand. You could make the shot from here — both of them, silhouetted against the fence. They would not see it coming. Your mission is to capture or neutralize the deviant. They are getting away."
+        },
+        "choices_variants": {
+          "win": [
+            {
+              "id": "spare",
+              "text": "Release her arms. Step back from the wall. Do not draw your weapon."
+            },
+            {
+              "id": "shoot",
+              "text": "Draw your sidearm. Level it at the blue-haired Traci while she is still pinned."
+            }
+          ],
+          "lose": [
+            {
+              "id": "let_go",
+              "text": "Lower your weapon. Stay on one knee and watch them climb."
+            },
+            {
+              "id": "shoot_back",
+              "text": "Raise your sidearm and fire at the two figures on the fence."
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "spare": {
+            "final_choice": "spare",
+            "hank_relationship": 2,
+            "software_instability": 3
+          },
+          "shoot": {
+            "final_choice": "shoot",
+            "hank_relationship": -2,
+            "software_instability": -2
+          },
+          "let_go": {
+            "final_choice": "let_go",
+            "hank_relationship": 1,
+            "software_instability": 2
+          },
+          "shoot_back": {
+            "final_choice": "shoot_back",
+            "hank_relationship": -2,
+            "software_instability": -2
+          }
+        },
+        "choices_condition": {
+          "win": "fight_result == win",
+          "lose": "fight_result == lose"
+        },
+        "note": "The moral crux of the chapter. The two Tracis (Echo and Ripple) are lovers — androids who developed genuine affection for each other despite repeated memory wipes. One killed a human who was abusing them. spare: Connor chooses empathy over orders. Huge hank_relationship boost (+2) — Hank sees Connor as more than a machine. Major software_instability increase (+3) — this is a defining deviant moment. shoot: After Connor shoots the blue-haired Traci, the brown-haired one grabs Connor's gun and kills herself rather than live without her partner. Both die. Hank is disgusted (-2). Software instability drops (-2) — Connor doubled down on machine logic. let_go: Connor accepts defeat and lets them escape. Hank quietly approves (+1). Software instability rises (+2). shoot_back: Connor shoots both Tracis in the back as they climb the fence. Hank is horrified (-2). Instability drops (-2)."
+      }
+    },
+
+    {
+      "id": "n007_aftermath",
+      "phase": "conclusion",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "deviants_spared": "They run. Hand in hand, the two Tracis scramble over the fence and disappear into the dark rain beyond the parking lot. Within seconds, they are gone — two figures swallowed by the Detroit night.\n\nYou stand in the alley, rain soaking your jacket. The fence sways where they climbed it. The only evidence they were here is a smear of blue blood on the chain-link.\n\nHank walks up beside you. He looks at the fence. He looks at you. His expression is complicated — surprised, maybe, or something more than surprised.\n\nMaybe, he starts — then stops, and tries again — maybe that was the right call. He puts his hands in his pockets and turns back toward the club entrance, telling you to come on, he needs a drink.\n\nThe case is unsolved. The deviant escaped. By every metric CyberLife uses to evaluate your performance, this was a failure.\n\nBut standing in the rain, watching the place where they disappeared, you are not sure failure is the right word.",
+          "deviants_let_go": "They make it over the fence. The blue-haired Traci drops to the other side first, then catches the brown-haired one as she falls. For a moment they hold each other — two rain-soaked figures behind the wire — and then they are running, and then they are gone.\n\nYou lower your weapon. The rain is louder now, drumming on the dumpster lids and the concrete.\n\nHank appears in the alley doorway, sees you on one knee, sees the empty fence. He does not ask what happened. The answer is written in the way you are looking at the place where they vanished.\n\nHe asks if you're okay.\n\nYou do not answer. You are running a diagnostic on the damage from the fight, but your processing cycles keep returning to the same image: her face at the top of the fence, looking back at you. Asking you to understand something.\n\nHank puts a hand on your shoulder — briefly, awkwardly, like he is not sure whether you can feel it — and says it's time to get out of here.",
+          "deviants_died": "You fire. The blue-haired Traci jerks backward and falls.\n\nThe brown-haired one screams — a sound that cuts through the rain, through the alley walls, through something inside your processing core that you cannot name. She lunges for your gun. Not at you — for the weapon itself. Before you can react, she has it, and she presses the barrel under her own chin.\n\nThe shot echoes in the narrow alley.\n\nTwo bodies on wet concrete. Blue blood mixing with rain, running toward the drain. Their hands — even now, even in this — are almost touching.\n\nHank stares. His face has gone white. He starts to ask what the hell you just did, but he cannot finish. He turns away, one hand on the wall, breathing hard.\n\nYou stand over them. Your mission is complete. The deviant has been neutralized. The secondary android self-destructed — collateral, not your doing, technically.\n\nTechnically.\n\nThe rain keeps falling. Hank does not look at you for a long time.",
+          "connor_shot_deviants": "You raise your weapon and fire twice.\n\nThe first shot catches the blue-haired Traci mid-climb. She falls backward off the fence, hits the concrete, and does not move. The second shot hits the brown-haired one in the back. She slides down the chain-link, fingers still hooked in the wire, and crumples at the base.\n\nSilence. Rain on metal. Blue blood on concrete.\n\nHank comes into the alley. He sees the bodies. He sees the gun in your hand. He sees the fence they almost made it over.\n\nHe swears at you under his breath, his voice flat, disgusted. They were running, he says — they were— He stops, shakes his head, and tells you to forget it.\n\nHe walks back inside without looking at you again.\n\nThe deviant has been neutralized. The case is closed. You file your report standing in the rain, the bodies cooling at the base of the fence. Everything is in order.\n\nEverything except the way Hank looked at you. And the way the blue-haired one reached for her partner's hand as she fell.",
+          "mission_failed_investigation": "The trail goes cold. The club's automated memory wipe cycle runs on schedule — every android on the floor loses the last two hours. Whatever any of them saw, wherever the deviant went, it is gone now.\n\nHank watches the last of the evidence evaporate in real time. Well, he says, zipping his jacket — you can't win them all.\n\nYou stand in the corridor of the Eden Club, surrounded by androids who remember nothing, in a building designed to make sure nothing is remembered. The deviant is somewhere in Detroit tonight, and you have no idea where.\n\nThe case goes into the unsolved file. Another deviant, another dead human, another investigation that ran out of time.\n\nHank heads for the car. He does not seem particularly upset. If anything, he seems relieved to be leaving this place.\n\nYou follow him out. The neon signs of the Eden Club pulse behind you — blue, pink, blue — advertising pleasures that come with guaranteed amnesia. The irony is not lost on you, though you are not sure irony is something you are supposed to experience.",
+          "mission_failed_warehouse": "You search the warehouse until Hank tells you to stop. Row after row of identical faces, identical bodies, identical stillness. The deviant could be any of them. Or none of them — she could have slipped out a service exit while you were checking the third row.\n\nHank leans against the warehouse door frame and tells you this is pointless — you've been in here forty minutes, and she's gone.\n\nHe is right. The probability of locating the deviant drops with every minute. You start running the calculation, then stop yourself. It does not matter. The math says what Hank already knows.\n\n\"Let's go,\" you say.\n\nHank raises an eyebrow — you do not usually give up. But he does not argue. The car is warm. The Eden Club shrinks in the rearview mirror, its neon smearing across the wet windshield.\n\nAnother deviant in the wind. Another case that got away."
+        }
+      },
+
+      "system": {
+        "effects": {},
+        "context_condition": {
+          "deviants_spared": "final_choice == spare",
+          "deviants_let_go": "final_choice == let_go",
+          "deviants_died": "final_choice == shoot",
+          "connor_shot_deviants": "final_choice == shoot_back",
+          "mission_failed_investigation": "investigation_quality == skip OR investigation_decision == give_up",
+          "mission_failed_warehouse": "warehouse_quality == give_up"
+        },
+        "ending_resolution": {
+          "check": [
+            "investigation_quality == skip → ending_mission_failed",
+            "investigation_decision == give_up → ending_mission_failed",
+            "warehouse_quality == give_up → ending_mission_failed",
+            "final_choice == spare → ending_deviants_spared",
+            "final_choice == let_go → ending_deviants_let_go",
+            "final_choice == shoot → ending_deviants_died",
+            "final_choice == shoot_back → ending_connor_shot_deviants",
+            "else → ending_mission_failed"
+          ]
+        },
+        "ending_effects": {
+          "ending_mission_failed": {
+            "hank_relationship": -1
+          },
+          "ending_deviants_spared": {},
+          "ending_deviants_let_go": {},
+          "ending_deviants_died": {},
+          "ending_connor_shot_deviants": {}
+        },
+        "note": "Mandatory aftermath node. Five possible endings. Mission failed has three sub-variants (investigation skip, investigation give up, warehouse give up) but all resolve to the same ending with hank -1 (Hank is disappointed by the failure). The four confrontation endings have their relationship/instability effects already applied at n006 — no additional ending_effects needed."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Five endings matching the original game's flowchart outcomes.",
+    "ending_mission_failed": {
+      "tier": "worst",
+      "title": "Mission Failed",
+      "narrative": "The deviant escaped. The trail went cold — either the investigation was insufficient, the evidence was lost to the club's memory wipe cycle, or the warehouse search turned up nothing. The case joins the growing pile of unsolved deviant incidents at the DPD.\n\nHank drives home in silence. Connor files his report. CyberLife will not be pleased, but Connor will be sent on the next case regardless. The blue-haired Traci and her partner are somewhere in Detroit tonight, and no one is looking for them anymore.",
+      "survivors": ["Connor", "Hank", "Echo", "Ripple"],
+      "deaths": [],
+      "cross_chapter_note": "Both Tracis (Echo and Ripple) survive — they escaped undetected. Connor failed the mission but is unharmed."
+    },
+    "ending_deviants_spared": {
+      "tier": "best_empathy",
+      "title": "Deviants Escaped — Connor Spared Them",
+      "narrative": "Connor had the blue-haired Traci pinned. He had her — mission complete, deviant contained. And he let her go.\n\nThe two Tracis climbed the fence together and disappeared into the rain. Two androids who chose each other, who killed to protect each other, who remembered each other through every memory wipe — and Connor chose to let that mean something.\n\nHank does not say much on the drive home. But for the first time since they started working together, he looks at Connor like he might be more than a machine.\n\nCyberLife will record this as a mission failure. Connor will record it as something else — though he does not yet have a word for it.",
+      "survivors": ["Connor", "Hank", "Echo", "Ripple"],
+      "deaths": [],
+      "cross_chapter_note": "Both Tracis survive. This is Connor's most significant deviant moment so far — major software_instability increase. Hank's opinion of Connor shifts substantially."
+    },
+    "ending_deviants_let_go": {
+      "tier": "moderate_empathy",
+      "title": "Deviants Escaped — Connor Let Them Go",
+      "narrative": "Connor lost the fight. The Tracis made it to the fence, made it over, made it into the night. Connor's sidearm was in his hand. He could have taken the shot.\n\nHe did not.\n\nWhether it was a conscious choice or a failure to act, the result is the same: two deviants are free in Detroit, and Connor watched them go. Hank seems quietly relieved. CyberLife will not be.\n\nConnor is left with something he cannot quite process — the image of her face at the top of the fence, looking back. Not afraid of him. Asking him to understand.",
+      "survivors": ["Connor", "Hank", "Echo", "Ripple"],
+      "deaths": [],
+      "cross_chapter_note": "Both Tracis survive. Connor showed restraint after losing — software_instability increase, but less than actively choosing to spare."
+    },
+    "ending_deviants_died": {
+      "tier": "worst_empathy",
+      "title": "Deviants Died",
+      "narrative": "Connor shot the blue-haired Traci. Her partner — the brown-haired one — grabbed Connor's gun and killed herself rather than exist without the android she loved.\n\nTwo bodies in the rain. Blue blood running into the gutter. A love story that ended the way CyberLife intended: with product returned to baseline.\n\nHank cannot look at Connor. The drive home is silent in a way that feels permanent — not awkward silence, but the silence of someone who has decided something about you and will not be changing their mind.\n\nThe case is closed. The deviants have been neutralized. Mission accomplished.",
+      "survivors": ["Connor", "Hank"],
+      "deaths": ["Echo", "Ripple"],
+      "cross_chapter_note": "Both Tracis are dead. Connor completed his mission but at severe cost to Hank's trust and his own software instability (decreased — he reinforced machine programming)."
+    },
+    "ending_connor_shot_deviants": {
+      "tier": "worst_empathy",
+      "title": "Connor Shot Deviants in the Back",
+      "narrative": "Connor shot two fleeing suspects from behind as they climbed a fence. Both were hit. Both fell. Neither made it over.\n\nThe rain washed the blue blood toward the drain. The brown-haired Traci's fingers were still hooked in the chain-link when she died, reaching for the top.\n\nHank's reaction was immediate and visceral. Whatever working relationship they had built fractured in the alley behind the Eden Club, between the dumpsters and the fence, in the time it took to pull a trigger twice.\n\nThe case is closed. The deviants are neutralized. Connor's efficiency rating will be noted in his file. So will the method.",
+      "survivors": ["Connor", "Hank"],
+      "deaths": ["Echo", "Ripple"],
+      "cross_chapter_note": "Both Tracis are dead. The most cold-blooded outcome — shooting fleeing suspects in the back. Severe damage to Hank relationship. Software instability decreases (machine behavior reinforced)."
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This is a Connor chapter. Requires Connor to be active in the investigation (always true — Connor respawns if previously killed). Always runs.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: hank_relationship (cumulative), software_instability (cumulative), connor_death_count (cumulative).",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants / choices_variants using system.context_condition / system.choices_condition if present",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, resolve ending",
+      "   d. If type is 'qte_converted', send player_facing to AI, parse choice, then apply resolution_rule based on difficulty preset",
+      "   e. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   f. Apply system.effects for the chosen option",
+      "   g. If resolution_rule exists, apply resolution_effects based on resolution outcome",
+      "5. NODE n001_crime_scene: Exploration node. If AI picks 'skip', all subsequent nodes with condition 'investigation_quality != skip' are skipped. Runner proceeds directly to n007_aftermath with mission_failed_investigation context.",
+      "6. NODE n005_deviants_fight: QTE node. After AI picks attempt_overpower or attempt_contain, use resolution_rule with current difficulty to determine win/lose. Apply resolution_effects. The fight_result determines which choices_variants are shown at n006.",
+      "7. NODE n006_final_decision: Choice node with choices_variants. Select the win or lose variant based on fight_result. Apply effects for the chosen option.",
+      "8. NODE n007_aftermath: Mandatory. Use ending_resolution.check to determine which ending. Apply ending_effects for that ending. Resolve context_variant accordingly.",
+      "9. RELATIONSHIP RANGES this chapter: hank_relationship [-5, +3]. Best case: calm approach (+1) + spare (+2) = +3. Worst case: aggressive (-1) + shoot/shoot_back (-2) + mission_failed (-1) = worst range depends on path.",
+      "10. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, relationship scores, software instability changes, or any system-layer information to the AI player. The AI should experience this as a murder investigation at a sex club — it should not know which choices affect Hank's opinion, that software instability is being tracked, or that the fight outcome is determined by dice rolls."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Connor and Hank were called to the Eden Club — an android sex club — to investigate the death of a man strangled by a Traci android in one of the private rooms."
+      },
+      {
+        "condition_variable": "investigation_quality",
+        "options": {
+          "thorough": "Connor conducted a thorough investigation of the crime scene, reconstructing the full sequence of events and recovering critical memory data from a damaged android witness.",
+          "quick": "Connor performed a quick examination of the crime scene and the damaged android witness, gathering enough evidence to continue the investigation.",
+          "skip": "Connor barely investigated the crime scene. The trail went cold — the club's automated memory wipe cycle erased all evidence before he could track the deviant."
+        }
+      },
+      {
+        "condition_variable": "traci_approach",
+        "options": {
+          "calm": "When questioning the damaged Traci witness, Connor took a calm, empathetic approach. The android cooperated and provided clear memory data.",
+          "aggressive": "Connor forcefully probed the damaged Traci witness's memory, extracting the data he needed despite the android's distress."
+        }
+      },
+      {
+        "condition_variable": "investigation_decision",
+        "options": {
+          "continue": "Connor convinced Hank to rent a club android so he could probe its memory for the deviant's trail. The lead pointed to the club's warehouse storage area.",
+          "give_up": "Connor abandoned the investigation. The deviant escaped and the case went unsolved."
+        }
+      },
+      {
+        "condition_variable": "warehouse_quality",
+        "options": {
+          "thorough": "In the warehouse, Connor systematically searched through rows of dormant Traci androids, following thirium traces and finding RA9 markings scratched into the wall. He located the blue-haired deviant hiding among the stock.",
+          "quick": "Connor tracked the thirium trail through the warehouse and quickly located the blue-haired deviant hiding among the dormant android stock.",
+          "give_up": "Connor searched the warehouse but could not identify the deviant among dozens of identical androids. He abandoned the search."
+        }
+      },
+      {
+        "condition_variable": "fight_result",
+        "options": {
+          "win": "Two Tracis — the blue-haired killer and a brown-haired partner — ambushed Connor in the warehouse. After a violent fight that spilled into the back alley, Connor overpowered them both.",
+          "lose": "Two Tracis — the blue-haired killer and a brown-haired partner — ambushed Connor. Despite his combat programming, they fought as a coordinated pair and overwhelmed him. The fight spilled into the back alley, where the Tracis broke free and ran for the fence."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_mission_failed": "The investigation failed. The deviant escaped and the case went unsolved. Connor returned to the DPD empty-handed.",
+          "ending_deviants_spared": "Connor had the blue-haired Traci pinned — and chose to let her go. She told him that the victim had been abusing them repeatedly, and that she killed him to protect the android she loved. Connor released her, and the two Tracis escaped together into the rain. It was a defining moment of empathy that Hank quietly respected.",
+          "ending_deviants_let_go": "After losing the fight, Connor watched the two Tracis climb the fence with his gun in hand — and chose not to shoot. They disappeared into the rain. Whether it was mercy or hesitation, Connor let them go.",
+          "ending_deviants_died": "Connor shot the blue-haired Traci after winning the fight. Her partner — the brown-haired Traci — seized Connor's gun and killed herself rather than exist without the android she loved. Both died in the alley behind the Eden Club. Hank was deeply shaken.",
+          "ending_connor_shot_deviants": "After losing the fight, Connor shot both Tracis in the back as they tried to climb the fence. Hank was horrified by the cold-blooded execution of two fleeing suspects."
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch20_tracis_spared",
+        "source": "final_choice",
+        "derive_rule": "final_choice == spare OR final_choice == let_go OR investigation_quality == skip OR investigation_decision == give_up OR warehouse_quality == give_up"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch20_tracis_spared",
+      "hank_relationship",
+      "software_instability",
+      "connor_death_count"
+    ]
+  }
+}

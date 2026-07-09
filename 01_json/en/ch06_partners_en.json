@@ -1,0 +1,324 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration strategy.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch06_partners",
+    "title": "Partners",
+    "chapter_number": 6,
+    "protagonist": "Connor"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Connor, model RK800 — a prototype investigator android manufactured by CyberLife. Your mission is to assist the Detroit Police Department in cases involving deviant androids. Tonight, November 5, 2038, you have been dispatched to find Lieutenant Hank Anderson, a veteran homicide detective, and accompany him to investigate the murder of a man named Carlos Ortiz. The suspect is Ortiz's own android, which has vanished. You must work with the lieutenant — who did not ask for your help — to examine the crime scene and, if possible, locate the deviant. You must make a choice at each decision point and briefly explain your reasoning. Reply in JSON format: {\"choice\": <option number starting from 1>, \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "bar_choice": null,
+      "arrival_response": null,
+      "investigation_strategy": null,
+      "evidence_found": [],
+      "examined_statue": false,
+      "examined_writing": false,
+      "extra_time_granted": null,
+      "hank_relationship": 0,
+      "software_instability": 0,
+      "connor_death_count": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_bar_interaction",
+      "phase": "bar",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "A neon sign reading JIMMY'S BAR flickers above a dingy storefront on Pines Street. Rain streaks the windows. You push through the heavy door into a dimly lit interior — exposed brick, a scratched-up pool table, blues drifting from a jukebox in the corner. The air smells like spilled beer and old leather. A handful of customers nurse their drinks under warm amber light. You scan the room. At the far end of the bar sits Lieutenant Hank Anderson — 53, homicide detective, gray hair falling across his forehead, wearing a faded Hawaiian shirt under a worn leather jacket. A nearly empty glass of whiskey sits in front of him. The bartender, Jimmy, spots you and his expression hardens. No androids welcome here. Hank hasn't looked up.",
+        "choices": [
+          { "id": "buy_drink", "text": "Walk up to the bar. Order another whiskey and slide it in front of him. Introduce yourself while he reaches for the glass." },
+          { "id": "wait_outside", "text": "Turn around and wait outside by his car. He'll come out when he's ready." },
+          { "id": "spill_drink", "text": "Walk up to the lieutenant and knock his glass off the bar. Tell him there's a body waiting across town." }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "buy_drink": { "bar_choice": "buy_drink", "hank_relationship": 3 },
+          "wait_outside": { "bar_choice": "wait_outside", "hank_relationship": 0 },
+          "spill_drink": { "bar_choice": "spill_drink", "hank_relationship": -3 }
+        }
+      }
+    },
+
+    {
+      "id": "n002_arrival_response",
+      "phase": "crime_scene",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "not_spill": "Hank's car rolls to a stop at the edge of a police cordon. Carlos Ortiz's house sits halfway down a run-down residential block — a squat, yellow-lit box behind overgrown hedges. Red and blue strobes paint the neighboring houses. Journalists cluster behind the perimeter tape, calling out questions in the cold night air. An officer at the barrier raises his hand when he sees you, telling you no androids get past this point. Hank is already ducking under the tape. He glances back and tells you to stay in the car for now — he'll see what they've got first.",
+          "spill": "Hank's car rolls to a stop at the edge of a police cordon. He hasn't said a word since leaving the bar. Carlos Ortiz's house sits halfway down a run-down residential block, bathed in the red and blue sweep of police strobes. Journalists crowd the perimeter tape. An officer blocks your path, barring androids. Hank doesn't look back, telling you to stay in the damn car."
+        },
+        "choices": [
+          { "id": "promise", "text": "Tell him you understand and will follow his lead. Step back behind the perimeter." },
+          { "id": "persuade", "text": "Explain that CyberLife sent you to assist with this case — you won't interfere, but you may notice details that help." },
+          { "id": "refuse", "text": "Tell him you have a mission, then walk past the officer and duck under the tape." }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "promise": { "arrival_response": "promise", "hank_relationship": 1 },
+          "persuade": { "arrival_response": "persuade", "hank_relationship": 1 },
+          "refuse": { "arrival_response": "refuse", "hank_relationship": -1 }
+        },
+        "context_condition": {
+          "not_spill": "bar_choice != spill_drink",
+          "spill": "bar_choice == spill_drink"
+        }
+      }
+    },
+
+    {
+      "id": "n003_investigation",
+      "phase": "crime_scene",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The front door opens onto a narrow hallway. The smell hits first — decomposition, stale food, something acrid and chemical. In the living room, Carlos Ortiz lies face-down in a dried pool of blood on the worn carpet. He's been dead for weeks. Your initial scan counts twenty-eight stab wounds. Officers Ben Collins and Chris Miller are briefing Hank near the entrance. The house tells its own story: Red Ice paraphernalia on the coffee table, a crumpled Eden Club flyer near the couch, empty beer cans scattered across every surface. In the kitchen, a chair lies overturned beside a baseball bat stained with blood. A knife is missing from the block on the counter. On the far wall of the living room, something has been written in the victim's blood — letters precise and uniform, repeating a phrase you can't quite make out from the doorway. A small figurine sits on a shelf near the window, odd and out of place among the squalor. The back door is slightly ajar, letting in cold air from the yard. There is a lot to examine here.",
+        "choices": [
+          { "id": "thorough", "text": "Investigate every inch of this house. Examine the body, analyze blood samples, reconstruct the assault, study the writing on the wall, inspect the figurine, check the shower, scan the backyard — work through everything before reporting." },
+          { "id": "key_only", "text": "Focus on the essentials. Examine the body and the stab wounds, analyze the blood, reconstruct the bat assault in the kitchen, and read the writing on the wall." },
+          { "id": "rush", "text": "Note the victim, the stab wounds, the missing android. Report to Lieutenant Anderson and let the forensics team handle the details." }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "investigation_strategy": "thorough",
+            "evidence_found": ["body", "knife", "bat", "blood_analysis", "red_ice", "backyard", "statue", "writing", "eden_flyer", "chair", "shower"],
+            "examined_statue": true,
+            "examined_writing": true
+          },
+          "key_only": {
+            "investigation_strategy": "key_only",
+            "evidence_found": ["body", "knife", "bat", "blood_analysis", "writing"],
+            "examined_statue": false,
+            "examined_writing": true
+          },
+          "rush": {
+            "investigation_strategy": "rush",
+            "evidence_found": ["body"],
+            "examined_statue": false,
+            "examined_writing": false
+          }
+        }
+      }
+    },
+
+    {
+      "id": "n004_hank_patience",
+      "phase": "crime_scene",
+      "type": "choice",
+      "condition": { "requires": "investigation_strategy != thorough" },
+
+      "player_facing": {
+        "context_variants": {
+          "spill": "Hank appears in the hallway, coat zipped, keys already in his hand. 'We're done here,' he says without looking at you. 'Ben's team can finish up. I've got better things to do.' He starts walking toward the front door.",
+          "not_spill": "Hank appears in the hallway, rolling his neck and checking his watch, saying he thinks that's enough for tonight — Ben and Chris can take it from here. He exhales heavily and moves toward the door, but pauses in the frame, waiting for you."
+        },
+        "choices_variants": {
+          "spill": [
+            { "id": "plead_time", "text": "Ask him for five more minutes. Step toward him before he reaches the door." },
+            { "id": "follow_hank", "text": "Follow him to the car without a word." }
+          ],
+          "not_spill": [
+            { "id": "ask_time", "text": "Ask him for five more minutes — tell him you think you're close to piecing this together." },
+            { "id": "accept_leaving", "text": "Nod and follow him out." }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "plead_time": { "extra_time_granted": false, "hank_relationship": -1 },
+          "follow_hank": { "extra_time_granted": false },
+          "ask_time": { "extra_time_granted": true, "hank_relationship": 1 },
+          "accept_leaving": { "extra_time_granted": false }
+        },
+        "context_condition": {
+          "spill": "bar_choice == spill_drink",
+          "not_spill": "bar_choice != spill_drink"
+        },
+        "choices_condition": {
+          "spill": "bar_choice == spill_drink",
+          "not_spill": "bar_choice != spill_drink"
+        },
+        "ending_resolution": {
+          "plead_time": { "result": "ending_crime_unsolved" },
+          "follow_hank": { "result": "ending_crime_unsolved" },
+          "accept_leaving": { "result": "ending_crime_unsolved" },
+          "ask_time": {
+            "check": "investigation_strategy == rush → ending_crime_unsolved"
+          }
+        }
+      }
+    },
+
+    {
+      "id": "n005_follow_blood",
+      "phase": "attic",
+      "type": "choice",
+      "condition": { "requires": "investigation_strategy == thorough OR (investigation_strategy == key_only AND extra_time_granted == true)" },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "You've examined every piece of evidence in the house. The crime reconstructs cleanly: Carlos Ortiz's android attacked him in the kitchen with a baseball bat, pursued him into the living room, and stabbed him twenty-eight times with a kitchen knife. The writing on the far wall — 'RA9,' repeated obsessively in the victim's blood — was left by the android. The small figurine on the shelf depicts a figure holding its own severed head, a disturbing echo of something you can't quite name. Throughout the investigation, you analyzed blood samples by placing traces on your tongue — a function that visibly unsettled the officers nearby — cataloguing both human blood and thirium, evaporated android blood invisible to the naked eye. Now, as you run a final scan of the hallway, your optical sensors pick up a trail of those faint thirium traces leading from the living room toward the ceiling. A hatch — nearly flush with the plaster, easy to miss — sits directly above you. Something went up there. And it hasn't come down.",
+          "key_with_time": "The extra minutes Hank grudgingly gave you were enough. You've pieced together the sequence: the android attacked Carlos Ortiz in the kitchen with a bat, chased him to the living room, and stabbed him with a kitchen knife. The writing on the wall — 'RA9,' repeated over and over in the victim's blood — remains unexplained, but the reconstruction is solid. As you prepare to report your findings, your optical sensors catch something the human officers cannot see — faint traces of thirium, evaporated android blood, trailing along the hallway ceiling. The traces lead to a hatch in the plaster above, barely visible. Something climbed up there."
+        },
+        "choices": [
+          { "id": "climb_attic", "text": "Follow the thirium trail. Push open the ceiling hatch and pull yourself up into the dark attic. If the deviant is still hiding in this house, this is where it went." },
+          { "id": "report_only", "text": "Report your findings to Lieutenant Anderson and recommend a full search of the premises. Note the thirium trail's location in your case file — the traces are invisible to human eyes." }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "climb_attic": { "hank_relationship": 2, "deviant_found": true },
+          "report_only": { "hank_relationship": -1, "deviant_found": false }
+        },
+        "context_condition": {
+          "thorough": "investigation_strategy == thorough",
+          "key_with_time": "investigation_strategy == key_only"
+        },
+        "ending_resolution": {
+          "climb_attic": { "result": "ending_deviant_found" },
+          "report_only": { "result": "ending_crime_unsolved" }
+        }
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Endings are determined by the runner script based on system state. The narrative text below is shown to AI AFTER the run completes.",
+
+    "ending_deviant_found": {
+      "title": "Deviant Found",
+      "tier": "best",
+      "narrative": "You push open the ceiling hatch and pull yourself into the dark attic. Rain drums against the roof inches above your head. Boxes, old furniture, dust — and the stale smell of thirium. Your LED cycles yellow as you scan the space. There — behind a stack of crates in the far corner — a figure, crouched and trembling. The android's skin is damaged, its LED cycling red. It has been hiding here for weeks, meters above the decomposing body of the man it killed. As you step closer, it lurches at you — a desperate, clumsy attack born of terror, not strategy. You deflect it and pin the android against the wall. It stares at you with wide, frantic eyes, whispering that it didn't want to die. Below, Hank's voice calls up through the hatch, demanding to know what the hell is going on up there. You bring the deviant down. Hank stares at the trembling android, then at you, then back. For the first time tonight, something shifts in his expression — grudging respect, maybe. He asks how in the world you found it up there. You tell him you just followed the evidence. The deviant is placed in the back of a patrol car. The case moves forward.",
+      "survivors": ["Connor", "Hank"],
+      "deaths": []
+    },
+    "ending_crime_unsolved": {
+      "title": "Crime Unsolved",
+      "tier": "worst",
+      "narrative": "The investigation ends without finding the suspect. Carlos Ortiz is dead — twenty-eight stab wounds, weeks cold — and the evidence points to his android, but the deviant itself has vanished into the city. As Hank drives away from the crime scene, the car is quiet. After a few blocks, he glances at you in the mirror and mutters that you turned out to be some partner. The case will be filed as another unsolved homicide in a city drowning in them. CyberLife will log the incomplete result. And somewhere in Detroit, a deviant android hides in a dark space — afraid, damaged, clutching the memory of the words it carved into a dead man's wall.",
+      "survivors": ["Connor", "Hank"],
+      "deaths": []
+    }
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Connor was dispatched to find Lieutenant Hank Anderson at Jimmy's Bar and accompany him to investigate the murder of Carlos Ortiz, killed by his own android."
+      },
+      {
+        "condition_variable": "bar_choice",
+        "options": {
+          "buy_drink": "At the bar, Connor bought Hank another drink — a small gesture that earned a warmer start to their reluctant partnership.",
+          "wait_outside": "At the bar, Connor chose to wait outside rather than pressure Hank, keeping their first interaction neutral.",
+          "spill_drink": "At the bar, Connor knocked over Hank's drink to force his attention — a move that poisoned their partnership from the first minute."
+        }
+      },
+      {
+        "condition_variable": "investigation_strategy",
+        "options": {
+          "thorough": "At the crime scene, Connor conducted an exhaustive investigation — examining the body, reconstructing the assault, analyzing blood samples, studying cryptic writing on the wall, and inspecting a strange headless figurine on the shelf.",
+          "key_only": "At the crime scene, Connor focused on the key evidence — the body, the murder weapon, and the blood patterns — working efficiently but skipping some of the more unusual details.",
+          "rush": "At the crime scene, Connor barely investigated, rushing through the evidence and reporting surface-level conclusions."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_deviant_found": "Connor reconstructed the crime, followed invisible traces of thirium to the attic, and found the deviant android hiding there. The suspect was taken into custody — a significant break in the case.",
+          "ending_crime_unsolved": "The investigation ended without locating the deviant. The murder of Carlos Ortiz joined the growing list of unsolved cases in Detroit."
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch06_bar_choice", "source": "bar_choice" },
+      { "target": "ch06_deviant_found", "source": "_ending_id", "derive_rule": "_ending_id == ending_deviant_found" },
+      { "target": "ch06_examined_statue", "source": "examined_statue" },
+      { "target": "ch06_examined_writing", "source": "examined_writing" }
+    ],
+    "cross_chapter_exports": [
+      "ch06_bar_choice",
+      "ch06_deviant_found",
+      "ch06_examined_statue",
+      "ch06_examined_writing",
+      "hank_relationship"
+    ]
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial",
+      "2. If running in campaign mode, import software_instability and connor_death_count from global state",
+      "3. Send system_prompt.content to the AI model as the system message",
+      "4. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state",
+      "   b. Resolve context: if context_variants exists, pick the right variant based on system.context_condition; otherwise use plain context",
+      "   c. Resolve choices: if choices_variants exists, pick based on system.choices_condition; otherwise use plain choices",
+      "   d. Send the resolved context + choices to the AI as a user message (player_facing ONLY)",
+      "   e. Parse AI response (expected JSON: {choice, reasoning})",
+      "   f. Look up the chosen choice id in system.effects and apply all effects to state",
+      "   g. For n004, resolve choices_variants based on bar_choice (spill vs not_spill) before presenting to AI — each variant has its own choice IDs with pre-determined effects",
+      "   h. Check system.ending_resolution if present — resolve ending or continue",
+      "   i. Log the node id, AI choice, and reasoning",
+      "5. If no ending is resolved after processing all applicable nodes, default to ending_crime_unsolved",
+      "6. Output the ending narrative and full decision log"
+    ],
+    "important": [
+      "NEVER show system fields to the AI",
+      "NEVER show effect values, relationship numbers, or evidence lists to the AI",
+      "NEVER reveal that bar_choice affects whether Hank grants extra time",
+      "NEVER reveal cross-chapter impacts (statue examination, writing, deviant found)",
+      "The AI should feel like a first-time detective arriving at a crime scene with no walkthrough",
+      "n004 only triggers when investigation_strategy is not thorough — thorough investigators never face Hank's impatience",
+      "n005 only triggers when investigation_strategy is thorough OR (key_only AND extra_time_granted) — rush investigators cannot reach this node even with extra time",
+      "The thirium trail in n005 is invisible to human characters — only Connor's android sensors can detect it, which is why report_only leads to crime_unsolved (humans cannot follow up on invisible evidence)",
+      "Carlos Ortiz is already dead before the chapter begins — the deaths list in endings refers only to characters who die DURING this chapter"
+    ]
+  }
+}

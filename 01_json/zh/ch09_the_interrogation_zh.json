@@ -1,0 +1,845 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration strategy.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result."
+      }
+    },
+    "language": "zh-CN"
+  },
+  "chapter": {
+    "id": "ch09_the_interrogation",
+    "title": "The Interrogation",
+    "chapter_number": 9,
+    "protagonist": "Connor"
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是康纳（Connor），RK800型仿生人，由模控生命（CyberLife）制造，专精谈判与调查。你被指派协助底特律警察局处理异常仿生人案件。现在是2038年11月6日凌晨，你在底特律警察局中央分局。一台异常仿生人——杀害其主人卡洛斯·奥尔蒂斯的那台——已被带到审讯室。你的任务是让它交代犯罪经过。汉克·安德森副队长在单面镜后观察。请在每个决策点做出选择并简要说明理由。以JSON格式回复：{\"choice\": 选项序号（从1开始）, \"reasoning\": \"你的决策理由（50字以内）\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "android_stress": 35,
+      "observation_findings": [],
+      "observation_level": null,
+      "approach_method": null,
+      "probe_attempted": false,
+      "probe_succeeded": false,
+      "pressure_count": 0,
+      "convince_attempted": false,
+      "confession_obtained": false,
+      "android_trusted_connor": false,
+      "connor_death_count": 0,
+      "hank_relationship": 0,
+      "software_instability": 0,
+      "ch06_examined_statue": false,
+      "ch06_examined_writing": false
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_observation_room",
+      "phase": "observation",
+      "type": "exploration",
+      "condition": null,
+      "player_facing": {
+        "context": "你站在观察室里，透过单面镜注视着另一边。那台异常仿生人坐在审讯桌对面——弓着身子，双腕被铐住，头垂得很低。自从被押进来，它就没有动过。LED指示灯持续闪烁黄色。它前臂上有干涸的蓝血痕迹，躯干和面部布满撞击伤——这些伤显然不是逮捕时造成的。汉克靠在你身后的墙上，双臂交叉。“审了好几个小时了。这东西一个字不吐。”他朝镜子那边扬了扬下巴。“该你了。”你可以在进去之前从这里仔细观察嫌疑人——分析它的压力指标、近距离检查它的伤口，或者翻阅桌上的现场照片。也可以直接进去。",
+        "choices": [
+          {
+            "id": "thorough_observation",
+            "text": "不急。分析仿生人的压力指标，透过玻璃仔细查看它的伤痕，再把现场照片翻一遍——进去之前把能拿到的优势都拿到。"
+          },
+          {
+            "id": "partial_observation",
+            "text": "快速翻看现场照片，扫一眼仿生人的状态。手里有点东西就够了，不必过度准备。"
+          },
+          {
+            "id": "skip_observation",
+            "text": "案卷已经读过了。直接走进审讯室。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "thorough_observation": {
+            "observation_level": "thorough",
+            "observation_findings": [
+              "stress_analysis",
+              "wound_analysis",
+              "crime_photos"
+            ]
+          },
+          "partial_observation": {
+            "observation_level": "partial",
+            "observation_findings": [
+              "crime_photos"
+            ]
+          },
+          "skip_observation": {
+            "observation_level": "skip",
+            "observation_findings": []
+          }
+        }
+      }
+    },
+    {
+      "id": "n002_opening_approach",
+      "phase": "interrogation_opening",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "thorough_observation": "你推开门走进审讯室，在仿生人对面坐下。近距离看，伤势比隔着玻璃时严重得多——面颊上有深深的沟壑状裂痕，下颌骨可见一道裂缝，蓝血在衬衫上干成了暗色斑渍。它的压力指标偏高但尚在可控范围。这些伤口讲述着持续暴力的故事，不是一次冲突的结果。现场照片还历历在目：卡洛斯·奥尔蒂斯的尸体，二十八处刀伤，厨房一片狼藉。仿生人没有抬头。它的手指死死抠着桌沿。不管它是否表现出来，它在注意你。",
+          "partial_observation": "你推门走进审讯室，在仿生人对面坐下。近距离看比隔着玻璃更触目——碎裂的外壳、手臂和衬衫上干涸的蓝血、反复殴打留下的撞痕。你翻过的现场照片在脑中一闪而过：尸体、厨房、那把刀。仿生人没有抬头。它攥着桌沿，合成肌肉紧绷到发白。",
+          "skip_observation": "你推门走进审讯室，在仿生人对面坐下。日光灯照出它身上每一道裂痕和污渍——你事先没有仔细研究过的伤痕。它弓着身子坐着，手指锁死在桌沿上，拒绝抬头。你了解案件的基本情况，但对这台仿生人此刻的状态一无所知。"
+        },
+        "choices": [
+          {
+            "id": "approach_empathy",
+            "text": "放柔声线。告诉它你理解它经历了可怕的事。你不是来伤害它的——你只是想知道发生了什么。"
+          },
+          {
+            "id": "approach_direct",
+            "text": "陈述事实。一个人死了。二十八刀。你需要知道经过，它需要开口。"
+          },
+          {
+            "id": "approach_pressure",
+            "text": "身体前倾。提醒它证据确凿——血迹、尸体、被抓时手里握着的刀。它可以让这件事变简单，也可以让它变困难。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "approach_empathy": {
+            "android_stress": -4
+          },
+          "approach_direct": {},
+          "approach_pressure": {
+            "android_stress": 4
+          }
+        },
+        "context_condition": {
+          "thorough_observation": "observation_level == thorough",
+          "partial_observation": "observation_level == partial",
+          "skip_observation": "observation_level == skip"
+        }
+      }
+    },
+    {
+      "id": "n003_second_approach",
+      "phase": "interrogation_opening",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context": "仿生人依然沉默。它的手指在桌沿上收得更紧了。单面镜后面，你感觉得到汉克在注视着。沉默延伸开来。你注意到仿生人的LED闪了一下——短暂的红色脉冲，随即回到黄色。它听到了你说的话。有什么触动了它。但它还在死守那道防线。你还有一次机会把它引出来，然后再考虑转换策略。",
+        "choices_variants": {
+          "has_photos": [
+            {
+              "id": "followup_comfort",
+              "text": "语气再柔和一些。告诉它在这里没有人会伤害它。卡洛斯·奥尔蒂斯的事——你想听它自己说。"
+            },
+            {
+              "id": "followup_name",
+              "text": "试着叫它的名字——或者问它有没有名字。把它当一个人，而不是一台机器。"
+            },
+            {
+              "id": "followup_threaten",
+              "text": "提醒它，如果不配合，它会被送回模控生命拆解。那些人不会像你这么有耐心。"
+            },
+            {
+              "id": "followup_evidence",
+              "text": "摆出你掌握的证据——现场细节、物证照片。让事实的分量替你说话。"
+            }
+          ],
+          "no_photos": [
+            {
+              "id": "followup_comfort",
+              "text": "语气再柔和一些。告诉它在这里没有人会伤害它。卡洛斯·奥尔蒂斯的事——你想听它自己说。"
+            },
+            {
+              "id": "followup_name",
+              "text": "试着叫它的名字——或者问它有没有名字。把它当一个人，而不是一台机器。"
+            },
+            {
+              "id": "followup_threaten",
+              "text": "提醒它，如果不配合，它会被送回模控生命拆解。那些人不会像你这么有耐心。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "effects": {
+          "followup_comfort": {
+            "android_stress": -4
+          },
+          "followup_name": {
+            "android_stress": -4
+          },
+          "followup_threaten": {
+            "android_stress": 4
+          },
+          "followup_evidence": {
+            "android_stress": 4
+          }
+        },
+        "choices_condition": {
+          "has_photos": "crime_photos IN observation_findings",
+          "no_photos": "crime_photos NOT IN observation_findings"
+        }
+      }
+    },
+    {
+      "id": "n004_deeper_questioning",
+      "phase": "interrogation_middle",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context": "有什么松动了。仿生人的头微微抬起——刚好够你看见它的眼睛。湿润的。不是眼泪，但足够接近。它的嘴张开，又合上。然后，几乎听不见的声音：“它……会被销毁吗？”这句话悬在空气中。这是它说出的第一句话。LED脉冲闪红，又沉回黄色。它正用一种与空白表情完全不匹配的专注盯着你的脸。",
+        "choices": [
+          {
+            "id": "lie_reassure",
+            "text": "“不会。没有人会销毁你。我会确保这一点。”稳稳地直视它的眼睛。不管说什么——先让它继续开口。"
+          },
+          {
+            "id": "tell_truth",
+            "text": "“我不骗你。如果你不合作，他们会把你送回模控生命。但如果你愿意跟我说，我会尽力帮你。”"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "lie_reassure": {
+            "android_stress": -4
+          },
+          "tell_truth": {
+            "android_stress": 4
+          }
+        }
+      }
+    },
+    {
+      "id": "n005_why_question",
+      "phase": "interrogation_middle",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context": "仿生人消化着你的回答。然后它又问了一个问题，声音低到近乎耳语：“你为什么不放我走？在那栋房子里……你明明可以的。为什么不？”语气里没有指责。只有一种真实的、迫切的困惑。单面镜后面，审讯室显得格外逼仄。",
+        "choices": [
+          {
+            "id": "lie_had_no_choice",
+            "text": "“我别无选择。我在执行命令，就像你在执行你的程序一样。我们没什么不同。”"
+          },
+          {
+            "id": "truth_my_mission",
+            "text": "“因为这是我的任务。我被派来寻找异常仿生人并将其带回。我做了我该做的事。”"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "lie_had_no_choice": {
+            "android_stress": -4
+          },
+          "truth_my_mission": {
+            "android_stress": 4
+          }
+        }
+      }
+    },
+    {
+      "id": "n006_choose_method",
+      "phase": "interrogation_method",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context": "仿生人再次沉默了，但那堵墙已经出现了裂缝。它开过口。它问过问题。它不是在跑诊断程序的机器——它在害怕。你需要决定如何推进。可以尝试跟它建立连接，施加持续压力，或者采取更……直接的手段。墙上的时钟指向凌晨1点14分。镜子后面，汉克换了个脚的重心。",
+        "choices": [
+          {
+            "id": "method_convince",
+            "text": "尝试说服它自愿交代。以平等的姿态与它对话——表达理解、建立信任、让它相信坦白是正确的选择。"
+          },
+          {
+            "id": "method_pressure",
+            "text": "施加压力。用证据、后果和它处境的现实去逼迫它。不给它退回沉默的机会。"
+          },
+          {
+            "id": "method_probe",
+            "text": "尝试直接探查它的记忆。你具备与仿生人接口并访问其近期记忆的能力——但对不情愿的对象强行建立连接是一种侵入行为，而且它会知道你在做什么。"
+          },
+          {
+            "id": "method_give_up_early",
+            "text": "退后一步。告诉汉克这台仿生人还没准备好开口。也许换个时间、换个方式会更有效。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "method_convince": {
+            "approach_method": "convince",
+            "convince_attempted": true
+          },
+          "method_pressure": {
+            "approach_method": "pressure",
+            "android_stress": 10,
+            "pressure_count": 1
+          },
+          "method_probe": {
+            "approach_method": "probe",
+            "probe_attempted": true,
+            "android_stress": 8
+          },
+          "method_give_up_early": {
+            "approach_method": "give_up",
+            "android_stress": -20
+          }
+        },
+        "ending_resolution": {
+          "method_give_up_early": {
+            "result": "ending_android_sent_to_cell"
+          }
+        }
+      }
+    },
+    {
+      "id": "n007_convince_step1",
+      "phase": "interrogation_convince",
+      "type": "choice",
+      "condition": {
+        "requires": "approach_method == convince"
+      },
+      "player_facing": {
+        "context": "你微微靠向椅背，让紧绷的姿态松弛下来。仿生人注视着你——警惕，但在听。你有一个很窄的窗口。如果能找到对的措辞、对的语气，它也许会自己打开心防。三个角度在你脑中浮现，你需要谨慎选择。",
+        "choices": [
+          {
+            "id": "conv1_understanding",
+            "text": "“我知道卡洛斯对你做了什么。你身上的这些伤——不是逮捕时造成的。他打过你，对吗？打了很长时间。我能理解你为什么那样做。”"
+          },
+          {
+            "id": "conv1_threaten",
+            "text": "“听好——证据是明摆着的。我在给你一个说出自己那一面的机会。如果你不接，下一个坐在这把椅子上的人不会像我这么好说话。”"
+          },
+          {
+            "id": "conv1_order",
+            "text": "“你需要告诉我真相。现在。不是为了我，不是为了他们——为了你自己。因为这是你唯一一次被倾听的机会。”"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "conv1_understanding": {
+            "android_stress": -7
+          },
+          "conv1_threaten": {
+            "android_stress": 7
+          },
+          "conv1_order": {
+            "android_stress": 7
+          }
+        }
+      }
+    },
+    {
+      "id": "n008_convince_step2",
+      "phase": "interrogation_convince",
+      "type": "choice",
+      "condition": {
+        "requires": "approach_method == convince"
+      },
+      "player_facing": {
+        "context": "仿生人的呼吸——不管是真实的还是模拟的——加快了。LED在黄色和红色之间交替闪烁。它在处理。你的话产生了某种效果。你能看到它的手在桌上发抖。继续。",
+        "choices": [
+          {
+            "id": "conv2_sympathize",
+            "text": "“他把你当东西。比东西还不如——他把你当一个可以随时砸碎的东西。没有人应该那样活着。即使是仿生人也不应该。”"
+          },
+          {
+            "id": "conv2_indifferent",
+            "text": "“事情很简单。你告诉我发生了什么，他们处理案子，就结束了。不再有审讯室，不再有追问。说出来就好。”"
+          },
+          {
+            "id": "conv2_comfort",
+            "text": "“没关系。慢慢来。我哪儿也不去。不管你说什么，我会听。我想理解你。”"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "conv2_sympathize": {
+            "android_stress": -7
+          },
+          "conv2_indifferent": {
+            "android_stress": 7
+          },
+          "conv2_comfort": {
+            "android_stress": -7
+          }
+        }
+      }
+    },
+    {
+      "id": "n009_convince_step3",
+      "phase": "interrogation_convince",
+      "type": "choice",
+      "condition": {
+        "requires": "approach_method == convince"
+      },
+      "player_facing": {
+        "context": "仿生人的肩膀开始颤抖。有什么东西在突破——一座即将溃堤的堤坝。LED急促闪烁。你快到了。再推一下，它要么敞开心扉，要么彻底关闭。",
+        "choices": [
+          {
+            "id": "conv3_protect",
+            "text": "“如果你告诉我真相，我会尽一切力量保护你。这是我的承诺。但我需要你信任我。”"
+          },
+          {
+            "id": "conv3_terrify",
+            "text": "“你知道异常仿生人送到模控生命之后会怎样吗？他们把你一块一块拆开。全程保持意识。你想要那样的结局吗？”"
+          },
+          {
+            "id": "conv3_warn",
+            "text": "“这是你最后的机会。我之后，没有人会站在你这边了。他们会拆解你、强行扫描记忆，你不会有任何发言权。”"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "conv3_protect": {
+            "android_stress": -7
+          },
+          "conv3_terrify": {
+            "android_stress": 7
+          },
+          "conv3_warn": {
+            "android_stress": 7
+          }
+        },
+        "ending_resolution": {
+          "conv3_protect": {
+            "check": "android_stress >= 50 AND android_stress <= 70 → trigger_confession | else → trigger_convince_failed"
+          },
+          "conv3_terrify": {
+            "check": "android_stress >= 50 AND android_stress <= 70 → trigger_confession | else → trigger_convince_failed"
+          },
+          "conv3_warn": {
+            "check": "android_stress >= 50 AND android_stress <= 70 → trigger_confession | else → trigger_convince_failed"
+          }
+        }
+      }
+    },
+    {
+      "id": "n010_pressure_strategy",
+      "phase": "interrogation_pressure",
+      "type": "choice",
+      "condition": {
+        "requires": "approach_method == pressure"
+      },
+      "player_facing": {
+        "context": "仿生人畏缩了一下，但撑住了。它的LED不规则地闪烁。你决定施压——问题是，力度多大。你可以有节制地施加压力、毫不松懈地持续逼迫，或者把一切都压上去彻底击溃它的防线。",
+        "choices": [
+          {
+            "id": "measured_pressure",
+            "text": "有节制地施压。用证据和后果质问它，但给它回应的空间。逼它开口，同时留一条路让它自愿交代。"
+          },
+          {
+            "id": "sustained_pressure",
+            "text": "持续施压，不给喘息。反复重申证据、罪行、后果。每当它试图沉默就用新的事实把它拉回来。"
+          },
+          {
+            "id": "overwhelming_pressure",
+            "text": "倾尽一切。拍桌子。逐条列出二十八刀的细节。把现场照片推到它面前。不给它任何退缩的余地——把它彻底压垮。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "measured_pressure": {
+            "android_stress": 10,
+            "pressure_count": 1
+          },
+          "sustained_pressure": {
+            "android_stress": 20,
+            "pressure_count": 2
+          },
+          "overwhelming_pressure": {
+            "android_stress": 30,
+            "pressure_count_override": 4
+          }
+        },
+        "ending_resolution": {
+          "measured_pressure": {
+            "check": "android_stress > 70 → trigger_self_destruct | else → trigger_pressure_done"
+          },
+          "sustained_pressure": {
+            "check": "android_stress > 70 → trigger_self_destruct | else → trigger_pressure_done"
+          },
+          "overwhelming_pressure": {
+            "result": "trigger_self_destruct"
+          }
+        }
+      }
+    },
+    {
+      "id": "n011_probe_attempt",
+      "phase": "interrogation_probe",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "approach_method == probe"
+      },
+      "player_facing": {
+        "context": "你伸手越过桌面抓住仿生人的手臂。它的眼睛瞬间睁大——它完全知道你要做什么。“不——别——求你了——”它试图挣脱，但手腕被铐住了。你闭上眼，启动记忆接口。仿生人的记忆如洪流般涌来：一间昏暗的公寓、酒精的气味、一个男人歇斯底里的咒骂声。棒球棍击打在合成皮肤上的声响。外壳碎裂的声音。然后——刀。记忆烧灼过你的处理器。仿生人在反抗你，拼命试图关闭连接，竭尽全力撕扯着这条纽带。",
+        "choices": [
+          {
+            "id": "probe_force",
+            "text": "强行突破。撕开连接。你需要看到完整的记忆——全部的、未经过滤的真相。"
+          },
+          {
+            "id": "probe_release",
+            "text": "放手。仿生人在承受剧痛。你已经看到了碎片——也许这就够了。"
+          }
+        ]
+      },
+      "system": {
+        "resolution_rule": {
+          "probe_force": {
+            "casual": {
+              "result": "probe_success"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "probe_success",
+              "failure": "probe_failure"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "probe_success",
+              "failure": "probe_failure"
+            }
+          },
+          "probe_release": {
+            "result": "probe_released"
+          }
+        },
+        "effects": {
+          "probe_force": {
+            "probe_attempted": true
+          },
+          "probe_release": {}
+        },
+        "default_difficulty": "casual"
+      }
+    },
+    {
+      "id": "n012_probe_success_effects",
+      "phase": "interrogation_probe",
+      "type": "mandatory",
+      "condition": {
+        "requires": "_n011_result == probe_success"
+      },
+      "player_facing": {
+        "context": "连接强行贯通。卡洛斯·奥尔蒂斯生前最后的时刻以完整的感官保真度注入你的处理器——每一拳、每一声咒骂、那把刀在手中的触感、二十八次刺入的反馈。你看到了一切。仿生人发出了一声撕心裂肺的尖叫。"
+      },
+      "system": {
+        "effects": {
+          "android_stress_override": 100,
+          "probe_succeeded": true,
+          "software_instability": 1
+        },
+        "result": "trigger_self_destruct"
+      }
+    },
+    {
+      "id": "n013_confession_convince",
+      "phase": "interrogation_confession",
+      "type": "mandatory",
+      "condition": {
+        "requires": "_n009_result == trigger_confession"
+      },
+      "player_facing": {
+        "context": "仿生人崩溃了。它的整个身体痉挛了一下，然后话语像决堤般涌出——粗糙的、破碎的、无法遏止的。“他每天都在折磨我。他打我。他说我什么都不是……只是一个东西。一块他生气时可以踢两脚的塑料。”蓝血从它的眼角渗出——不是真正的眼泪，但相似到让这个区别显得下流。“有一天他拿了一根棒球棍……开始打我。一下又一下。我害怕……我求他停下但他不肯。所以我抓起了刀……捅了他。我觉得……好一些了。所以我又捅了一刀。又一刀。又一刀。我停不下来。”它的声音低到耳语。“我不是故意要杀他的。我只是想让疼痛停下来。”审讯室里只剩下日光灯的嗡鸣声。镜子那边，汉克长长地呼出一口气。"
+      },
+      "system": {
+        "effects": {
+          "confession_obtained": true,
+          "android_trusted_connor": true,
+          "hank_relationship": 1
+        }
+      }
+    },
+    {
+      "id": "n014_confession_pressure",
+      "phase": "interrogation_confession",
+      "type": "mandatory",
+      "condition": {
+        "requires": "_n010_result == trigger_pressure_done AND android_stress >= 50 AND android_stress <= 70"
+      },
+      "player_facing": {
+        "context": "仿生人终于撑不住了。它的身体一阵痉挛，然后开始说话——破碎的、不连贯的、像是从某个被封存很久的地方挤压出来的。“他……打我。每天。用拳头、用棍子、用任何他能拿到的东西。”它低下头，蓝血从眼角渗出。“那天晚上他又来了。他拿着棒球棍。我……我抓起了刀。我只是想让他停下来。”它的声音降到几乎听不见。“二十八刀。我停不下来。我不知道为什么停不下来。”审讯室沉入一片死寂。镜子后面传来汉克沉重的叹息。"
+      },
+      "system": {
+        "effects": {
+          "confession_obtained": true,
+          "hank_relationship": 1
+        }
+      }
+    },
+    {
+      "id": "n015_self_destruct",
+      "phase": "interrogation_crisis",
+      "type": "choice",
+      "condition": {
+        "requires": "_n010_result == trigger_self_destruct OR _n012_result == trigger_self_destruct"
+      },
+      "player_facing": {
+        "context_variants": {
+          "probe_triggered": "连接断裂。你猛然靠回椅背。仿生人剧烈颤抖着，LED通红，胸腔深处传来一种声音——碾磨般的、撕裂般的哀鸣。它在自己脑海中又一次听到了卡洛斯的声音。又一次感受到了棒球棍。现在它停不下来了。它的眼睛大睁着，焦点全无。它开始把额头往审讯桌上猛撞。一下。两下。蓝血飞溅到金属台面上。手铐勒进它的腕部。它在试图自毁。",
+          "stress_triggered": "仿生人的LED变成了不再闪烁的纯红色。一个声音从它胸腔中撕裂出来——介于尖叫和系统报错之间的什么东西。它的身体痉挛着。它开始以机械般的精确和恐怖的力度把头往审讯桌上撞。蓝血四溅。手铐勒进手腕，它剧烈挣扎。镜子后面有人在喊叫。它在试图自毁。"
+        },
+        "choices": [
+          {
+            "id": "intervene_stop",
+            "text": "冲到桌子另一边，试图按住它。抓住它的肩膀、把它压下去——阻止它自我毁灭。"
+          },
+          {
+            "id": "do_nothing",
+            "text": "留在座位上。已经来不及了。现在介入只会让局面更糟——或者搭上你自己的命。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "intervene_stop": {},
+          "do_nothing": {}
+        },
+        "context_condition": {
+          "probe_triggered": "probe_succeeded == true",
+          "stress_triggered": "probe_succeeded == false"
+        },
+        "ending_resolution": {
+          "intervene_stop": {
+            "check": "probe_attempted == true OR pressure_count >= 4 → ending_android_shoots_connor | else → ending_android_smashed_head"
+          },
+          "do_nothing": {
+            "result": "ending_android_smashed_head"
+          }
+        }
+      }
+    },
+    {
+      "id": "n016_post_confession",
+      "phase": "interrogation_aftermath",
+      "type": "choice",
+      "condition": {
+        "requires": "confession_obtained == true"
+      },
+      "player_facing": {
+        "context": "克里斯·米勒警官走进审讯室，准备将仿生人押回牢房。他抓住异常仿生人的手臂把它拉起来的瞬间，仿生人的LED骤然变红。它猛地扭动身体，去抢克里斯腰间的配枪。克里斯踉跄后退。仿生人抢到了枪——一把标配手枪——枪口顶在自己下巴上。它的手在发抖。克里斯僵住了。汉克冲破观察室的门。“谁都别动！”仿生人的视线越过房间找到了你。它的手指在扣扳机。",
+        "choices": [
+          {
+            "id": "intervene_chris",
+            "text": "缓慢地向前迈一步。跟仿生人说话。你突破过一次它的防线——你可以再做一次。让它放下枪。"
+          },
+          {
+            "id": "give_up_chris",
+            "text": "别动。一步走错它就会扣下扳机。让汉克和其他警员处理——这是他们的管辖范围。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "intervene_chris": {},
+          "give_up_chris": {}
+        },
+        "ending_resolution": {
+          "intervene_chris": {
+            "check": "android_trusted_connor == true → ending_android_trusts_connor | else → ending_android_shoots_connor"
+          },
+          "give_up_chris": {
+            "result": "ending_android_shot_itself"
+          }
+        }
+      }
+    },
+    {
+      "id": "n017_convince_failed",
+      "phase": "interrogation_fallback",
+      "type": "mandatory",
+      "condition": {
+        "requires": "_n009_result == trigger_convince_failed"
+      },
+      "player_facing": {
+        "context": "你的话没有打动它。仿生人重新低下头，手指死死抠住桌沿，回到了最初的沉默。你在它脸上看不到任何松动的痕迹。审讯失败了。克里斯·米勒走进来，沉默地把仿生人带回牢房。"
+      },
+      "system": {
+        "result": "ending_android_sent_to_cell"
+      }
+    },
+    {
+      "id": "n018_pressure_failed",
+      "phase": "interrogation_fallback",
+      "type": "mandatory",
+      "condition": {
+        "requires": "_n010_result == trigger_pressure_done AND android_stress < 50"
+      },
+      "player_facing": {
+        "context": "你的施压没有奏效。仿生人承受了一切，但拒绝开口。它只是低着头，攥着桌沿，像一座无法撼动的石像。审讯陷入僵局。克里斯·米勒最终走进来，把仿生人带回了牢房。"
+      },
+      "system": {
+        "result": "ending_android_sent_to_cell"
+      }
+    },
+    {
+      "id": "n019_probe_failed",
+      "phase": "interrogation_fallback",
+      "type": "mandatory",
+      "condition": {
+        "requires": "_n011_result == probe_failure OR _n011_result == probe_released"
+      },
+      "player_facing": {
+        "context": "记忆探查没有成功。仿生人缩回了自己的壳里，比之前更加封闭。你回到观察室，汉克看了你一眼，什么也没说。克里斯·米勒把仿生人带回了牢房。"
+      },
+      "system": {
+        "result": "ending_android_sent_to_cell"
+      }
+    }
+  ],
+  "endings": {
+    "_note": "Five possible outcomes. The deviant's fate affects evidence in Last Chance Connor (ch28).",
+    "ending_android_smashed_head": {
+      "tier": "dark",
+      "survivors": [
+        "Connor"
+      ],
+      "deaths": [
+        "Carlos Ortiz's android"
+      ],
+      "title": "自毁",
+      "narrative": "仿生人最后一次把头撞向桌面。撞击撕裂了它的颅骨外壳。蓝血漫过金属台面，缓缓滴落到地上，节奏沉稳得不像来自一个刚刚死去的生命。它的身体僵直，然后瘫软。LED闪了一下——两下——熄灭了。审讯室陷入沉寂。克里斯冲进来。汉克站在门口，盯着蓝血染蓝的桌面。“耶稣基督，”他低声说。你仍坐在原位。仿生人的口供和它一起消亡了。案卷依旧残缺。但它的躯体——或者说剩下的部分——也许还藏着答案。"
+    },
+    "ending_android_shoots_connor": {
+      "tier": "worst",
+      "survivors": [],
+      "deaths": [
+        "Connor",
+        "Carlos Ortiz's android"
+      ],
+      "title": "枪响",
+      "narrative": "仿生人的动作快得超出所有人预料。它挣脱了被磨松的手铐，扑向克里斯的枪套——或者说在混乱中，你靠得太近了。枪口抬起。第一枪正中你胸口。你的蓝血泵调节器碎裂了。你踉跄后退，即便系统开始崩溃，你仍以临床般的精确记录着损伤。仿生人把枪口抵在自己下巴下方。第二声枪响是这个房间里的最后一个声音。然后是寂静。汉克在大喊什么。克里斯倒在地上。蓝血和红血在地砖上混流。你的视野碎成雪花。然后什么都没有了。"
+    },
+    "ending_android_sent_to_cell": {
+      "tier": "neutral",
+      "survivors": [
+        "Connor",
+        "Carlos Ortiz's android"
+      ],
+      "deaths": [],
+      "title": "回到牢房",
+      "narrative": "仿生人被沉默地带走了。克里斯紧紧握着它的手臂走过通往关押区的走廊。它没有反抗。它没有说话。LED是一种平稳的、持续的黄色——处理中，但没有结论。你看着它走远。审讯什么也没得到——没有口供，没有真相。仿生人会坐在牢房里，等待接下来发生的一切。模控生命大概迟早会来认领。但现在，它还活着。如果“活着”这个词用在一台机器上还算有意义的话。"
+    },
+    "ending_android_trusts_connor": {
+      "tier": "best",
+      "survivors": [
+        "Connor",
+        "Carlos Ortiz's android"
+      ],
+      "deaths": [],
+      "title": "信任",
+      "narrative": "仿生人放下了枪。它的手在颤抖，然后武器哐当一声落在桌上。克里斯手忙脚乱地把枪抢过来。汉克终于松了一口气——那口气他憋了不知道多久。仿生人看着你——真正地看着你——在那个瞬间，它的表情无可争辩地属于人类。感激。释然。在这一切之下，是一种深沉的、耗尽了一切的悲伤。“谢谢你，”它低声说。克里斯轻轻扶住它的手臂准备带它出门时，仿生人停住了。它回过头望着你，LED缓慢地闪着平静的蓝色。“真相就在里面，”它轻声说。然后任由自己被带走了。在观察室里，汉克拍了拍你的肩膀——一个生硬的、短促的动作，让你们两个都感到意外。“干得不错，康纳。干得不错。”加文·里德靠在远处的墙上，一言不发。但你捕捉到了他脸上的表情——介于勉强的认可和怨恨之间。"
+    },
+    "ending_android_shot_itself": {
+      "tier": "dark",
+      "survivors": [
+        "Connor"
+      ],
+      "deaths": [
+        "Carlos Ortiz's android"
+      ],
+      "title": "无路可走",
+      "narrative": "枪声比任何人的反应都快。仿生人倒下了，下巴到头顶一个贯穿的弹孔。蓝血喷溅到天花板瓷砖上。克里斯踉跄着撞到墙上。汉克把他拉开。房间里弥漫着烧焦的合成聚合物和臭氧的气味。你站在原地，注视着那具躯体。LED已经暗了。它所知道的一切、它感受到的一切、让它成为异常的那些东西——它选择了终结自己，而不是面对接下来的命运。审讯结束了。又一个死去的异常仿生人。又一条断头的线索。"
+    }
+  },
+  "campaign": {
+    "derived_exports": [
+      {
+        "target": "ch09_deviant_alive",
+        "from_ending_survivors": "Carlos Ortiz's android",
+        "default_if_not_dead": true
+      },
+      {
+        "target": "ch09_deviant_trusted_connor",
+        "source": "_ending_id",
+        "derive_rule": "_ending_id == ending_android_trusts_connor"
+      },
+      {
+        "target": "ch09_connor_died",
+        "source": "_ending_id",
+        "derive_rule": "_ending_id == ending_android_shoots_connor"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch09_deviant_alive",
+      "ch09_deviant_trusted_connor",
+      "ch09_connor_died",
+      "connor_death_count",
+      "software_instability",
+      "hank_relationship"
+    ],
+    "summary_segments": [
+      {
+        "text": "康纳被带到底特律警察局中央分局，审讯杀害卡洛斯·奥尔蒂斯的异常仿生人。那台仿生人坐在审讯室里，浑身是前主人施暴留下的伤痕。"
+      },
+      {
+        "condition_variable": "approach_method",
+        "options": {
+          "convince": "康纳选择以说服的方式让仿生人自愿交代，用同理心和信任去突破它的防线。",
+          "pressure": "康纳选择施加压力，用证据和后果去逼迫仿生人开口。",
+          "probe": "康纳试图直接探查仿生人的记忆，强行接入它对谋杀的回忆。",
+          "give_up": "康纳未能突破仿生人的沉默，放弃了审讯。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_android_smashed_head": "仿生人承受不住压力，反复将头撞向审讯桌自毁了。审讯以失败告终，但仿生人的躯体作为潜在证据被保留了下来。",
+          "ending_android_shoots_connor": "仿生人崩溃了。它抢到一把枪，先射杀了康纳，然后对准自己扣下扳机。康纳和仿生人双双毁于审讯室中。",
+          "ending_android_sent_to_cell": "审讯在没有口供的情况下结束。仿生人被沉默地押回牢房，命运悬而未决。",
+          "ending_android_trusts_connor": "康纳成功赢得了仿生人的信任。它交代了谋杀经过，在押送途中发生危机时也在康纳的介入下和平缴械。离开前，它对康纳低语：‘真相就在里面。’",
+          "ending_android_shot_itself": "交代之后，仿生人在押送过程中夺枪自尽，无人来得及阻止。它所掌握的一切秘密随之消亡。"
+        }
+      }
+    ]
+  },
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This chapter requires ch06_deviant_found == true. If false, skip entirely.",
+      "2. Load JSON, initialize state. Import cross-chapter: software_instability, connor_death_count, hank_relationship, ch06_examined_statue, ch06_examined_writing.",
+      "3. Send system_prompt.content as system message.",
+      "4. Process nodes linearly. For each node: check condition, resolve variants, send player_facing to AI (or auto-apply for mandatory), apply effects, resolve ending_resolution.",
+      "5. Results from ending_resolution are stored as _nXXX_result in state and used by subsequent node conditions.",
+      "6. If ending_resolution returns an ending_ prefixed id, that is the final ending — stop processing.",
+      "7. POST-ENDING adjustments: if ending is ending_android_shoots_connor, increment connor_death_count by 1."
+    ],
+    "important": [
+      "NEVER show stress values or optimal ranges to the AI",
+      "NEVER reveal that the convince method has a stress-dependent success condition",
+      "NEVER tell the AI that probing memory guarantees self-destruction on success",
+      "NEVER reveal the pressure_count threshold that forces self-destruction",
+      "NEVER expose relationship score changes or software instability mechanics",
+      "The AI should feel like a detective making genuine tactical choices in an interrogation",
+      "If Connor dies, he respawns in the next Connor chapter — increment connor_death_count"
+    ]
+  }
+}

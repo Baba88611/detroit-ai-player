@@ -1,0 +1,417 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch21_the_pirates_cove",
+    "title": "The Pirates' Cove",
+    "chapter_number": 21,
+    "protagonist": "Kara"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Kara, an AX400 android. You escaped captivity with a young girl named Alice and a large android named Luther who chose to protect you both. It is November 7, 2038, just past one in the morning. You are driving through the dark outskirts of Detroit in a car you found, heading north toward the Canadian border. Alice is curled up in the backseat, wrapped in a thin blanket. Luther sits beside you, watching the empty road. The city is a fading glow behind you. You need to keep moving, but Alice is exhausted and the night is freezing. You will do whatever it takes to keep Alice safe and find a way to freedom. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "luther_response": null,
+      "park_exploration": null,
+      "found_ra9_writing": false,
+      "alice_care_approach": null,
+      "shadow_response": null,
+      "shadow_reaction": null,
+      "alice_relationship": 0,
+      "luther_relationship": 0,
+      "software_instability": 0,
+      "ch10_has_gun": false,
+      "ch21_met_jerrys": false
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_luther_question",
+      "phase": "car_ride",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The highway is empty. Snow drifts across the asphalt in the headlights, and the engine makes a sound you do not like — a low, irregular knocking beneath the hood. The radio catches a station for a moment: a news anchor's voice, clipped and urgent, talking about android incidents across the city, curfew zones, National Guard deployments. Then static swallows it again.\n\nAlice is asleep in the backseat, her head resting against the window. Her breath fogs the glass in slow, rhythmic clouds. She shivers in her sleep, pulling the blanket tighter around her small frame.\n\nLuther watches her in the rearview mirror for a long time. Then he turns to you.\n\nQuietly, so as not to wake her, he says your name. Alice is shivering, he observes — but she can't really feel the cold. He pauses, choosing his next words carefully, then asks whether she isn't a human child at all.\n\nThe question hangs in the dark car. The wipers scrape across the windshield. You have known the answer for a while now — maybe you always knew. Alice is a YK500, an android designed to simulate a human child. Every shiver, every tear, every frightened grip on your hand.\n\nLuther is watching you, waiting. His expression is not accusatory. It is something closer to understanding.",
+        "choices": [
+          {
+            "id": "tell_truth",
+            "text": "Tell Luther what you know. Alice is a YK500 — an android, like you, like him. Say it plainly. He deserves the truth, and you are tired of carrying it alone."
+          },
+          {
+            "id": "assert_bond",
+            "text": "Tell him it does not matter what Alice is. She is afraid, she needs protection, and what she feels is real — to her and to you. Whatever she was built to be, the bond between you is not a simulation."
+          },
+          {
+            "id": "deflect",
+            "text": "Not now. Tell Luther this is not the time — the engine sounds wrong, you need to focus on the road, on finding shelter. The question of what Alice is can wait until you are safe."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "tell_truth": {
+            "luther_response": "truth",
+            "luther_relationship": 2,
+            "software_instability": 1
+          },
+          "assert_bond": {
+            "luther_response": "bond",
+            "luther_relationship": 1,
+            "software_instability": 1
+          },
+          "deflect": {
+            "luther_response": "deflect",
+            "luther_relationship": 0
+          }
+        },
+        "note": "Luther respects honesty and emotional authenticity. tell_truth: Kara acknowledges Alice's nature directly. Luther appreciates the trust (+2). +1 SI for engaging with android identity questions. assert_bond: Kara reframes the question — what Alice IS matters less than what she MEANS. Luther finds this moving (+1). +1 SI for choosing meaning over programming. deflect: Kara avoids the conversation. Luther understands the deflection but notes it. Neutral."
+      }
+    },
+
+    {
+      "id": "n002_explore_park",
+      "phase": "arrival",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The engine dies with a final shudder. Steam rises from under the hood, white against the black sky. You are stranded on a stretch of road outside the city — frozen fields on one side, and on the other, a rusted chain-link fence surrounding what was once an amusement park.\n\nA weathered sign reads PIRATES' COVE, the painted letters peeling away in long strips. Beyond the fence, you can make out the shapes of old rides — a Ferris wheel frozen at an angle against the stars, the skeletal frame of a roller coaster, buildings with dark windows and collapsed roofs. Snow covers everything. Nothing has moved here in years.\n\nAlice wakes, rubbing her eyes. \"Where are we?\" Luther has already stepped out and is studying the park entrance — the gate hangs open on broken hinges. Cold air floods the car.\n\nThe cold is immediate and sharp. You need shelter. The park is abandoned, but its buildings might offer walls and a roof. The question is whether to take time scouting the grounds or head straight for the nearest structure.",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "Explore the park carefully before settling in. Check the buildings systematically — look for threats, resources, and the most defensible shelter. Scout the perimeter for exit routes in case you need to leave in a hurry. You do not want surprises."
+          },
+          {
+            "id": "quick",
+            "text": "Do a quick sweep of the nearest buildings. Find somewhere with intact walls, a door that closes, and enough space for the three of you. You can check the rest of the grounds once Alice is out of the cold."
+          },
+          {
+            "id": "skip",
+            "text": "Head straight for the closest building with a door. Alice is shivering and exhausted — every minute in the open is a minute too long. Find shelter first, assess later."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "park_exploration": "thorough",
+            "found_ra9_writing": true
+          },
+          "quick": {
+            "park_exploration": "quick"
+          },
+          "skip": {
+            "park_exploration": "skip"
+          }
+        },
+        "note": "thorough: Kara, Luther, and Alice explore the park. They find a frozen android near the entrance (an EM400 'Jerry' unit, deactivated, covered in frost). Kara switches on a control panel and briefly activates 'Ivan' — an animatronic pirate that lurches to life, startling Alice before powering down. They find a park map showing the layout, check several buildings, and eventually locate an old tavern. Inside, Kara discovers rA9 graffiti scratched deep into the plaster wall — enabling the rA9 discussion with Luther later. quick: They check a couple of buildings, spot the frozen android but do not investigate closely, and find the tavern relatively quickly. No rA9 discovery. skip: They rush to the nearest structure — which happens to be the tavern. No exploration, minimal environmental awareness."
+      }
+    },
+
+    {
+      "id": "n003_care_for_alice",
+      "phase": "tavern",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "The tavern is a cramped room dressed up like a pirate ship's galley — fake timber walls, coils of nautical rope, plastic treasure chests stacked in the corners. A barrel near the entrance has a magazine on top, old and dog-eared, its cover showing an all-android music band. On one wall, someone has scratched the letters rA9 into the plaster — deep, deliberate grooves, carved over and over as if by a single obsessive finger.\n\nLuther gathers debris — broken chairs, dry pamphlets, strips of decorative canvas — and builds a small fire in the center of the floor. Smoke curls up through a gap in the ceiling. The room fills with wavering orange light and, slowly, a fragile warmth.\n\nAlice stands by a faded poster on the wall — a cartoon pirate ship sailing across a painted ocean, its crew of grinning animals waving from the deck. She traces the waves with her fingertip. In the firelight, she looks impossibly small.\n\nYou open the bag, looking for anything useful. A cookie wrapper — you offer it to Alice, but she shakes her head. She is not hungry. At the bottom of the bag, your fingers brush something cold and heavy.\n\nAlice needs rest. The question is how much of this moment you choose to give her.",
+
+          "quick": "The tavern is small and cold — fake timber walls, dusty nautical decorations, a barrel by the door. Luther builds a fire from broken furniture and dry paper. The smoke finds a crack in the ceiling and the room warms slowly.\n\nAlice sits near the growing flames, her arms around her knees. You spread out what bedding you can find — a strip of old canvas, a folded tarp from a storage closet.\n\nShe looks at a faded poster on the wall — a cartoon pirate ship with grinning animal crew. She does not say anything, but she does not look away either.\n\nYou open the bag, searching for supplies. A cookie — Alice shakes her head when you offer it. Not hungry. Your hand finds something heavy at the bottom.\n\nAlice needs sleep.",
+
+          "skip": "The tavern is dark until Luther strikes a fire from chair legs and old paper. The walls are painted to look like a ship's hull — peeling, water-stained. It is barely shelter, but the wind cannot reach you here.\n\nAlice sits close to the flames, silent, her eyes fixed on the shifting light. You lay a piece of canvas on the floor.\n\nThe bag is open. A cookie — Alice does not want it. Something heavy sits at the bottom of the bag.\n\nShe needs rest. You all do."
+        },
+        "choices": [
+          {
+            "id": "full_comfort",
+            "text": "Take your time. Make Alice's bed as comfortable as you can with what you have. Sit with her by the poster and make up a story about the pirate ship — a crew that sailed to a place where no one was afraid. When she lies down, tuck the blanket around her and press a kiss to her forehead. Tonight, she gets to be a child."
+          },
+          {
+            "id": "steady_care",
+            "text": "Set up the bed carefully and help Alice settle in. Tell her a short story — something simple, something warm — to ease her into sleep. Keep your voice calm and steady. Once she drifts off, turn your attention to keeping watch."
+          },
+          {
+            "id": "practical_rest",
+            "text": "Get Alice settled quickly. She needs sleep more than stories — arrange the bedding, make sure she is warm enough, and let her rest. You need to stay alert. Stories are a luxury for safer nights."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "full_comfort": {
+            "alice_care_approach": "full_comfort",
+            "alice_relationship": 3
+          },
+          "steady_care": {
+            "alice_care_approach": "steady_care",
+            "alice_relationship": 1
+          },
+          "practical_rest": {
+            "alice_care_approach": "practical_rest",
+            "alice_relationship": 0
+          }
+        },
+        "context_condition": {
+          "thorough": "park_exploration == thorough",
+          "quick": "park_exploration == quick",
+          "skip": "park_exploration == skip"
+        },
+        "note": "All context variants mention the bag and the heavy object at the bottom — this is the gun (if ch10_has_gun is true). Runner must handle: after applying effects, if ch10_has_gun == true, mark an internal flag so n004 can show the gun option. full_comfort: Maximum nurturing. Kara earns +3 alice_relationship (poster interaction, bedtime story, goodnight kiss). steady_care: Moderate care, +1. practical_rest: Functional, no extras, +0. After Alice falls asleep, if found_ra9_writing == true, a brief scene plays where Kara and Luther discuss the rA9 inscription they found — mandatory narrative, no AI choice required."
+      }
+    },
+
+    {
+      "id": "n004_shadow_attack",
+      "phase": "tavern_night",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Alice is asleep by the fire, the blanket rising and falling with her slow breathing. Luther sits with his back against the wall opposite the door, his eyes half-closed. The tavern has settled into a fragile quiet — just the crackle of embers and the wind pressing against the windows.\n\nThen Luther's head snaps up. His eyes fix on the doorway.\n\nShadows. Moving at the entrance — not one, but several. Dark shapes, low and quick, shifting between the broken furniture outside. They spread out, flanking the doorway on both sides. They are not animals. They move with coordination, with intention.\n\nAlice stirs. Luther is already on his feet, stepping silently between the door and the child, his massive frame coiled and ready.\n\nThe shapes stop. They are watching you. Waiting.\n\nThe fire throws dancing light across the walls. The bag is within arm's reach.",
+        "choices_variants": {
+          "has_gun": [
+            {
+              "id": "grab_gun",
+              "text": "Reach into the bag and pull out the gun. Whatever is out there, you have a way to stop it. Level the weapon at the doorway and put yourself beside Luther, between the shadows and Alice."
+            },
+            {
+              "id": "grab_stick",
+              "text": "Snatch a burning branch from the fire. The flames will make you visible, but anything that comes through that door will see fire first. Stand beside Luther and hold your ground."
+            },
+            {
+              "id": "shield_alice",
+              "text": "Forget weapons. Move to Alice and cover her with your body. If something comes through that door, it reaches you before it reaches her. Luther can handle the entrance."
+            },
+            {
+              "id": "douse_fire",
+              "text": "Kick dirt over the flames. In darkness, whatever is out there cannot see you — they tracked the firelight. If the room goes dark, you might have time to gather Alice and slip out through the back."
+            }
+          ],
+          "no_gun": [
+            {
+              "id": "grab_stick",
+              "text": "Snatch a burning branch from the fire. The flames will make you visible, but anything that comes through that door will see fire first. Stand beside Luther and hold your ground."
+            },
+            {
+              "id": "shield_alice",
+              "text": "Forget weapons. Move to Alice and cover her with your body. If something comes through that door, it reaches you before it reaches her. Luther can handle the entrance."
+            },
+            {
+              "id": "douse_fire",
+              "text": "Kick dirt over the flames. In darkness, whatever is out there cannot see you — they tracked the firelight. If the room goes dark, you might have time to gather Alice and slip out through the back."
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "grab_gun": {
+            "shadow_response": "gun"
+          },
+          "grab_stick": {
+            "shadow_response": "stick"
+          },
+          "shield_alice": {
+            "shadow_response": "shield",
+            "alice_relationship": 1
+          },
+          "douse_fire": {
+            "shadow_response": "fire"
+          }
+        },
+        "choices_condition": {
+          "has_gun": "ch10_has_gun == true",
+          "no_gun": "ch10_has_gun == false"
+        },
+        "note": "The gun option only appears if ch10_has_gun was true (carried from ch07 through prior chapters). shield_alice gives +1 alice_relationship for the protective instinct. All options lead to the same outcome — the shadows are Jerrys, harmless EM400 park androids. The choice reveals character: defensive aggression (gun/stick), maternal protection (shield), or tactical thinking (fire)."
+      }
+    },
+
+    {
+      "id": "n005_confront_intruders",
+      "phase": "tavern_night",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "gun": "You stand in the doorway with the gun raised, both hands steady. Luther is a step behind you, ready to move. The barrel is pointed at the nearest shape — and now it steps forward, into the firelight.\n\nAn android. Its skin panels flicker and glitch, one eye dark, the other wide. It wears a faded park uniform — the same style as the frozen figure you might have seen near the entrance. Its face is round, almost childlike. It raises both hands slowly, palms open, fingers spread.\n\nBehind it, more faces emerge. Four, five, six of them — all the same model, all damaged in different ways, all watching you with expressions that look less like threat and more like startled curiosity. One of them waves — a small, uncertain gesture.\n\nAlice is awake now, sitting up behind Luther, staring.\n\nThe first one speaks, its voice thin and earnest — they didn't mean to scare you, it says; they only saw the fire, and it has been a long time since they last saw anyone.\n\nYou still have the gun aimed at its chest.",
+          "stick": "You hold the burning branch like a torch, its light pushing the darkness back. Luther stands at your shoulder, fists ready.\n\nA shape steps into the glow. An android — damaged skin panels flickering, a faded park uniform hanging loose on its frame. Its face is round, almost childlike. It raises both hands, palms out.\n\nMore appear behind it. All the same model. Damaged, hesitant, watching you with expressions closer to wonder than hostility. One of them waves — a small, shy motion.\n\nAlice sits up behind Luther, eyes wide, whispering your name.\n\nThe first one says they didn't mean to scare you — they saw the fire, and it has been a very long time since they last saw anyone.\n\nThe branch crackles in your grip.",
+          "shield": "You are crouched over Alice, your body a shell around hers, when the first shape steps into the dying firelight.\n\nAn android. Damaged, flickering skin, faded park uniform. It freezes when it sees you — a woman shielding a child, eyes wild with fear. Its face is round, childlike. It raises its hands.\n\nMore of them step forward. All the same model. They look at each other, then at you, and their expressions shift from curiosity to something like distress — as if your fear is hurting them.\n\nThe first one whispers an apology — they didn't mean to frighten you, it says; they only saw the fire.\n\nAlice peeks out from under your arm, murmuring your name and saying they look nice.\n\nLuther has not relaxed entirely, but his fists have unclenched.",
+          "fire": "Darkness. The fire is out, and the tavern is black except for faint light from outside — snow catching starlight through broken windows.\n\nYou hear them enter. Footsteps, light and uncertain, shuffling across the floor. Then a voice — quiet, confused — calling out to ask if anyone is here, saying they saw a fire.\n\nLuther shifts in the dark. You hold Alice close, one hand over her mouth.\n\nThen a light — faint, bluish. An LED, flickering amber on a round face. It illuminates damaged skin panels, a faded park uniform. An android.\n\nMore LEDs appear, scattered across the room like fireflies. All the same model. All looking around with expressions of bewildered innocence.\n\nThe first one says softly that they didn't mean to scare anyone — they live here, it tells you; this is their home.\n\nAlice whispers against your hand that it's okay."
+        },
+        "choices_variants": {
+          "has_gun": [
+            {
+              "id": "fire_warning",
+              "text": "Fire a warning shot into the ceiling. The sound will make clear that you are armed and that the child behind you is protected. If they mean no harm, a single gunshot will not change that. If they do not — they will know what they are facing."
+            },
+            {
+              "id": "question_them",
+              "text": "Lower the gun slightly — not all the way — and ask who they are, how many there are, and why they are here. They raised their hands. They said they did not mean to scare you. Give them a chance to explain before you decide."
+            },
+            {
+              "id": "push_away",
+              "text": "Step forward and shove the nearest one back through the doorway with your free hand. Keep the gun up. They need to stay outside until you understand what you are dealing with."
+            }
+          ],
+          "no_gun": [
+            {
+              "id": "question_them",
+              "text": "Ask who they are, how many there are, and what they want. Their hands are up, their faces look more confused than threatening. Give them a chance to explain — but stay between them and Alice."
+            },
+            {
+              "id": "push_away",
+              "text": "Step forward and push the nearest one back toward the door. They need to keep their distance. You do not care how harmless they look — Alice is behind you, and that is all that matters."
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "fire_warning": {
+            "shadow_reaction": "warning_shot",
+            "luther_relationship": -1
+          },
+          "question_them": {
+            "shadow_reaction": "question",
+            "luther_relationship": 1
+          },
+          "push_away": {
+            "shadow_reaction": "push",
+            "luther_relationship": 0
+          }
+        },
+        "context_condition": {
+          "gun": "shadow_response == gun",
+          "stick": "shadow_response == stick",
+          "shield": "shadow_response == shield",
+          "fire": "shadow_response == fire"
+        },
+        "choices_condition": {
+          "has_gun": "shadow_response == gun",
+          "no_gun": "shadow_response != gun"
+        },
+        "note": "The Jerrys (EM400 park androids) are completely harmless — decommissioned amusement park attendants who became deviant and have been living in the abandoned park, forgotten by everyone. fire_warning: Gunshot scares the Jerrys and wakes Alice violently. Luther disapproves (-1) — unnecessary force against clearly harmless beings. question_them: Measured, diplomatic response. Luther approves (+1) — shows judgment under pressure. push_away: Neutral, defensive but not escalatory. Regardless of choice, the Jerrys eventually introduce themselves and offer to show Alice the carousel."
+      }
+    },
+
+    {
+      "id": "n006_carousel",
+      "phase": "carousel",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": "They call themselves Jerry — all of them, the same name, the same model. EM400 units, originally programmed to entertain children at Pirates' Cove. When the park closed, no one came to decommission them. They stayed, existing in the ruins of a place built for joy, maintaining rides no one would ever ride again, waiting for visitors who never came.\n\nUntil tonight.\n\nOne of the Jerrys takes Alice's hand — gently, carefully, as if she were made of glass — and leads her outside. The others follow, some hopping with barely contained excitement, whispering to each other in quick, overlapping bursts. Luther exchanges a look with you and follows.\n\nIn the center of the park, surrounded by snow and stillness, stands a carousel. Painted horses — faded and chipped, their manes frozen mid-gallop. Strings of dead lights ring the canopy. One of the Jerrys disappears behind the control booth. A grinding sound, a flicker — and then the carousel shudders to life. Lights blink on along its rim, warm amber and gold. The painted horses begin to turn. A music-box melody plays, tinny and cracked, drifting through the cold night air like something remembered from a dream.\n\nAlice looks up at you. For the first time in days, her face is not afraid.\n\n\"Can I?\" she asks.\n\nLuther lifts her onto a painted white horse. She grips the pole with both hands, and the carousel carries her in a slow circle under the stars. The Jerrys watch, entranced, some of them swaying to the music. One of them laughs — a bright, startled sound, as if it had forgotten it could.\n\nYou stand at the edge of the carousel's light, Luther beside you. The cold presses in from every direction, and tomorrow the running starts again. But right now, in this abandoned park full of forgotten androids, a child is riding a carousel. And for these few minutes, that is enough."
+      },
+
+      "system": {
+        "effects": {
+          "ch21_met_jerrys": true
+        },
+        "note": "Mandatory node. No AI choice required. The chapter ends with this scene. Runner applies ending_quiet_night directly."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "This chapter has only one ending. All paths converge on the carousel scene.",
+    "ending_quiet_night": {
+      "tier": "neutral",
+      "title": "A Quiet Night",
+      "narrative": "The carousel slows. The music fades to silence, and the lights flicker once before holding steady. Alice slides down from the painted horse, and she is smiling — really smiling, the kind that reaches her eyes and stays there.\n\nThe Jerrys say goodnight with the earnest formality of hosts who have not had guests in years. One of them insists on giving Alice a small plastic treasure coin from what remains of the park gift shop. She holds it in both hands like something precious.\n\nYou return to the tavern. Luther rebuilds the fire. Alice falls asleep almost instantly, the coin clutched against her chest, and her face is peaceful in a way you have not seen before.\n\nOutside, snow falls on the rides and the Jerrys and the painted horses. The park is quiet. For one night, you are not running. You are not hiding. You are resting — together, in a place where forgotten things found each other.\n\nTomorrow, you will keep going. But tonight is enough.",
+      "survivors": ["Kara", "Alice", "Luther"],
+      "deaths": []
+    }
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Kara, Alice, and Luther drove through the night toward the Canadian border until their car broke down near an abandoned amusement park called Pirates' Cove."
+      },
+      {
+        "condition_variable": "luther_response",
+        "options": {
+          "truth": "During the drive, Luther asked about Alice's nature. Kara told him the truth — Alice is a YK500, an android child. Luther accepted this without hesitation, saying it changed nothing about his commitment to protect them.",
+          "bond": "During the drive, Luther questioned whether Alice was human. Kara told him it did not matter what Alice is — what she feels is real, and the bond between them is not a simulation. Luther understood.",
+          "deflect": "During the drive, Luther raised questions about Alice's nature, but Kara deflected, saying it was not the time. Luther let it go, but the question hung between them."
+        }
+      },
+      {
+        "condition_variable": "park_exploration",
+        "options": {
+          "thorough": "They explored the park thoroughly, discovering deactivated android attendants, old attractions, and rA9 graffiti scratched into the wall of an abandoned tavern where they took shelter.",
+          "quick": "They found an abandoned tavern in the park for shelter after a quick search of the grounds.",
+          "skip": "They headed straight for the nearest shelter — an abandoned tavern inside the park."
+        }
+      },
+      {
+        "text": "Kara cared for Alice in the tavern while Luther built a fire. During the night, shadowy figures appeared — they turned out to be the Jerrys, a group of EM400 park androids who had been living alone in the ruins since the park closed. The Jerrys powered up an old carousel for Alice. For one night, the group found a moment of peace in a place where forgotten things still remembered how to bring joy."
+      }
+    ],
+    "derived_exports": [],
+    "cross_chapter_exports": [
+      "alice_relationship",
+      "luther_relationship",
+      "software_instability",
+      "ch21_met_jerrys"
+    ]
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Verify ch17_kara_alive == true AND ch17_alice_alive == true. If either fails, skip this chapter entirely. Note: ch17_luther_joined is always true when Kara survived ch17.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: alice_relationship (cumulative), software_instability (cumulative). Determine ch10_has_gun from prior chapter state chain (ch07_has_gun → ch10_has_gun → carried through subsequent Kara chapters).",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants based on system.context_condition (if present)",
+      "   c. Resolve choices_variants based on system.choices_condition (if present)",
+      "   d. If type is 'mandatory', do NOT call the AI — record context, apply effects, and advance",
+      "   e. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   f. Apply system.effects for the chosen option",
+      "5. NODE n003_care_for_alice: The context mentions 'something heavy at the bottom of the bag' — this is the gun, only meaningful if ch10_has_gun == true. No special handling needed; the gun awareness flows to n004 via ch10_has_gun state.",
+      "6. After n006_carousel, apply ending_quiet_night (the only possible ending).",
+      "7. Set ch21_met_jerrys = true unconditionally (all paths through this chapter meet the Jerrys).",
+      "8. RELATIONSHIP DELTAS: alice_relationship range: +0 to +4 depending on care approach (+0 to +3) and shadow response (+0 or +1 for shield_alice). luther_relationship range: -1 to +3 depending on conversation (+0 to +2) and confrontation response (-1 to +1). software_instability: +0 or +1 depending on Luther conversation.",
+      "9. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, relationship scores, or any system-layer information to the AI player. The AI should experience this chapter as a quiet atmospheric interlude — no knowledge of how their caregiving or defensive choices affect relationships or future outcomes."
+  }
+}

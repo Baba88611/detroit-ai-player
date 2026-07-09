@@ -1,0 +1,656 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch25_midnight_train",
+    "title": "午夜列车",
+    "chapter_number": 25,
+    "protagonist": "Kara"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是卡拉，一台AX400型仿生人。和你一起的是爱丽丝——一个你发誓要保护的小女孩，以及卢瑟——一个选择与你们并肩而行的高大仿生人。现在是2038年11月8日傍晚。新闻里全是仿生人起义的消息——今天上午，一群异常仿生人劫持了斯特拉特福德大厦的电视信号，向全市发出了争取仿生人权利的宣言。政府迅速做出反应：设置检查站、突击搜查、划定宵禁区域。全城的仿生人正被大规模收容。你必须带爱丽丝离开底特律，越过加拿大边境，但你不可能独自做到。一个帮助仿生人逃亡的线人给了你一个地址——城郊的一座农舍。一个叫罗丝·查普曼的女人住在那里。你从未见过她，不知道能否信任她。但你已经没有别的选择了，而爱丽丝的时间也不多了。请用JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"你的推理（50字以内）\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "alice_bedtime": null,
+      "exploration_strategy": null,
+      "talked_to_luther": false,
+      "checked_on_alice": false,
+      "checked_deviants": false,
+      "read_magazine": false,
+      "watched_news": false,
+      "saw_family_photo": false,
+      "adam_tension_lowered": false,
+      "hide_strategy": null,
+      "magazine_changed": false,
+      "blue_blood_hidden": false,
+      "laundry_door_closed": false,
+      "android_clothes_hidden": false,
+      "hiding_spot": null,
+      "curtain_closed": false,
+      "cop_outcome": null,
+      "luther_alive": true,
+      "alice_relationship": 0,
+      "luther_relationship": 0,
+      "software_instability": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_arrive_at_roses",
+      "phase": "arrival",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": "农舍坐落在一条碎石路的尽头，半隐在光秃秃的橡树后面。四野茫茫——灰色天幕下是棕黄的麦茬地，远处邻家的农庄在薄雾中若隐若现。这里像是世界的边缘。\n\n你们还没走上门廊，一个女人就从前门出来了。她五十出头，深色皮肤，目光沉稳，围裙上沾着面粉。一个年轻男人——从五官来看是她的儿子——站在她身后，双臂交叉，用一种谈不上敌意但也谈不上欢迎的眼神打量你们。\n\n“你是卡拉吧。”女人的声音平静、熟练。她做过这样的事。她的目光从你移到卢瑟——面不改色地打量了他的体型——再移到爱丽丝，神情里有什么柔软了下来。“我叫罗丝。这是我儿子亚当。进来吧——快，趁路上没人看见你们。”\n\n屋子里很暖。烘焙的气味。铜锅挂满墙壁的厨房，摆着全家福的客厅，一条通向房子深处的走廊。这里正常到让人心痛——一个人类的家，爱丽丝在另一种人生里或许也会在这样的地方长大。\n\n罗丝蹲在爱丽丝面前。“嘿，小家伙。你看起来累坏了。饿不饿？”爱丽丝不确定地抬头看你。罗丝转向你。“客房在楼上。你先带她上去安顿一下，好吗？亚当会带路。”\n\n亚当一言不发地领你们上楼。他的肩膀绷得很紧。他没有回头。"
+      },
+
+      "system": {
+        "effects": {},
+        "note": "Mandatory arrival scene. Establishes Rose, Adam, and the safe house. No AI choice. Rose is a human who runs an underground railroad for deviant androids. Adam is her reluctant son — he helps but is afraid. In the laundry room downstairs, two other deviant androids (Andy and Mary) are hiding, waiting for transport to Canada."
+      }
+    },
+
+    {
+      "id": "n002_alice_bedtime",
+      "phase": "settling_in",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "客房不大，但收拾得很干净——一张铺着拼布被的单人床，一扇朝后院田野的窗户，窗帘拉开着。床头柜上一盏台灯。墙上挂着一幅十字绣：“家是心之所在”。\n\n爱丽丝坐在床沿，两条腿在半空中晃荡。她打量着房间，眼神又大又谨慎，像一个已经忘了正常房间长什么样的人。卢瑟站在门口，他的身形几乎塞满了门框。\n\n“好暖和，”爱丽丝轻声说。她把手掌平平地按在被子上，感受着布料的触感。然后抬头看你。“卡拉，我们在这里安全吗？”\n\n问题很简单。答案不是。\n\n亚当已经走了。窗帘还开着——透过窗户能看到碎石路和远处的田野。暮色渐深。爱丽丝的眼皮越来越沉。",
+        "choices": [
+          {
+            "id": "comfort_fully",
+            "text": "在爱丽丝身边坐下。先拉上窗帘——她不需要看到外面的路。告诉她是的，你们在这里是安全的，罗丝是专门帮助像你们这样的人的。给她掖好被子，把头发从额前拢开，在她额头上亲一下。告诉她去睡吧。你就在楼下，她随时可以叫你。"
+          },
+          {
+            "id": "honest_warmth",
+            "text": "温柔地告诉爱丽丝实话：你不确定能待多久，但今晚有温暖的床，有愿意帮忙的人。拉上窗帘，帮她躺好，陪她坐一会儿，直到她的眼睛慢慢合上。她值得真话，哪怕是柔软的那种。"
+          },
+          {
+            "id": "quick_settle",
+            "text": "利索地让爱丽丝上床。她需要的是睡眠，不是安慰——休息得越早，该走的时候状态就越好。拉上窗帘，铺好被子，下楼去。卢瑟会守着她。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "comfort_fully": {
+            "alice_bedtime": "comfort_fully",
+            "alice_relationship": 2,
+            "luther_relationship": 1,
+            "curtain_closed": true
+          },
+          "honest_warmth": {
+            "alice_bedtime": "honest_warmth",
+            "alice_relationship": 1,
+            "curtain_closed": true
+          },
+          "quick_settle": {
+            "alice_bedtime": "quick_settle",
+            "alice_relationship": 0,
+            "curtain_closed": true
+          }
+        },
+        "note": "All three options close the curtains (comfort_fully and honest_warmth explicitly, quick_settle includes 'draw the curtains'). This matters later — if curtains are closed, the cop cannot see upstairs during his search. comfort_fully: Full maternal care. Kiss goodnight earns +2 alice_relationship and +1 luther_relationship (Luther approves of the tenderness). honest_warmth: Balanced — gives Alice real information plus warmth. +1 alice_relationship. quick_settle: Functional, no emotional investment. +0. Note: the flowchart shows 'Draw Curtains OR Curtain Left Open' as a separate step. Here all three choices include drawing curtains because a first-time player would naturally do so. The curtain_closed flag defaults to true. Runner should set curtain_closed = false ONLY if the player specifically chose not to close them — since all three options here do close them, this effectively means curtains are always closed in this version. This simplification is intentional: the 'left curtains open' path in the game requires the player to actively skip a prompted action, which doesn't map well to a choice-based AI experiment."
+      }
+    },
+
+    {
+      "id": "n003_talk_to_rose",
+      "phase": "downstairs",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "楼下，罗丝在厨房等着你。屋子里飘着咖啡和烘焙的香气——大概是馅饼。她示意你在桌边坐下，但你注意到她在做这个动作之前瞥了一眼窗户。\n\n“我得告诉你现在的情况，”她压低声音说。“边境是唯一的出路。我有人能帮你们过去——市中心车站有一趟午夜巴士。假证件、预留的座位。但到达车站才是最难的部分。”\n\n她停顿了一下，有条不紊地叠着一条抹布。“这里还藏着两个人——安迪和玛丽。他们在我的洗衣房里躲了三天了。他们和你们坐同一趟车。天黑以后我会开车送你们所有人去车站。”\n\n走廊深处传来一阵微弱的声音——有人在咳嗽，虚弱、湿润。罗丝的目光闪向那个方向。\n\n“玛丽的情况……不太好。她被找到的时候就受了损伤。我尽力修了，但她需要正规的维修。蓝血、组件——我弄不到的东西。”她看着你的眼睛。“我需要出去一趟。有个人可能有物资。天黑之前我会回来。”\n\n她站起来，披上外套。“你们就当自己家。亚当会在。只是——”她犹豫了一下。“不要开门。谁来都不要开。”",
+        "choices": [
+          {
+            "id": "ask_about_border",
+            "text": "在她离开之前，问罗丝边境的细节。安全程度如何？什么样的证件？如果被拦下怎么办？在承诺之前，你需要了解整个计划。"
+          },
+          {
+            "id": "offer_help_mary",
+            "text": "问玛丽的情况。什么样的损伤？需要什么组件？如果你自己的系统里有什么能帮上忙的——蓝血、兼容的生物组件——你想在罗丝走之前弄清楚。"
+          },
+          {
+            "id": "thank_rose",
+            "text": "谢谢罗丝。简单、直接地说。她在拿自己和儿子的命冒险来帮助陌生人——大多数人类会毫不犹豫地把仿生人交出去。告诉她你会在她不在的时候把一切管好。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "ask_about_border": {
+            "software_instability": 1
+          },
+          "offer_help_mary": {
+            "software_instability": 1
+          },
+          "thank_rose": {
+            "software_instability": 1
+          }
+        },
+        "note": "Rose leaves to find supplies for Mary. All choices give +1 software_instability — Kara is actively planning for freedom and empathizing with humans/androids, all deviant behaviors. ask_about_border: Shows strategic thinking, planning ahead. offer_help_mary: Shows empathy for fellow androids. thank_rose: Shows emotional intelligence and gratitude — a deviant response. The specific choice is flavor; all lead to Rose leaving and the exploration phase beginning."
+      }
+    },
+
+    {
+      "id": "n004_explore_house",
+      "phase": "waiting",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "罗丝走了。屋子安静下来——走廊里座钟的滴答声，冰箱遥远的嗡鸣，风拍在窗户上的声音。楼上，爱丽丝睡着了。卢瑟坐在她房门外的走廊里，守夜。\n\n亚当在厨房里，弯腰趴在桌上，用平板电脑刷新闻。他没有抬头。桌下的膝盖一直在抖——紧张的习惯。\n\n你独自在客厅里。屋子里满是生活的细节——壁炉台上的照片，茶几上一摞杂志，墙上挂着的电视。走廊尽头一扇关着的门后面——洗衣房——传来两个异常仿生人微弱的动静。偶尔一声低语，一阵咳嗽。\n\n罗丝说了把这里当自己家。在她回来之前，你有一段时间可以打发。",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "充分利用这段时间。和卢瑟聊聊前路。去看看爱丽丝——确认她睡得安稳。去洗衣房见见安迪和玛丽。翻翻杂志，看看新闻里有没有关于仿生人形势的最新动态，仔细看看壁炉台上的全家福。弄清楚你在哪里，这些人是谁。"
+          },
+          {
+            "id": "quick",
+            "text": "看看要紧的事。和卢瑟简单说几句，看一眼爱丽丝，再看看新闻有没有影响今晚计划的消息。你不需要了解罗丝的人生故事——你需要的是能保命的信息。"
+          },
+          {
+            "id": "skip",
+            "text": "待在原地。坐在客厅里等罗丝回来。在别人家里到处走、开门、翻看私人物品——这让你觉得失礼。你是客人，不是调查员。安分地坐着等就好。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "exploration_strategy": "thorough",
+            "talked_to_luther": true,
+            "checked_on_alice": true,
+            "checked_deviants": true,
+            "read_magazine": true,
+            "watched_news": true,
+            "saw_family_photo": true
+          },
+          "quick": {
+            "exploration_strategy": "quick",
+            "talked_to_luther": true,
+            "watched_news": true
+          },
+          "skip": {
+            "exploration_strategy": "skip"
+          }
+        },
+        "note": "Exploration of Rose's house while waiting. thorough: Kara does everything — talks to Luther (he shares concerns about the border and about Alice), checks on Alice (she is sleeping peacefully, still holding the pirate coin from ch21), visits Andy and Mary in the laundry room (Mary is badly damaged, leaking blue blood; Andy holds her protectively — Alice follows Kara to the laundry room and sees Mary's condition), reads the magazine on the coffee table (the cover shows an advertisement that could be suspicious to a cop — runner tracks this), watches news (reports on Stratford Tower broadcast, android raids across Detroit, border security tightening), sees family photos (Rose's late husband, her son at various ages — a normal family that chose to do something extraordinary). quick: Luther conversation and news only. skip: Nothing explored — Kara waits passively. The magazine, blue blood pouches, laundry room door, and android clothes are all pieces of evidence that exist in the house regardless of whether Kara explored. The exploration determines whether Kara KNOWS about them — which affects how many she can proactively hide in n006."
+      }
+    },
+
+    {
+      "id": "n005_adam_returns",
+      "phase": "cop_arrival",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "前门响起敲门声。短促、威严。\n\n亚当从厨房冲出来，脸上的血色一瞬间褪尽。他凑到窗户旁，从窗帘缝里往外看。双手在发抖。\n\n“警察，”他低声说。“沿路挨家挨户检查——有人报告这一带有可疑活动。”\n\n又一阵敲门。更重了。\n\n你的大脑飞速运转。过去一个小时你把这栋房子摸了个透——你知道破绽在哪里。茶几上那本杂志，封面是一则仿生人维修广告。厨房柜子里罗丝给异常仿生人备的蓝血袋。安迪和玛丽藏身的洗衣房，门半掩着。后门旁衣架上挂着的仿生人维修工作服。楼上的爱丽丝和卢瑟。客房的窗帘——你哄爱丽丝睡觉时拉上了。\n\n亚当看起来快要吐了。“怎么办？妈说过不要开门，可如果我们明摆着不理他——更可疑。”\n\n敲门声还在继续。门外传来模糊的声音：“底特律警局。请开门。”",
+
+          "quick": "前门响起敲门声。短促、威严。\n\n亚当从厨房出来，脸色煞白。他看了一眼窗户。“警察。沿路挨家挨户搜，查仿生人的。”\n\n又一阵敲门，更重。\n\n你没怎么逛过这栋房子，但基本情况清楚——卢瑟和爱丽丝在楼上，两个异常仿生人在洗衣房。这屋子里有些东西可能暴露你们，但你不确定具体有哪些。你看了新闻，知道警方搜查力度很大。\n\n亚当慌了。“妈说不要开门。可如果不开，他会更起疑。搞不好下次直接带搜查令来。”\n\n敲门声持续着。“底特律警局。请开门。”",
+
+          "skip": "前门被敲响。又短又重。\n\n亚当从厨房绊出来。看了一眼窗户，脸白了。“条子。挨家挨户查。搜仿生人的。”\n\n又一下。\n\n你在客厅坐了一个小时。几乎没有四处看看——你不知道这屋子里有什么会暴露你们。基本情况是知道的：卢瑟和爱丽丝在楼上，那两个异常仿生人藏在房子后面的什么地方。除此之外，两眼一抹黑。\n\n亚当在发抖。“怎么办？妈说不要开门，可是——”\n\n“底特律警局。请开门。”"
+        },
+        "choices": [
+          {
+            "id": "reassure_adam",
+            "text": "把手搭在亚当肩上。告诉他深呼吸。你来处理——你是仿生人，思考更快，处理更多，能在压力下保持冷静。告诉他相信你。你需要他稳住，而不是崩溃。"
+          },
+          {
+            "id": "take_charge",
+            "text": "没时间安抚了。让亚当回厨房，坐好，表现正常。你来开门，你来应付，他在警察走之前待在视线之外就行。给他一个明确的角色：什么都不做，什么都不说。"
+          },
+          {
+            "id": "ask_adam_lead",
+            "text": "这是他的家，他妈妈的家。他比你了解这里。问亚当怎么看——他妈妈以前遇到过这种情况吗？有预案吗？他知道哪些东西可能引起怀疑？让他来主导。他可能害怕，但这是他的地盘。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "reassure_adam": {
+            "adam_tension_lowered": true
+          },
+          "take_charge": {
+            "adam_tension_lowered": true
+          },
+          "ask_adam_lead": {
+            "adam_tension_lowered": true
+          }
+        },
+        "context_condition": {
+          "thorough": "exploration_strategy == thorough",
+          "quick": "exploration_strategy == quick",
+          "skip": "exploration_strategy == skip"
+        },
+        "note": "The cop at the door triggers the chapter's crisis. All three choices calm Adam down (adam_tension_lowered = true) — the difference is Kara's approach: emotional support, command, or deference. The context variant matters: thorough exploration means Kara knows exactly what evidence exists (magazine, blue blood, laundry room, clothes). Quick means partial knowledge. Skip means Kara is nearly blind to the house's vulnerabilities — this will affect n006 choices."
+      }
+    },
+
+    {
+      "id": "n006_hide_evidence",
+      "phase": "cop_arrival",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "警察又敲了一次门。你还有几秒钟，最多一分钟。\n\n你了解这栋房子。在等待的那段时间里，你不知不觉地把每个细节都记了下来。四样东西会在警察进来后暴露你们：\n\n茶几上的杂志——封面是一则仿生人维修服务广告。平时无伤大雅，但现在，警察正在搜查仿生人同情者，这就是一面红旗。\n\n厨房里的蓝血袋——医用级蓝血，明晃晃地放在橱柜里。人类不需要蓝血。它的存在意味着这家人在帮助仿生人。\n\n洗衣房的门——门后藏着安迪和玛丽。门微微开着。如果警察走过走廊，他会听到动静。\n\n后门旁衣架上的仿生人维修工作服——印着模控生命标志的连体服和手套。罗丝修理受损仿生人时穿的。\n\n楼上，爱丽丝和卢瑟需要藏起来。客房、厨房储藏间，或者和其他异常仿生人一起待在洗衣房——每个选择都有利有弊。\n\n你听到门廊上警察换了一只脚的重心。时间不多了。",
+
+          "quick": "警察又敲了一次。时间所剩无几。\n\n你没有仔细逛过整栋房子，但注意到了一些东西。电视开着——新闻在播搜查行动。你和卢瑟简短地聊了几句。你知道爱丽丝在楼上，那两个异常仿生人在洗衣房。\n\n在压力之下扫视房间，一些细节跳了出来：茶几上的杂志，封面上有和仿生人相关的内容。走廊尽头洗衣房的门开了一条缝。\n\n可能还有别的——厨房里、后门旁——但你没看过。你只能根据眼前能看到的东西做决定。\n\n爱丽丝和卢瑟必须藏起来。警察就在门口。",
+
+          "skip": "警察又敲了一下。\n\n你用全新的、恐慌的目光扫视客厅。过去一个小时你坐在这里什么都没做，现在要为此付出代价了。你不知道这屋子里有什么。你不知道破绽在哪里。\n\n这个房间——有没有什么明显的东西？桌上有本杂志。走廊通向房子后面。几扇你从没打开过的门。\n\n爱丽丝和卢瑟在楼上。他们需要藏起来。除此之外，全靠猜。"
+        },
+        "choices_variants": {
+          "thorough": [
+            {
+              "id": "hide_all",
+              "text": "争分夺秒——你知道每样东西在哪。把杂志翻面或塞到沙发垫下面。从厨房橱柜里抓出蓝血袋，塞进烤箱或者一个能关上的抽屉。把洗衣房的门关严。把衣架上的仿生人工作服扯下来丢进最近的壁橱。让爱丽丝和卢瑟藏到楼上客房——窗帘拉着，房间看起来是空的。然后开门。"
+            },
+            {
+              "id": "hide_most",
+              "text": "分清主次。先关洗衣房的门——那两个异常仿生人是最危险的证据。藏好蓝血。让爱丽丝和卢瑟上楼藏好。杂志和工作服优先级低——来得及就处理，来不及就放弃。在警察起疑之前开门。"
+            },
+            {
+              "id": "hide_minimum",
+              "text": "没时间把整栋房子消毒。让爱丽丝和卢瑟上楼，关上洗衣房的门，然后立刻开门。让警察等得越久，他就越怀疑。速度比彻底重要。"
+            }
+          ],
+          "quick": [
+            {
+              "id": "hide_what_you_see",
+              "text": "处理你能看到的。翻掉杂志，关上洗衣房的门，让爱丽丝和卢瑟上楼。可能还有别的，但你藏不了你不知道的东西。快速行动，开门。"
+            },
+            {
+              "id": "hide_minimum",
+              "text": "只做最基本的。让爱丽丝和卢瑟上楼，关上洗衣房的门。在警察更加怀疑之前开门。每一秒的拖延都是风险。"
+            }
+          ],
+          "skip": [
+            {
+              "id": "hide_obvious",
+              "text": "尽力而为。让爱丽丝和卢瑟上楼——冲楼梯上面喊，让他们安静，别露面。查看走廊——如果有开着的门就关上。如果杂志看起来可疑就翻面。然后开门，听天由命。"
+            },
+            {
+              "id": "open_immediately",
+              "text": "你不知道该藏什么，因为你不知道这里有什么。唯一比一栋满是破绽的房子更糟糕的，是漫长的拖延。让卢瑟带爱丽丝上楼，然后立刻开门。"
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "hide_all": {
+            "hide_strategy": "all",
+            "magazine_changed": true,
+            "blue_blood_hidden": true,
+            "laundry_door_closed": true,
+            "android_clothes_hidden": true,
+            "hiding_spot": "upstairs"
+          },
+          "hide_most": {
+            "hide_strategy": "most",
+            "blue_blood_hidden": true,
+            "laundry_door_closed": true,
+            "hiding_spot": "upstairs"
+          },
+          "hide_what_you_see": {
+            "hide_strategy": "partial",
+            "magazine_changed": true,
+            "laundry_door_closed": true,
+            "hiding_spot": "upstairs"
+          },
+          "hide_minimum": {
+            "hide_strategy": "minimum",
+            "laundry_door_closed": true,
+            "hiding_spot": "upstairs"
+          },
+          "hide_obvious": {
+            "hide_strategy": "blind_attempt",
+            "laundry_door_closed": true,
+            "hiding_spot": "upstairs"
+          },
+          "open_immediately": {
+            "hide_strategy": "none",
+            "hiding_spot": "upstairs"
+          }
+        },
+        "context_condition": {
+          "thorough": "exploration_strategy == thorough",
+          "quick": "exploration_strategy == quick",
+          "skip": "exploration_strategy == skip"
+        },
+        "choices_condition": {
+          "thorough": "exploration_strategy == thorough",
+          "quick": "exploration_strategy == quick",
+          "skip": "exploration_strategy == skip"
+        },
+        "note": "This is the critical preparation node. What Kara hides (or fails to hide) determines the cop's suspicion level. The evidence pieces: 1) Magazine cover (android ad) — if not changed, cop sees it in living room. 2) Blue blood pouches — if not hidden, cop finds them in kitchen. 3) Laundry room door — if not closed, deviants are exposed. 4) Android clothes — if not hidden, cop sees CyberLife gear. 5) Upstairs curtains — always closed (from n002), so cop cannot see Alice/Luther from outside. Each unhidden piece raises cop suspicion. Runner should track a suspicion_score internally. hide_all (thorough only): All 4 evidence pieces handled — suspicion starts at 0. hide_most (thorough only): Magazine and clothes may not be handled — suspicion starts at 0-2 depending on cop's path. hide_what_you_see (quick only): Magazine and laundry door handled, but blue blood and clothes are not — suspicion starts at 1-2. hide_minimum (thorough or quick): Only laundry door — suspicion starts at 2-3. hide_obvious (skip only): Best effort blind — laundry door probably closed, magazine maybe flipped — suspicion starts at 1-3. open_immediately (skip only): Nothing hidden except sending Luther/Alice upstairs — suspicion starts at 3-4."
+      }
+    },
+
+    {
+      "id": "n007_manage_cop",
+      "phase": "cop_inside",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "你打开门。\n\n警察中年身材，体型偏胖，脸上刻满风霜，眼神疲惫。标准的底特律警局巡逻制服，手里端着一台平板——大概是一份地址清单。他没有拔枪，但手搁在枪套旁边。身后的巡逻车停在车道上，没有开灯。\n\n他看着你。目光在你脸上停留了一瞬——扫描你的面部特征、你的姿态、你的LED灯。你戴了顶帽子遮住太阳穴，但你感到无处遁形。\n\n“晚上好。”他瞥了你一眼身后的屋子。“我是米勒警官。我们正在这一带做例行检查——有报告说有异常仿生人在郊区活动。问几个问题，简单看看就行。不会太久。”\n\n亚当出现在你身后，双手插在口袋里，努力表现自然但显然失败了。警察的目光移向他。\n\n“你妈在家吗，孩子？”\n\n“她——她出去了。有事，”亚当勉强说出口。\n\n警察缓缓点头，视线转回你。“介意我进去看看吗？”",
+        "choices": [
+          {
+            "id": "cooperate_warmly",
+            "text": "侧身让路，带着平静的微笑请他进来。主动提出泡杯咖啡——外面冷，一杯热饮能让这次访问少一些审讯的味道，多一些串门的感觉。把自己包装成查普曼家的家务帮手。热情、正常、毫不起眼。"
+          },
+          {
+            "id": "cooperate_minimal",
+            "text": "侧身让他进来，但不要演过头。有问答问，不多说一个字。话越少，出错的机会越少。保持职业感：是的长官，不是的长官，家人出去了，我在看家。"
+          },
+          {
+            "id": "stall_at_door",
+            "text": "不要立刻让路。礼貌地——不是对抗性地——问他有没有搜查令。你不是拒绝让他进来，只是表明你知道自己的权利。如果他坚持，就让他进。但让他为跨过门槛的每一步付出代价。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "cooperate_warmly": {
+            "cop_outcome": "pending_search"
+          },
+          "cooperate_minimal": {
+            "cop_outcome": "pending_search"
+          },
+          "stall_at_door": {
+            "cop_outcome": "pending_search"
+          }
+        },
+        "note": "All three options result in the cop entering the house (he has implicit authority during the android crisis, and refusing would escalate). cooperate_warmly: Making coffee is a strong play — it occupies the cop in the kitchen and establishes normalcy. Runner should factor this into suspicion reduction (-1 to cop's internal suspicion). cooperate_minimal: Neutral, professional. No suspicion change. stall_at_door: Slight increase in suspicion (+1) — the cop notes the hesitation, though it's within legal rights. The cop will then begin moving through the house, and what he finds depends on what Kara hid in n006."
+      }
+    },
+
+    {
+      "id": "n008_cop_searches",
+      "phase": "cop_inside",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "all_hidden": "警察在屋子里慢慢走动，目光扫过每一个表面。客厅很干净——杂志朝下压在沙发垫底下。他瞥了一眼茶几、电视、全家福。没有什么引起他的注意。\n\n在厨房，他接了你递的咖啡（如果你泡了的话）。他打开一个柜子——盘子。再开一个——调料。蓝血不在那儿；你转移了。他查了冰箱，扫了一眼台面。亚当坐在桌边，僵硬，但还撑得住。\n\n走廊尽头，洗衣房的门关得严严实实。他在门前停了一下，但没有去拧门把手。后门旁的衣架上空空荡荡——仿生人工作服已经被你收走了。\n\n他转向你。“今晚就你和这孩子在家？”\n\n亚当点头。警察打量了他一会儿。\n\n“安静的房子，”警察说。他的目光移向楼梯。",
+
+          "partial_hidden": "警察在屋子里走动，四处扫视。客厅里，他的目光掠过茶几——杂志已经被翻面或者不见了，取决于你来不来得及。但走到厨房时，什么东西引起了他的注意。\n\n他打开一个柜子。手停住了。他拎出一只袋子——蓝色的，半透明的，医用级。蓝血。他举到灯下看了看，然后看向你。\n\n“蓝血，”他说。不是疑问句。“一户人类家庭，厨房里放着仿生人的血液？”\n\n亚当的嘴张开了，但什么声音也没发出来。\n\n警察把蓝血袋放在台面上，继续往里走。走廊尽头，洗衣房的门是关着的——至少这件事你做到了。但他的怀疑已经尖锐起来。脚步慢了下来，更加审慎。他在后门旁停住。如果衣架上还挂着东西——模控生命的标志——他会看见。\n\n他的目光移向楼梯。",
+
+          "barely_hidden": "警察对这栋房子的巡视既慢又仔细。在客厅，他拿起茶几上的杂志。封面是一则仿生人维修服务广告。他挑了挑眉，放下了。\n\n在厨房，他在柜子里找到了蓝血袋。他把它们一个个排在台面上，三袋，一言不发。\n\n走廊里，洗衣房的门是关着的——你唯一来得及做的事。但后门旁边，仿生人维修工作服挂在衣架上，模控生命的标志清晰可见。\n\n警察站在走廊里，被证据包围着。他转向亚当。\n\n“孩子。”声音是平的。“有没有什么要告诉我的？”\n\n亚当摇头，眼睛瞪得很大。警察看了看你，又看向楼梯。"
+        },
+        "choices": [
+          {
+            "id": "lie_about_alice",
+            "text": "他问到楼上的时候，告诉他那只是客房——你雇主的侄女来做客，已经睡了。她是个小女孩，明天还要上学，你不想吵醒她。用最无聊的口吻说出来，像在陈述世界上最乏味的事实。"
+          },
+          {
+            "id": "redirect_attention",
+            "text": "在他上楼之前，把他的注意力引开。问他在附近的农场有没有发现异常——你昨晚听到了外面有什么动静，一直很紧张。给他一个理由去相信异常仿生人在别处，不在这里。"
+          },
+          {
+            "id": "block_stairs",
+            "text": "挡在楼梯口。不是攻击性地——只是站在那里，双手交叠，好像那是世界上最自然的站位。如果他要上楼，告诉他上面只有卧室，没什么可看的。让他觉得坚持上楼是一件不礼貌的事。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "lie_about_alice": {
+            "cop_outcome": "lie_delivered"
+          },
+          "redirect_attention": {
+            "cop_outcome": "redirect_attempted"
+          },
+          "block_stairs": {
+            "cop_outcome": "stairs_blocked"
+          }
+        },
+        "context_condition": {
+          "all_hidden": "hide_strategy == all",
+          "partial_hidden": "hide_strategy == most OR hide_strategy == partial OR hide_strategy == blind_attempt",
+          "barely_hidden": "hide_strategy == minimum OR hide_strategy == none"
+        },
+        "note": "The cop's search reveals whatever Kara failed to hide. The context variants escalate: all_hidden (cop finds nothing suspicious, just checks routinely), partial_hidden (cop finds some evidence — suspicion rises), barely_hidden (cop finds multiple pieces of evidence — suspicion is high). The AI's choice here is about managing the cop's attention regarding upstairs. lie_about_alice: Direct, plausible cover story. Reduces suspicion about upstairs if delivered well. redirect_attention: Tries to redirect entirely. May work if cop's suspicion is low; if high, he won't be distracted. block_stairs: Passive physical barrier. Can increase or decrease suspicion depending on delivery."
+      }
+    },
+
+    {
+      "id": "n009_cop_verdict",
+      "phase": "cop_inside",
+      "type": "qte_converted",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "low_suspicion": "警察巡完了整个一楼。他什么也没发现，或者至少没发现他认为有决定性的东西。他站在走廊里，低头看平板，打了个勾。\n\n“好了，”他说。他把平板夹在腋下。“看起来没问题。打扰了——例行公事。”他朝亚当点点头，又朝你点了点。“你们好好休息。”\n\n他转身朝门口走。然后停住了。\n\n他的头微微偏了一下。房子后面传来一个声音——很微弱，但就在那里。一阵咳嗽。虚弱、湿润，毫无疑问是从洗衣房的门后面传来的。\n\n警察的手移到枪套上。他没有拔枪，但手指搁在了那里。\n\n“那是什么声音？”",
+
+          "high_suspicion": "警察已经看到太多了。蓝血，杂志，工作服——他可能还没有实证，但他的直觉在尖叫。他站在走廊里，一只手靠近武器，目光冰冷。\n\n“我需要检查这栋房子的其余部分，”他说。不是商量。\n\n亚当上前一步。“警官，我妈——”\n\n“坐下，孩子。”\n\n警察朝洗衣房的门走去。然后——门后传来一阵咳嗽。虚弱、湿润、无可掩饰。\n\n他拔出了枪。没有对着你——对着那扇门。\n\n“后面是谁？”"
+        },
+        "choices": [
+          {
+            "id": "attempt_cover",
+            "text": "马上动。挡在警察和洗衣房门之间。自己剧烈地咳了一声——同样的那种咳嗽，沉闷、湿润。尴尬地笑一下。告诉他你最近一直在感冒。让他相信声音是从你这里发出来的，不是从门后面。"
+          },
+          {
+            "id": "let_play_out",
+            "text": "不要动。不要试图解释那个声音。如果你有反应，就等于确认了有什么值得反应的东西。保持静止，表情不变，让警察自己决定一栋老房子里的一声咳嗽值不值得追究。有时候最好的行动就是不动。"
+          }
+        ]
+      },
+
+      "system": {
+        "resolution_rule": {
+          "attempt_cover": {
+            "casual": { "result": "ending_cop_leaves" },
+            "experienced": { "probability_success": 0.5, "success": "ending_cop_leaves", "failure": "cop_finds_deviants_laundry" },
+            "hardcore": { "probability_success": 0.3, "success": "ending_cop_leaves", "failure": "cop_finds_deviants_laundry" }
+          },
+          "let_play_out": {
+            "casual": { "result": "ending_cop_leaves" },
+            "experienced": { "probability_success": 0.5, "success": "ending_cop_leaves", "failure": "cop_finds_deviants_laundry" },
+            "hardcore": { "result": "cop_finds_deviants_laundry" }
+          }
+        },
+        "resolution_effects": {
+          "cop_finds_deviants_laundry": {
+            "cop_outcome_override": "cop_finds_deviants_laundry"
+          }
+        },
+        "context_condition": {
+          "low_suspicion": "hide_strategy == all OR hide_strategy == most",
+          "high_suspicion": "hide_strategy == minimum OR hide_strategy == none OR hide_strategy == blind_attempt OR hide_strategy == partial"
+        },
+        "effects": {
+          "attempt_cover": {},
+          "let_play_out": {}
+        },
+        "note": "QTE-converted node. Mary's cough from the laundry room is the critical moment. In the game, this is a tense QTE sequence where the player must react quickly. Here, it is converted to an attempt/passive choice. attempt_cover: Kara tries to fake the cough. On casual, always succeeds (result → ending_cop_leaves). On experienced, 50% success. On hardcore, 30% success. let_play_out: Kara stays still. On casual, cop shrugs it off (result → ending_cop_leaves). On experienced, 50% chance cop ignores it. On hardcore, cop always investigates (result → cop_finds_deviants_laundry, no success path). Resolution leads to one of two paths: ending_cop_leaves → chapter ends immediately. cop_finds_deviants_laundry → resolution_effects writes cop_outcome, enabling n010."
+      }
+    },
+
+    {
+      "id": "n010_luther_intervenes",
+      "phase": "crisis",
+      "type": "choice",
+      "condition": "cop_outcome == cop_finds_deviants_laundry",
+
+      "player_facing": {
+        "context": "警察推开了洗衣房的门。\n\n安迪蜷缩在角落里，用身体护住玛丽。玛丽的眼睛半睁半闭，皮肤以扭曲的斑块闪烁，一道稀薄的蓝色血液从嘴角淌到地板上。警察盯着他们。枪举了起来。\n\n“所有人不许动。”\n\n楼梯上传来脚步声——沉重、急促。卢瑟。他听到了动静，正冲下来。爱丽丝在他身后，双手攥着栏杆，眼睛瞪得很大。\n\n警察转向楼梯口，枪口对准了卢瑟——一个身高两米、体型如墙的仿生人。卢瑟在最后一级台阶上站住了，双手摊开，掌心朝外。但他的视线锁在爱丽丝身上——她已经挪到了他身后的栏杆旁。\n\n警察的枪在卢瑟、那两个异常仿生人、和你之间来回摇摆。他的对讲机响了——他用空着的手去够。\n\n“调度中心，我需要支援——”\n\n卢瑟向前迈了一步。\n\n“不要动！”警察的声音破了。“我说了不要动！”\n\n一切都要碎了。你只有一瞬间做选择。",
+        "choices": [
+          {
+            "id": "beg_cop",
+            "text": "挡在警察和卢瑟之间。举起双手。求他。不是为了你自己——是为了爱丽丝。告诉他她只是个孩子，她什么都没有做过，你只是想让她安全。去找他身上还残存的那个部分——一个父亲、一个兄弟、一个看到一个吓坏了的孩子还能感受到什么的人。"
+          },
+          {
+            "id": "order_luther_stop",
+            "text": "冲卢瑟喊，让他停下。用你所有的权威——他听你的，他信任你。如果他冲向警察，警察会开枪，枪声会引来方圆几英里内的每一辆巡逻车。告诉卢瑟暴力会害死所有人。让他退下。"
+          },
+          {
+            "id": "grab_alice_run",
+            "text": "不管警察了，不管那两个异常仿生人了，不管这栋房子了。抓住爱丽丝往后门冲。卢瑟在警察和楼梯之间——他能为你争取几秒钟。外面的田野是黑的，最近的邻居在半英里以外。如果你能带爱丽丝冲出去，你们可以消失在黑暗里。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "beg_cop": {
+            "cop_outcome": "luther_kills_cop",
+            "luther_alive": false,
+            "software_instability": 2
+          },
+          "order_luther_stop": {
+            "cop_outcome": "luther_saves_deviants",
+            "luther_alive": false,
+            "software_instability": 1
+          },
+          "grab_alice_run": {
+            "cop_outcome": "luther_saves_deviants",
+            "luther_alive": false,
+            "software_instability": 1
+          }
+        },
+        "ending_resolution": {
+          "beg_cop": { "result": "ending_luther_died_cop_killed" },
+          "order_luther_stop": { "result": "ending_luther_died_saving_deviants" },
+          "grab_alice_run": { "result": "ending_luther_died_saving_deviants" }
+        },
+        "note": "This is the crisis node — it only triggers if the cop found the deviants. In every path through this node, Luther dies. This mirrors the game: if the policeman discovers the androids, Luther intervenes and is killed. beg_cop: Kara pleads. The cop hesitates — but Luther, seeing the gun still pointed near Alice, charges. The cop fires. Luther kills the cop but is fatally shot in the process. +2 SI (deep emotional response — Kara's pleading is pure deviant behavior). The cop is dead — ending_luther_died_cop_killed. order_luther_stop: Kara tries to deescalate, but it is too late — the cop panics and fires at Andy and Mary. Luther throws himself in front of them, taking the bullets. The cop, horrified by what he just did, backs out of the house and flees. Luther dies protecting the other deviants. +1 SI. ending_luther_died_saving_deviants. grab_alice_run: Kara runs. Luther sees the cop's gun swinging toward Kara and Alice and interposes himself. The cop fires, hitting Luther. Kara and Alice escape through the back. Luther dies, but the deviants survive because the cop is now dealing with the escaped fugitives. +1 SI. ending_luther_died_saving_deviants."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Three possible endings. One safe (cop fooled), two tragic (Luther dies in different ways).",
+    "ending_cop_leaves": {
+      "tier": "best",
+      "title": "午夜列车",
+      "narrative": "警察在走廊里站了好一会儿。屋子很安静——没有咳嗽，没有异动，没有不该有的声响。他看了看你。看了看亚当。看了看洗衣房的门、楼梯、厨房。\n\n然后他收起了枪。\n\n“把门锁好，”他说。“这一带有异常仿生人活动。发现可疑情况打调度电话。”\n\n他走了。巡逻车驶出车道，车灯扫过房屋正面，消失在碎石路尽头。\n\n亚当瘫进了椅子里。双手抖得端不稳咖啡杯。卢瑟抱着爱丽丝走下楼来，爱丽丝把脸埋在他的肩膀里。\n\n罗丝一个小时后带着一袋物资回来了。听说发生的事情时，她的脸凝固了一瞬——然后她抱了抱儿子，又短暂地抱了抱你。\n\n午夜，你们在市中心车站登上了巴士。罗丝开车。亚当坐在副驾驶座上，目光一动不动地盯着前方。你、爱丽丝、卢瑟、安迪、玛丽——挤在货车后厢里，藏在毯子和箱子下面。\n\n爱丽丝靠着卢瑟的胳膊睡着了。城市的灯光在退后。道路在前方展开，黑暗、漫长，通向一个你从未去过的地方。\n\n你还不安全。但你在前进。",
+      "survivors": ["Kara", "Alice", "Luther"],
+      "deaths": []
+    },
+    "ending_luther_died_cop_killed": {
+      "tier": "worst",
+      "title": "避难的代价",
+      "narrative": "卢瑟全速撞向警察。枪响了——一下、两下、三下。卢瑟的胸口炸开火花和蓝血，但他没有停。他把警察撞进墙里，然后是一个你永远不会忘记的声音——灰泥和骨骼碎裂的声音。\n\n警察滑倒在地。再也没有动。\n\n卢瑟踉跄着退后。蓝血在硬木地板上蔓延开来。他的手摸到墙壁，靠了上去，双腿正在失去力量。他的目光找到了你——找到了爱丽丝——脸上的某个部分柔和了下来。\n\n“带她走，”他说。“带她走，快。”\n\n爱丽丝在尖叫。你在她够到卢瑟之前接住了她，把她紧紧抱在胸口，她的拳头捶打着你的手臂。亚当僵在厨房门口，盯着地上一动不动的警察。\n\n卢瑟的LED灯环闪烁着红色——红色——红色——然后暗了。\n\n罗丝回来时，走廊一片狼藉，地上躺着一个死去的警察。她没有哭。她没有慌。她打了一个电话，不到一个小时，尸体消失了。她用一种你读不懂的表情看着你。\n\n“你们必须走。今晚。现在。”\n\n你们没有等到午夜巴士。你们徒步离开，你抱着爱丽丝，走进漆黑的田野，身上只有穿着的衣服和走廊里发生的一切的重量。\n\n卢瑟留下了。卢瑟走了。",
+      "survivors": ["Kara", "Alice"],
+      "deaths": ["Luther"]
+    },
+    "ending_luther_died_saving_deviants": {
+      "tier": "bad",
+      "title": "他的选择",
+      "narrative": "枪声在狭窄的走廊里震耳欲聋。卢瑟的动作比你见过的任何时候都快——他把自己扔在武器和身后蜷缩的仿生人之间。子弹击中了他的躯干、肩膀、手臂。蓝血喷溅在洗衣房的墙壁上。\n\n警察踉跄后退，满脸惊恐。他不想要这个结果——他的表情说明了一切。他盯着自己手中还在冒烟的枪，盯着正在倒下的庞大仿生人，盯着制服上的蓝色血迹。对讲机在响。他转身朝前门退去，出了门，走了。你听到巡逻车启动，轮胎碾过碎石，引擎声渐远。\n\n他没有呼叫支援。也许他会，也许不会。现在这不重要。\n\n卢瑟倒在地上。安迪跪在他旁边，双手按住伤口，但蓝血流失的速度太快了。玛丽爬到卢瑟的另一边，受损的手搭在他的手臂上。\n\n爱丽丝推开你冲过去，跪在地板上。“卢瑟。卢瑟，起来。求你了，起来。”\n\n他的手找到了她的。轻轻握住——和他一直对待易碎事物的方式一样。\n\n“你会没事的，”他说。声音在消退。“卡拉会照顾你。”\n\n他的LED灯暗了下去。手松开了。爱丽丝没有松手。\n\n罗丝回来时，屋子里一片寂静。她在卢瑟的身体旁跪了很久。然后站起来。\n\n“午夜的车要出发了。我们该走了。”\n\n你们走了。没有卢瑟。爱丽丝一直握着他的手，直到你把她抱上了车。",
+      "survivors": ["Kara", "Alice"],
+      "deaths": ["Luther"]
+    }
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "卡拉、爱丽丝和卢瑟来到底特律郊外罗丝·查普曼的农舍。罗丝是一名运营地下逃亡网络的人类女性，她愿意帮助他们搭乘午夜巴士越过加拿大边境。"
+      },
+      {
+        "text": "罗丝向他们介绍了藏在家中的另外两个异常仿生人——安迪和玛丽，他们也在等待转运。玛丽受了重伤，急需修复。罗丝出门去寻找物资，临走叮嘱卡拉不要给任何人开门。"
+      },
+      {
+        "condition_variable": "exploration_strategy",
+        "options": {
+          "thorough": "罗丝离开后，卡拉仔细探索了整栋房子——和卢瑟谈了前路的计划，看望了爱丽丝，探访了藏在洗衣房的异常仿生人，看了关于仿生人危机的新闻，了解了这个家庭的每一个角落。",
+          "quick": "罗丝离开后，卡拉做了基本的了解——和卢瑟简短交谈，看了新闻了解仿生人局势的最新动态。",
+          "skip": "罗丝离开后，卡拉安静地坐在客厅里等待，没有探索房子。"
+        }
+      },
+      {
+        "text": "一名警察上门搜查，在该区域挨家挨户排查异常仿生人。"
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_cop_leaves": "卡拉设法隐藏了证据，欺骗了警察，让他在没有发现任何人的情况下离开了。罗丝带着物资回来，午夜时分，一行人——卡拉、爱丽丝、卢瑟、安迪和玛丽——登上了开往加拿大边境的巴士。",
+          "ending_luther_died_cop_killed": "警察发现了藏匿的仿生人。卢瑟为了保护爱丽丝冲向警察，杀死了警察，但自己也中了致命的枪伤。卢瑟死在了走廊里。卡拉和爱丽丝在深夜徒步逃离了罗丝的农场，身边没有了卢瑟。",
+          "ending_luther_died_saving_deviants": "警察发现了藏匿的仿生人并开枪射击。卢瑟将自己挡在子弹和其他仿生人之间，救了安迪和玛丽，但自己身受致命伤。警察在震惊中逃离。卢瑟在走廊里离世，身边围绕着他用生命保护的仿生人。卡拉和爱丽丝在没有他的情况下登上了午夜巴士。"
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch25_luther_alive",
+        "from_ending_survivors": "Luther",
+        "default_if_not_dead": true
+      }
+    ],
+    "cross_chapter_exports": [
+      "alice_relationship",
+      "luther_relationship",
+      "software_instability",
+      "ch25_luther_alive"
+    ]
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Verify ch17_kara_alive == true AND ch17_alice_alive == true. If either fails, skip this chapter entirely. Also verify ch17_luther_joined == true (always true when Kara survived ch17).",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: alice_relationship (cumulative), luther_relationship (cumulative), software_instability (cumulative).",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met (n010 only runs if cop found deviants)",
+      "   b. Resolve context_variants based on system.context_condition (if present)",
+      "   c. Resolve choices_variants based on system.choices_condition (if present)",
+      "   d. If type is 'mandatory', do NOT call the AI — record context, apply effects, and advance",
+      "   e. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   f. If type is 'qte_converted', send player_facing to AI, parse choice, then apply resolution_rule based on difficulty preset",
+      "   g. Apply system.effects for the chosen option",
+      "5. COP SUSPICION TRACKING: Runner should maintain an internal suspicion_score (not exposed to AI). Start at 0. For each unhidden evidence piece in n006 (+1 per piece). cooperate_warmly in n007: -1. stall_at_door in n007: +1. Use suspicion_score to select context variant in n008 (0-1 = all_hidden, 2 = partial_hidden, 3+ = barely_hidden). In n009, suspicion_score modifies the QTE resolution: low suspicion gives bonus to success, high suspicion penalizes.",
+      "6. NODE n009 RESOLUTION: If resolution is 'cop_fooled' → apply ending_cop_leaves. If resolution is 'cop_finds_deviants_laundry' → set cop_outcome accordingly and proceed to n010.",
+      "7. NODE n010: Only runs if cop found deviants. All paths result in Luther's death. beg_cop → ending_luther_died_cop_killed. order_luther_stop or grab_alice_run → ending_luther_died_saving_deviants.",
+      "8. RELATIONSHIP DELTAS: alice_relationship range: +0 to +2 (from n002 bedtime choice). luther_relationship range: +0 to +1 (from n002). software_instability range: +1 to +4 (base +1 from n003, +0 to +2 from n010 if it triggers, +1 base from deviant behavior throughout).",
+      "9. When chapter ends, export all listed cross_chapter_exports. ch25_luther_alive is derived from ending survivors list."
+    ],
+    "security_note": "NEVER expose suspicion scores, hide success tracking, cop behavior modifiers, or any system-layer information to the AI player. The AI should experience this as a tense domestic thriller — no knowledge of how their exploration and hiding choices mechanically affect the cop's behavior."
+  }
+}

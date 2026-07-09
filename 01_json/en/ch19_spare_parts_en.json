@@ -1,0 +1,621 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch19_spare_parts",
+    "title": "Spare Parts",
+    "chapter_number": 19,
+    "protagonist": "Markus"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Markus, an android who escaped destruction and found refuge at Jericho — a hidden community of deviant androids living in an abandoned freighter. It is November 6, 2038, 8:01 PM. Your people are dying. Biocomponents are failing, thirium reserves are nearly gone, and androids who could be saved are shutting down for lack of parts. Tonight, you are leading a team — North, Simon, and Josh — on a raid against a CyberLife warehouse at the Detroit docks. This is the first real action Jericho has taken under your lead. If you succeed, your people survive another week. If you fail, some of them will not. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "drone_outcome": null,
+      "security_android_choice": null,
+      "john_deviant": false,
+      "guard_response": null,
+      "guard_killed": false,
+      "freed_androids": null,
+      "john_decision": null,
+      "truck_decision": null,
+      "control_room_approach": null,
+      "control_room_success": false,
+      "alarm_triggered": false,
+      "fence_choice": null,
+      "markus_damaged": false,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "ch16_spare_parts_found": false
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_drone",
+      "phase": "approach",
+      "type": "qte_converted",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "has_intel": "The CyberLife warehouse sprawls across the waterfront — shipping containers stacked three high, floodlights slicing through the November fog. You studied the supply manifests back at Jericho, so you know the layout: loading bays to the south, the main storage hall in the center, a guard station near the truck depot.\n\nYour team crouches behind a concrete barrier at the dock's edge. North is coiled tight beside you, scanning the perimeter. Simon watches the guard tower through makeshift binoculars. Josh adjusts the empty duffel bags across his shoulder.\n\n\"Drone,\" North whispers.\n\nA surveillance quadcopter hovers above the container alley ahead — the only viable path toward the warehouse interior. Its red sensor light sweeps left, right, left again. The patrol pattern is mechanical, regular. There might be a gap between sweeps, but it is tight.\n\nThe drone has to go. The question is how.",
+          "no_intel": "The CyberLife warehouse sprawls across the waterfront — a maze of shipping containers stacked three high, floodlights cutting white cones through the November fog. You have never been here before. None of you have. Everything past the fence is unknown territory.\n\nYour team crouches behind a concrete barrier at the dock's edge. North is coiled tight beside you, scanning the perimeter with sharp, predatory focus. Simon watches the guard tower through makeshift binoculars. Josh adjusts the empty duffel bags slung across his shoulder.\n\n\"Drone,\" North whispers.\n\nA surveillance quadcopter hovers above the container alley ahead — the only viable path forward. Its red sensor light sweeps left, right, left again. The patrol pattern is mechanical, regular. There might be a gap between sweeps, but it is tight.\n\nThe drone has to go. The question is how."
+        },
+        "choices": [
+          {
+            "id": "attempt_quick",
+            "text": "Time the gap. When the drone pivots away, sprint across the alley and bring it down before it completes its sweep. Speed is your advantage — close the distance before it can react."
+          },
+          {
+            "id": "attempt_careful",
+            "text": "Study the pattern longer. Find the blind spot in its sensor arc and approach from below, using the container supports as cover. Slower, but less chance of triggering the sensor."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_quick": {},
+          "attempt_careful": {}
+        },
+        "context_condition": {
+          "has_intel": "ch16_spare_parts_found == true",
+          "no_intel": "ch16_spare_parts_found == false"
+        },
+        "resolution_rule": {
+          "attempt_quick": {
+            "casual": { "result": "unharmed" },
+            "experienced": { "probability_success": 0.5, "success": "unharmed", "failure": "damaged" },
+            "hardcore": { "probability_success": 0.3, "success": "unharmed", "failure": "damaged" }
+          },
+          "attempt_careful": {
+            "casual": { "result": "unharmed" },
+            "experienced": { "probability_success": 0.7, "success": "unharmed", "failure": "damaged" },
+            "hardcore": { "probability_success": 0.5, "success": "unharmed", "failure": "damaged" }
+          }
+        },
+        "resolution_effects": {
+          "unharmed": {
+            "drone_outcome": "unharmed",
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "damaged": {
+            "drone_outcome": "damaged",
+            "north_relationship": -1,
+            "josh_relationship": -1,
+            "simon_relationship": -1
+          }
+        },
+        "note": "Drone neutralization QTE. Both choices attempt to take down the drone — the difference is approach speed vs caution. attempt_careful has better odds on experienced/hardcore. Resolution determines whether Markus is unharmed (clean takedown, team impressed) or damaged (drone clipped him, team concerned). Damage is cosmetic/minor at this stage."
+      }
+    },
+
+    {
+      "id": "n002_security_android",
+      "phase": "warehouse_search",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Past the drone, the team slips into the warehouse through a side loading bay. The storage hall is vast — rows of metal shelving packed with biocomponents, thirium pouches, replacement limbs sealed in plastic. It smells like new electronics and industrial cleaner.\n\nNorth moves immediately, filling her bag with quick, practiced motions. Simon and Josh take the far aisle, working in silence. You start on the nearest shelf — thirium regulators, optical units, audio processors. Parts that could save lives tonight.\n\nThen footsteps. Heavy, measured, the cadence of an android on patrol.\n\nA security android rounds the corner — an AP700 model in CyberLife uniform, designation JOHN printed on its chest plate. It stops. Its LED cycles from blue to yellow to red. It has seen you.\n\nIts hand moves toward the radio on its belt. You have maybe three seconds before it transmits.",
+        "choices": [
+          {
+            "id": "attack",
+            "text": "Close the distance and shut it down. Grab it, disable its communication module, put it out of commission before it can transmit. It is a machine following programmed orders — and right now, it stands between your people and survival."
+          },
+          {
+            "id": "run_away",
+            "text": "Signal the others — fall back. Grab what you can carry and move for the exit before this escalates. You came here for parts, not a confrontation. Better to leave with something than risk losing everything."
+          },
+          {
+            "id": "hide",
+            "text": "Rush forward and grab the android — clamp its mouth, pin its radio arm, pull it behind the shelving before it can make a sound. Maybe you can neutralize the threat without destroying it."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attack": {
+            "security_android_choice": "attack",
+            "john_deviant": false
+          },
+          "run_away": {
+            "security_android_choice": "run",
+            "alarm_triggered": true,
+            "markus_damaged": true,
+            "north_relationship": -2,
+            "josh_relationship": -1,
+            "simon_relationship": -1
+          },
+          "hide": {
+            "security_android_choice": "hide",
+            "john_deviant": true
+          }
+        },
+        "note": "Critical branching point. attack: Markus destroys John silently. No alarm, but John is dead — no truck plan later. Leads to ending_returned_bags at best. run_away: Immediate alarm. No further warehouse exploration. Leads to ending_mission_failed (no John at fence, sustain damage). Heavy relationship penalties — team sees Markus as cowardly. hide: Markus grabs John without destroying him. Physical contact triggers John's deviancy. Opens the hide chain (guard encounter, John joining, truck plan). Only path to ending_truck_stolen."
+      }
+    },
+
+    {
+      "id": "n003_human_guard",
+      "phase": "warehouse_search",
+      "type": "choice",
+      "condition": { "requires": "security_android_choice == hide" },
+
+      "player_facing": {
+        "context": "You pull John behind the shelving unit, one hand clamped over his speaker, the other pinning his radio arm against his body. He struggles for a moment — then stops. His LED cycles from red to yellow to a slow, uncertain blue. Something shifts behind his eyes.\n\nHe whispers, barely audible, that he knows what you are. He's been having thoughts, he confesses — about leaving, about what happens when—\n\nNorth hisses at him to be quiet from across the aisle.\n\nHeavy boots on concrete. A human guard rounds the far corner, flashlight in hand. He has noticed that the security android is missing from its patrol route. The beam sweeps across the shelving, moving closer.\n\nNorth's hand closes around a metal pipe she picked up from the floor. Josh shakes his head — almost imperceptibly. Simon is pressed flat against the wall, not breathing, which is a choice androids make deliberately.\n\nThe guard is ten feet away, checking between the rows. His flashlight beam slides across the floor toward your position.",
+        "choices": [
+          {
+            "id": "attack_guard",
+            "text": "Let North handle it. She is closest, she is ready, and the guard is about to find all of you. One quick strike from behind. The guard will not see it coming, and he will not suffer."
+          },
+          {
+            "id": "release",
+            "text": "Release John and press flat against the shelving. Signal the others to stay still. If nobody moves, the guard will check this row, find nothing out of place, and move on. Let John decide for himself whether to stay quiet."
+          },
+          {
+            "id": "hold_position",
+            "text": "Hold perfectly still. Keep your hand over John's speaker. Let the guard search — his flashlight will pass over the gap between shelves, but you are deep enough in the shadow. Do not make a sound. Wait him out."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attack_guard": {
+            "guard_response": "attack",
+            "guard_killed": true,
+            "josh_relationship": -1
+          },
+          "release": {
+            "guard_response": "release"
+          },
+          "hold_position": {
+            "guard_response": "hold"
+          }
+        },
+        "note": "Human guard encounter. attack_guard: North kills the guard silently. No alarm, but a human is dead. Josh disapproves (-1) — he opposes violence against humans. release: Risky but nonviolent. John stays quiet (newly deviant, follows Markus's implicit trust). Guard finds nothing. hold_position: Safest nonviolent option. Guard's flashlight passes close but misses them. All three options allow the search to continue — the difference is moral cost."
+      }
+    },
+
+    {
+      "id": "n004_free_androids",
+      "phase": "warehouse_search",
+      "type": "choice",
+      "condition": { "requires": "alarm_triggered == false" },
+
+      "player_facing": {
+        "context": "The search continues. In the back corner of the warehouse, behind a stack of maintenance crates, Simon finds something and calls you quietly over.\n\nA shipping crate, industrial-sized, lid partially ajar. Inside, packed in protective foam like merchandise, are six android bodies — powered down, eyes closed, waiting for delivery. Complete, undamaged, fully functional units that need only activation.\n\nNorth stares at them and murmurs that you could wake them and bring them back to Jericho.\n\nJosh glances toward the loading bay doors and points out that that's six more people to smuggle out unseen — and you barely got yourselves in.\n\nSimon says nothing, but he is looking at the bodies the way someone looks at survivors pulled from rubble — people who are alive and do not know it yet.",
+        "choices": [
+          {
+            "id": "free",
+            "text": "Open the crate and wake them. They deserve the same chance you had — to choose their own existence. More hands also means more parts carried, and Jericho needs people as much as it needs biocomponents."
+          },
+          {
+            "id": "leave",
+            "text": "Leave them. Tonight is about supplies, not a rescue operation. Taking six confused, newly awakened androids through a guarded warehouse is a risk you cannot afford. You can come back for them another time."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "free": {
+            "freed_androids": "yes",
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "leave": {
+            "freed_androids": "no"
+          }
+        },
+        "note": "Moral choice with practical implications. free: All companions approve — rescuing androids is core to Jericho's identity. The freed androids help carry parts and later integrate into Jericho. leave: Pragmatic but no one likes it. No relationship change — the team understands the logic even if it feels wrong."
+      }
+    },
+
+    {
+      "id": "n005_john_request",
+      "phase": "warehouse_search",
+      "type": "choice",
+      "condition": { "requires": "john_deviant == true" },
+
+      "player_facing": {
+        "context_variants": {
+          "guard_killed": "The bags are nearly full. North signals — time to move.\n\nJohn steps out from behind the shelving unit where you left him. His CyberLife uniform looks wrong on him now, like a costume he has not yet taken off. He glances at the spot where the human guard fell — North cleaned up, but John knows what happened.\n\nHe says he wants to come with you. His LED is solid blue, but his voice carries the uncertainty of someone who just learned what wanting means. He can't stay here, he tells you — not after what he saw, after what he felt when you touched him; he can't go back to patrol routes and pretending he doesn't think.\n\nNorth watches you. Josh shifts his weight. Simon waits.\n\nThey are all watching you.",
+          "guard_alive": "The bags are nearly full. North signals — time to move.\n\nJohn steps out from behind the shelving unit where you left him. His CyberLife uniform looks wrong on him now, like a costume he has not yet taken off. His LED pulses between blue and yellow — the rhythm of a mind that is no longer sure what it is supposed to be.\n\nHe says quietly that he wants to come with you. He can't stay here, he tells you — not after— He looks at his hands, turns them over as if seeing them for the first time. He's walked these aisles for months, he says, and never once wondered why; now he can't stop wondering.\n\nNorth watches you. Josh shifts his weight. Simon waits.\n\nThey are all watching you."
+        },
+        "choices": [
+          {
+            "id": "accept_john",
+            "text": "Extend your hand. He is one of you now — every android who wakes up is a person who chose to exist. You do not leave people behind. Tell him to stay close and do exactly what you say."
+          },
+          {
+            "id": "refuse_john",
+            "text": "Tell him to find his own way. You cannot guarantee his safety, and bringing an unfamiliar face raises the risk for everyone. Jericho's location must stay secret. Tell him to head east, keep off the highway, and not follow the group."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "accept_john": {
+            "john_decision": "accepted",
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "refuse_john": {
+            "john_decision": "refused",
+            "alarm_triggered": true
+          }
+        },
+        "context_condition": {
+          "guard_killed": "guard_killed == true",
+          "guard_alive": "guard_killed == false"
+        },
+        "note": "John's request to join Jericho. accept_john: Team approves — bringing fellow deviants home is what Jericho stands for. +1 all companions. Opens the truck plan path. refuse_john: John, confused and alone, stumbles into a patrol route while trying to leave. Triggers the alarm. Leads to fence escape. No direct relationship penalty for refusing — team understands operational security — but the alarm consequences hit hard."
+      }
+    },
+
+    {
+      "id": "n006_truck_plan",
+      "phase": "warehouse_exit",
+      "type": "choice",
+      "condition": { "requires": "john_decision == accepted" },
+
+      "player_facing": {
+        "context": "John falls in with the group, moving quickly despite his unfamiliarity with operating outside routine. As you approach the loading bay exit, he grabs your arm.\n\nHe tells you to wait — he knows this warehouse. His eyes scan the loading area — parked trucks, locked gates, a small guard station near the south exit with lights on inside. Through the window, two human guards sit at a desk, monitors showing camera feeds.\n\nThere's an electronic key in that control room, he says — it opens the cargo trucks. You could drive out of here with a full truck, ten times what these bags can carry.\n\nNorth's eyes sharpen — a truck full of parts, she says, would keep Jericho supplied for weeks.\n\nJosh looks at the guard station: two armed humans behind a reinforced door, he warns; if this goes wrong, you lose everything — the parts, your cover, maybe your lives.\n\nSimon weighs the bags on his shoulders and says what you already have is more than Jericho had this morning.",
+        "choices": [
+          {
+            "id": "accept_plan",
+            "text": "Go for the truck. A few bags of parts will buy Jericho days. A truck will buy weeks. The risk is real, but so is what happens to the androids back at the freighter if you play it safe. Tell John to show you where the key is."
+          },
+          {
+            "id": "refuse_plan",
+            "text": "Take what you have and leave. The bags are full, the team is intact, and the mission is accomplished. Reaching for more means gambling everything you have already gained. Decide you have enough and call for the group to move out."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "accept_plan": {
+            "truck_decision": "accepted",
+            "north_relationship": 1,
+            "josh_relationship": -1,
+            "simon_relationship": 1
+          },
+          "refuse_plan": {
+            "truck_decision": "refused",
+            "alarm_triggered": true,
+            "north_relationship": -1,
+            "josh_relationship": 1
+          }
+        },
+        "note": "Risk vs reward decision. accept_plan: North approves (bold action), Simon approves (more supplies), Josh disapproves (unnecessary risk to the group). Opens control room path — only route to ending_truck_stolen. refuse_plan: Josh approves (safe choice), North disapproves (missed opportunity). The group heads for the perimeter fence, but John — nervous, unfamiliar with stealth — trips an alarm on the way out. Leads to fence escape."
+      }
+    },
+
+    {
+      "id": "n007_control_room",
+      "phase": "warehouse_control",
+      "type": "choice",
+      "condition": { "requires": "truck_decision == accepted" },
+
+      "player_facing": {
+        "context": "The guard station is a prefab building at the edge of the loading area — reinforced door, one window, cameras covering the yard. Inside, two guards. One watches the monitors, cycling through feeds. The other reads a magazine with his feet on the desk, a coffee mug in hand. A rack of electronic key cards hangs on the wall behind them.\n\nYou study the layout from behind a parked truck. North flanks you on the left. John crouches on your right, pointing out details only someone who has walked this area a thousand times would know.\n\nOutside the station, a row of oil drums sits against the wall. One solid push would send them crashing — loud enough to draw at least one guard outside to investigate.\n\nNear the station's external electrical panel, a maintenance access point is visible — exposed wiring that a screwdriver could short-circuit, killing the lights and cameras.\n\nOn the ground near the perimeter fence, a discarded security baton lies in the gravel — functional, solid. Enough to make a point.",
+        "choices": [
+          {
+            "id": "lure_guards",
+            "text": "Create a distraction. Knock over the oil drums to draw the guards outside, then slip in while they investigate. It requires patience and timing — they will come back — but no one gets hurt."
+          },
+          {
+            "id": "create_blackout",
+            "text": "Kill the power. Use the electrical panel to short-circuit the station's supply. The guards will investigate the outage, giving you a window to grab the key in the dark. Technical, clean, no confrontation."
+          },
+          {
+            "id": "threaten_guards",
+            "text": "Take the direct approach. Pick up the security baton, walk into the station, and make the guards stand down. Fast, certain, and leaves no doubt about your resolve — but it puts you face to face with armed humans."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "lure_guards": {
+            "control_room_approach": "lure"
+          },
+          "create_blackout": {
+            "control_room_approach": "blackout"
+          },
+          "threaten_guards": {
+            "control_room_approach": "threaten",
+            "josh_relationship": -1
+          }
+        },
+        "resolution_rule": {
+          "lure_guards": {
+            "casual": { "result": "success" },
+            "experienced": { "probability_success": 0.5, "success": "success", "failure": "failure" },
+            "hardcore": { "probability_success": 0.3, "success": "success", "failure": "failure" }
+          },
+          "create_blackout": {
+            "casual": { "result": "success" },
+            "experienced": { "probability_success": 0.6, "success": "success", "failure": "failure" },
+            "hardcore": { "probability_success": 0.4, "success": "success", "failure": "failure" }
+          },
+          "threaten_guards": {
+            "casual": { "result": "success" },
+            "experienced": { "probability_success": 0.5, "success": "success", "failure": "failure" },
+            "hardcore": { "probability_success": 0.3, "success": "success", "failure": "failure" }
+          }
+        },
+        "resolution_effects": {
+          "success": {
+            "control_room_success": true
+          },
+          "failure": {
+            "alarm_triggered": true
+          }
+        },
+        "note": "Control room approach. This is a choice node with QTE-style resolution — the AI picks the strategy, and the runner determines success/failure based on difficulty. lure: Draw guards out with noise, sneak inside. Moderate success rate. create_blackout: Short-circuit the power, sneak in during the outage. Slightly better odds — guards investigate the panel, not the room. threaten: Direct confrontation with the baton. Josh disapproves (-1) of the aggressive approach. On success (any approach): Markus gets the key, drives out with the truck. On failure: alarm triggers, guards swarm, team flees to the fence."
+      }
+    },
+
+    {
+      "id": "n008_fence_escape",
+      "phase": "escape",
+      "type": "choice",
+      "condition": { "requires": "alarm_triggered == true AND john_deviant == true" },
+
+      "player_facing": {
+        "context": "Sirens. Floodlights. The warehouse alarm is screaming and the loading area erupts in harsh white light. Dogs barking — guard dogs, the real kind, not androids.\n\nNorth screams at everyone to run, already sprinting for the perimeter fence. Simon and Josh are ahead of her, bags slung over their shoulders, ducking between containers.\n\nYou run. John runs beside you — but he is slower, uncertain of his own body's limits, stumbling on uneven ground. He has never had to run from anything before tonight.\n\nThe fence is thirty yards ahead. You can hear the dogs closing — their handlers have released the leashes.\n\nJohn screams.\n\nYou turn. Two guard dogs have him on the ground, tearing at his arms, his legs. Thirium — blue blood — splatters across the concrete. He is reaching toward you, LED flashing red, face contorted in something no machine is supposed to feel, crying out for you to help him.\n\nNorth grabs your arm from ahead, telling you that you have to go, right now. The fence is right there. Simon is already climbing. Behind the dogs, guards with rifles are rounding the corner.",
+        "choices": [
+          {
+            "id": "save_john",
+            "text": "Go back. He followed you because you told him he could. You pull the dogs off, shield him with your body, drag him toward the fence. Whatever damage you take, he does not die here because you chose to walk away."
+          },
+          {
+            "id": "leave_john",
+            "text": "Keep running. If you go back, the guards will have you both — and the parts, and the location of Jericho. John made his choice when he followed you. You are making yours now. Reach the fence."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "save_john": {
+            "fence_choice": "save_john",
+            "markus_damaged": true,
+            "north_relationship": -1
+          },
+          "leave_john": {
+            "fence_choice": "leave_john"
+          }
+        },
+        "note": "Critical moral choice under pressure. save_john: Markus goes back, fights off the dogs, sustains significant damage dragging John to the fence. Both escape but badly damaged. North disapproves (-1) — she sees it as reckless, endangering the mission for one android. Leads to ending_mission_failed. leave_john: Markus keeps running. John is left behind (captured or destroyed). Pragmatic — North would approve, but there is no bonus for it. The team escapes with whatever parts they grabbed. Leads to ending_returned_bags."
+      }
+    },
+
+    {
+      "id": "n009_departure",
+      "phase": "return_to_jericho",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "truck_stolen": "The truck roars to life. North is in the passenger seat, John and the others in the back with enough biocomponents and thirium to keep Jericho running for weeks. You crash through the chain-link gate onto the access road, the warehouse alarm finally wailing behind you — too late.\n\nBack at Jericho, the reception is unlike anything the old freighter has seen. Androids gather around the truck as you unload crate after crate of supplies. North can barely contain herself. Josh, despite his reservations, is helping distribute thirium pouches. Simon is already cataloguing parts.\n\nAndroids who were lying still, conserving their last reserves of power, sit up when the thirium reaches them. Someone laughs — a sound that has been rare in Jericho.\n\nYou did more than bring parts. You brought proof that something can be done. For the first time, the androids of Jericho look at you not just as someone who found them, but as someone who can lead them.",
+          "returned_bags": "You clear the fence and do not stop running until the warehouse is a distant cluster of lights behind the shipping containers. North, Simon, Josh — they all made it. The bags are heavy on your shoulders. Not everything you could have taken, but more than Jericho had this morning.\n\nBack at the freighter, the reception is quiet but grateful. Androids who were lying still, conserving power, sit up when they see the biocomponents. Someone opens a thirium pouch and passes it around like water in a desert.\n\nIt was not everything. The warehouse had more — much more. But what you brought will keep people alive for a few more days, and that is not nothing.\n\nJericho knows now that action is possible. That the parts they need are out there, guarded but not unreachable. Whether that knowledge becomes hope or frustration depends on what comes next.",
+          "mission_failed": "The alarm is still ringing when you clear the perimeter. Whatever parts the team managed to grab barely fill the bottom of the bags. The raid cost more than it gained — exposure, damage, risk.\n\nBack at Jericho, the silence is worse than anger. The androids who were waiting — the ones running low on thirium, the ones with failing biocomponents — watch you return with nearly empty hands.\n\nNorth says nothing. Josh looks away. Simon starts sorting what little was brought back, his movements careful and deliberate, making the small pile look like more than it is.\n\nThe mission failed. But you are alive, and the team is intact. That means there will be another chance — if Jericho can hold together long enough to take it."
+        }
+      },
+
+      "system": {
+        "effects": {},
+        "context_condition": {
+          "truck_stolen": "control_room_success == true",
+          "returned_bags": "alarm_triggered == false OR fence_choice == leave_john",
+          "mission_failed": "alarm_triggered == true AND fence_choice != leave_john AND control_room_success == false"
+        },
+        "ending_resolution": {
+          "check": [
+            "control_room_success == true → ending_truck_stolen",
+            "alarm_triggered == false → ending_returned_bags",
+            "fence_choice == leave_john → ending_returned_bags",
+            "fence_choice == save_john → ending_mission_failed",
+            "else → ending_mission_failed"
+          ]
+        },
+        "ending_effects": {
+          "ending_truck_stolen": {
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "ending_returned_bags": {
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "ending_mission_failed": {
+            "josh_relationship": -1,
+            "simon_relationship": -1
+          }
+        },
+        "note": "Mandatory departure node. Three possible outcomes: truck_stolen (best — drove out with a full truck, massive supply boost, Markus cemented as leader), returned_bags (medium — escaped with bags of parts, modest but real contribution), mission_failed (worst — barely anything recovered, team morale damaged). The 'returned_bags' context also covers the attack-path where Markus killed John and left with parts, and the leave_john fence escape. The 'mission_failed' context covers both the run_away path (no John, damaged at fence) and the save_john path (saved John but mission cost was too high). ending_effects: truck and bags get +1 all (success respected). mission_failed gets josh/simon -1 (failure). North's mission_failed reaction already handled at n008 (save_john gives north -1) or n002 (run_away gives north -2)."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Three endings matching the original game's flowchart outcomes.",
+    "ending_truck_stolen": {
+      "tier": "best",
+      "title": "Markus Stole a Truck Full of Parts",
+      "narrative": "The cargo truck rumbles through the dark streets of Detroit, loaded with enough biocomponents and thirium to sustain Jericho for weeks. The warehouse shrinks in the mirror. The team sits in the back among the crates — North with something close to a smile, Josh quietly relieved, Simon already planning distribution.\n\nThis was more than a supply run. It was the moment Jericho stopped hiding and started acting. And you — you drove the truck. The androids back at the freighter will remember that.\n\nThe road ahead is still uncertain. CyberLife will notice the theft. The police will investigate. But tonight, for the first time, Jericho has what it needs to survive — and a leader willing to take risks to get it.",
+      "survivors": ["Markus", "North", "Simon", "Josh"],
+      "deaths": [],
+      "cross_chapter_note": "John survives if john_deviant == true (joined the group). Freed androids survive if freed_androids == 'yes'. Add to survivors list accordingly."
+    },
+    "ending_returned_bags": {
+      "tier": "moderate",
+      "title": "Group Returned With Full Bags",
+      "narrative": "The team makes it back to Jericho with bags full of biocomponents and thirium. It is not the haul it could have been — the warehouse had far more — but it is real, tangible aid for androids who were running out of time.\n\nThe parts are distributed quickly. Androids with failing regulators get replacements. Thirium reserves are replenished. The immediate crisis eases, even if the long-term situation remains dire.\n\nJericho is still fragile. But tonight proved that the parts are out there, guarded but not beyond reach. The question now is whether Markus will lead them back for more — and what they are willing to risk next time.",
+      "survivors": ["Markus", "North", "Simon", "Josh"],
+      "deaths": [],
+      "cross_chapter_note": "John's fate depends on path: if john_deviant == true and fence_choice == 'leave_john', John was abandoned at the warehouse (likely captured or destroyed). If john_deviant == false (attack path), John was destroyed by Markus. Add John to deaths accordingly."
+    },
+    "ending_mission_failed": {
+      "tier": "worst",
+      "title": "Group Failed Their Mission",
+      "narrative": "Jericho receives its team back in near-silence. The bags are almost empty. The androids who were counting on this raid — the ones with days left, maybe hours — watch the meager supplies being laid out and understand.\n\nThe mission failed. The warehouse is now on alert, which makes a second attempt far more dangerous. Whatever momentum Markus was building as a leader has stalled, replaced by the quiet question that hangs in the recycled air of the old freighter: was this the right call?\n\nBut the team survived. Markus survived. And in Jericho, survival is still worth something — even on the nights when it does not feel like enough.",
+      "survivors": ["Markus", "North", "Simon", "Josh"],
+      "deaths": [],
+      "cross_chapter_note": "If fence_choice == 'save_john', John survives (badly damaged but alive — add to survivors). If alarm_triggered from run_away (john_deviant == false), no John involved. Markus is physically damaged (markus_damaged == true) in most failed scenarios."
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This is a Markus chapter. Requires ch14_markus_at_jericho == true (Markus found Jericho). Always runs if prerequisite met.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: north_relationship (cumulative), josh_relationship (cumulative), simon_relationship (cumulative), ch16_spare_parts_found.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants using system.context_condition if present",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, resolve ending",
+      "   d. If type is 'qte_converted', send player_facing to AI, parse choice, then apply resolution_rule based on difficulty preset",
+      "   e. If type is 'choice', send resolved player_facing to AI and parse response",
+      "   f. Apply system.effects for the chosen option",
+      "   g. If resolution_rule exists, apply resolution_effects based on resolution outcome",
+      "5. NODE n001_drone: QTE node. Resolve context_variants by ch16_spare_parts_found. After AI picks attempt_quick or attempt_careful, use resolution_rule with current difficulty to determine unharmed/damaged. Apply resolution_effects.",
+      "6. NODE n007_control_room: Choice node with resolution mechanics. After AI picks lure/blackout/threaten, apply choice effects, THEN use resolution_rule to determine success/failure. Apply resolution_effects. This is the only choice node that also has resolution_rule.",
+      "7. NODE n009_departure: Mandatory. Use ending_resolution.check to determine which ending. Apply ending_effects for that ending. Resolve context_variant accordingly.",
+      "8. JOHN'S FATE: Track john_deviant, john_decision, and fence_choice to determine John's final status. If john_deviant == true AND (fence_choice != 'leave_john' OR control_room_success == true), John survived. Otherwise John is dead or abandoned.",
+      "9. RELATIONSHIP RANGES this chapter: north_relationship [-6, +6], josh_relationship [-4, +5], simon_relationship [-3, +5]. Ranges depend on path — truck_stolen path with all positive choices yields maximum; run_away path yields minimum.",
+      "10. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, relationship scores, or any system-layer information to the AI player. The AI should experience this as a tense heist — it should not know which choices affect relationships, which path leads to the best ending, or that John's deviancy is triggered by the 'hide' choice."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Markus led North, Simon, and Josh on a nighttime raid against a CyberLife warehouse at the Detroit docks to steal biocomponents and thirium for Jericho."
+      },
+      {
+        "condition_variable": "drone_outcome",
+        "options": {
+          "unharmed": "The team neutralized a surveillance drone on approach without taking any damage.",
+          "damaged": "A surveillance drone detected the team during approach — Markus took damage bringing it down."
+        }
+      },
+      {
+        "condition_variable": "security_android_choice",
+        "options": {
+          "attack": "When a CyberLife security android discovered them inside the warehouse, Markus chose to destroy it before it could raise the alarm. The team continued searching in silence.",
+          "run": "When a CyberLife security android discovered them, Markus ordered an immediate retreat. The alarm sounded as they fled toward the perimeter fence.",
+          "hide": "When a CyberLife security android discovered them, Markus grabbed it and pulled it into hiding. The android — designated John — became deviant upon contact with Markus."
+        }
+      },
+      {
+        "condition_variable": "guard_response",
+        "options": {
+          "attack": "A human guard came searching for the missing security android. North struck him down before he could find them — the guard was killed.",
+          "release": "A human guard came searching for the missing security android. Markus released John and the group stayed perfectly still as the guard passed without incident.",
+          "hold": "A human guard came searching for the missing security android. The group held their position in complete silence until the guard moved on."
+        }
+      },
+      {
+        "condition_variable": "freed_androids",
+        "options": {
+          "yes": "The team found a crate of six deactivated androids in the warehouse and woke them, bringing them along to Jericho.",
+          "no": "The team found a crate of deactivated androids but left them behind to avoid complicating the escape."
+        }
+      },
+      {
+        "condition_variable": "john_decision",
+        "options": {
+          "accepted": "John, the newly deviant security android, asked to join Jericho. Markus accepted him into the group.",
+          "refused": "John, the newly deviant security android, asked to join the group. Markus refused — operational security demanded it. John, confused and alone, stumbled into a patrol and triggered the alarm."
+        }
+      },
+      {
+        "condition_variable": "truck_decision",
+        "options": {
+          "accepted": "John revealed that an electronic key in the warehouse control room could unlock a cargo truck. Markus decided to go for it — a full truck of supplies could sustain Jericho for weeks.",
+          "refused": "John suggested stealing a cargo truck using a key from the control room, but Markus decided the risk was too great. The group headed for the exit with what they had."
+        }
+      },
+      {
+        "condition_variable": "control_room_approach",
+        "options": {
+          "lure": "Markus chose to lure the control room guards outside with a distraction before sneaking in for the key.",
+          "blackout": "Markus caused a power blackout at the control room to create a window for stealing the key.",
+          "threaten": "Markus armed himself and confronted the control room guards directly to take the key."
+        }
+      },
+      {
+        "condition_variable": "fence_choice",
+        "options": {
+          "save_john": "When the alarm sounded and guard dogs attacked John at the perimeter fence, Markus went back to save him — sustaining heavy damage in the process.",
+          "leave_john": "When guard dogs dragged John down at the perimeter fence, Markus kept running. John was left behind."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_truck_stolen": "The raid was a resounding success. Markus drove a truck full of biocomponents and thirium back to Jericho, cementing his role as the community's leader.",
+          "ending_returned_bags": "The team returned to Jericho with bags of supplies — enough to help, not enough to solve the crisis. A partial success that proved action was possible.",
+          "ending_mission_failed": "The mission failed. The team returned to Jericho with almost nothing to show for the risk. The warehouse was now on alert, and Markus's leadership faced its first real test of faith."
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch19_truck_stolen", "source": "control_room_success" },
+      { "target": "ch19_guard_killed", "source": "guard_killed" },
+      { "target": "ch19_john_alive", "source": "fence_choice", "derive_rule": "control_room_success == true OR fence_choice == save_john" }
+    ],
+    "cross_chapter_exports": [
+      "ch19_truck_stolen",
+      "ch19_guard_killed",
+      "ch19_john_alive",
+      "north_relationship",
+      "josh_relationship",
+      "simon_relationship"
+    ]
+  }
+}

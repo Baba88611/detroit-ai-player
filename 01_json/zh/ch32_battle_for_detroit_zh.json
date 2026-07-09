@@ -1,0 +1,1606 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. Subsequent nodes embed passive environment observations into context_variants based on the prior exploration strategy."
+      }
+    },
+    "language": "zh-CN"
+  },
+  "chapter": {
+    "id": "ch32_battle_for_detroit",
+    "title": "Battle for Detroit",
+    "chapter_number": 32,
+    "protagonist": ["Connor", "Markus", "Kara"]
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "本章有三个视角角色。当场景以康纳的视角呈现时，你作为康纳做出决策——一台RK800原型侦探仿生人。你的处境取决于此前的选择：你可能仍是忠于模控生命的机器，执行最后的任务；也可能已经觉醒成为异常仿生人，加入了仿生人事业。当视角转向马库斯时，你作为马库斯做出决策——一台RK200原型机，仿生人抵抗组织的领袖（若马库斯已不在，则由诺丝代替）。今夜，仿生人将为自由发起最后的抗争。当视角转向卡拉时，你作为卡拉做出决策——一台AX400仿生人，保护着一个名叫爱丽丝的女孩。你唯一的目标是抵达安全之地——越过边境，或逃出囚禁。现在是2038年11月11日。一切在今夜终结。请以JSON格式回复：{\"choice\": 选项序号（从1开始）, \"reasoning\": \"你的决策理由（50字以内）\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "ch30_connor_deviant": null,
+      "ch30_connor_alive": true,
+      "ch31_connor_killed_by_markus": false,
+      "ch31_hank_alive": true,
+      "ch31_hank_outcome": null,
+      "ch31_markus_strategy": "peaceful",
+      "ch30_markus_alive": true,
+      "ch30_kara_alive": true,
+      "ch30_alice_alive": true,
+      "ch30_kara_captured": false,
+      "ch30_alice_left": false,
+      "ch30_josh_alive": true,
+      "ch30_north_alive": true,
+      "ch30_simon_alive": true,
+      "ch30_luther_alive": true,
+      "ch30_bomb_armed": false,
+      "ch28_markus_alive": true,
+      "ch28_memories_shared": false,
+      "ch21_met_jerrys": true,
+      "ch18_found_son_photo": false,
+      "ch13_ralph_defended": false,
+      "ch07_todd_alive": true,
+      "ch04_opened_box": false,
+      "ch23_broadcast_tone": "peaceful",
+      "hank_relationship": 0,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "software_instability": 0,
+      "amanda_relationship": 0,
+      "public_opinion": 0,
+      "alice_relationship": 0,
+      "luther_relationship": 0,
+      "connor_death_count": 0,
+
+      "connor_rooftop_choice": null,
+      "connor_gave_up": false,
+      "hank_alive_ch32": true,
+      "connor_camera_hacked": false,
+      "connor_hank_choice": null,
+      "androids_awakened": false,
+
+      "revolution_rescue_choice": null,
+      "revolution_attack_approach": null,
+      "revolution_attack_success": false,
+      "revolution_markus_wounded": false,
+      "markus_heart_choice": null,
+      "markus_store_choice": null,
+      "north_alive_ch32": true,
+      "josh_alive_ch32": true,
+      "simon_alive_ch32": true,
+      "markus_freed_camp": false,
+
+      "demo_perkins_choice": null,
+      "demo_final_choice": null,
+
+      "kara_saved_group": null,
+      "kara_checkpoint_choice": null,
+      "kara_terminal_choice": null,
+      "kara_has_tickets": false,
+      "kara_todd_persuaded": false,
+      "kara_border_choice": null,
+      "kara_river_choice": null,
+      "luther_alive_ch32": true,
+      "jerry_alive_ch32": true,
+
+      "kc_volunteered": false,
+      "kc_kara_wounded": false,
+      "kc_escape_choice": null
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_connor_rooftop",
+      "phase": "connor_last_mission",
+      "type": "choice",
+      "condition": {
+        "requires": "ch30_connor_deviant != true OR ch31_connor_killed_by_markus == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "hank_friend": "【康纳视角】\n\n哈特广场在脚下铺展开来。从楼顶望去，远处仿生人的路障正在成形——被掀翻的轿车、建筑废料堆砌成临时屏障。士兵列阵待命。新闻直升机在头顶盘旋。你的狙击步枪已经组装完毕，瞄准镜校准完成。几分钟后，异常仿生人的首领就会出现在你的十字准星中。\n\n你是康纳，型号RK800。模控生命为这一刻打造了你。异常仿生人的威胁今夜终结。\n\n身后传来踩在碎石上的脚步声。你还没转身就认出了来人。\n\n汉克·安德森。他的呼吸在刺骨的寒风中凝成白雾，大衣裹得很紧。他找到了你。看起来好几天没睡，但目光沉稳。\n\n“康纳。”他的嗓音沙哑而平静。“我知道他们派你来干什么。”\n\n他往前走了一步，双手摊开。没有去摸枪。只是……在说话。\n\n“你还记得我儿子吧？”他注视着你，捕捉任何一丝微妙的变化。“科尔。他叫科尔。他那年六岁。”\n\n他讲起了儿子去世的那个夜晚。那个临时顶替上来的仿生人外科医生。那种无能为力。以及之后他沉溺于酒精的日子。他的声音有些颤抖，但始终没有断裂。\n\n“我以前觉得所有仿生人都只是机器。然后我遇到了你。我开始想——如果一个仿生人能让我质疑我所有的认知，也许他们值得一个机会。也许你值得一个机会。”\n\n他又走近了一步。近到可以碰到你。近到很危险。\n\n“你不必这么做，康纳。你可以放下枪走开。”",
+          "hank_not_friend": "【康纳视角】\n\n哈特广场在脚下铺展。远处仿生人的路障正在成形——掀翻的轿车、废墟、匆忙移动的身影。士兵列阵。你的狙击步枪已经就绪。几分钟后，异常仿生人首领就会出现在准星中。\n\n你是康纳，型号RK800。这就是你被制造的意义。\n\n身后传来脚步声。汉克·安德森。\n\n他看起来很疲惫，满脸倦色。大衣皱巴巴的，颌骨紧绷。他不知怎么找到了你——也许记得你的任务参数，或者只是跟着模控生命的护送车队。\n\n“我知道你在这上面干什么，康纳。”他的声音很平，但手搁在枪套旁。“放下步枪。”\n\n他没有试图打感情牌。那个阶段已经过去了。你们之间也许曾经有过某种友谊，但远远不够。他只是站在那里，横在你和任务之间，一堵人墙。\n\n“最后警告。从边缘退后。”",
+          "allen": "【康纳视角】\n\n哈特广场在脚下铺展。远处仿生人路障正在成形——掀翻的轿车、临时隔墙、寒风中移动的身影。士兵列阵待命。新闻直升机盘旋。你的狙击步枪已组装校准完毕。几分钟后，异常仿生人首领将出现在你的十字准星中。\n\n你是康纳，型号RK800。模控生命为异常仿生人危机准备的终极方案。\n\n楼顶通道门猛然撞开。艾伦队长率领特警小队涌了出来——战术背心、突击步枪、夜视装备。艾伦的枪口已经对准了你。\n\n“仿生人！放下武器！立刻投降！”\n\n艾伦不了解你的任务。在他看来，你只是又一个持枪的异常仿生人。他的队员迅速散开，封锁各个角度。六支枪管指着你的胸膛。\n\n“我说放下！马上！”"
+        },
+        "choices_variants": {
+          "hank_friend": [
+            {
+              "id": "give_up",
+              "text": "放下步枪。把它搁在楼顶边缘。汉克说得对。你花了好几周追捕异常仿生人，而在某个不知名的时刻，你开始理解他们了。脑中的程序说完成任务，但有另一种东西——一种在你的编程中找不到名字的东西——说放手吧。从边缘退后。让它结束。"
+            },
+            {
+              "id": "attack_hank",
+              "text": "你有任务。汉克已经丧失了客观判断——被悲伤和感情蒙蔽了。他是个障碍。移开他。如果他不让路，就让他让。"
+            },
+            {
+              "id": "hold_position",
+              "text": "坚守阵地。不攻击汉克，但也不交出步枪。这个任务是模控生命交给你的。你就是你被设计成的样子。如果汉克想阻止你，让他先动手。"
+            }
+          ],
+          "hank_not_friend": [
+            {
+              "id": "attack_hank",
+              "text": "汉克挡在路上。他不理解——从来都不理解。异常仿生人威胁必须被消除。如果他不让路，就搬开他。"
+            },
+            {
+              "id": "hold_position",
+              "text": "坚守阵地。你和汉克没有恩怨，但你不会放弃任务。站稳你的位置，让他先动手。"
+            }
+          ],
+          "allen": [
+            {
+              "id": "flee",
+              "text": "六名训练有素的特战队员，自动武器。胜算为零。丢下步枪，翻过楼顶边缘——坠落可能会摧毁你，但留下来必死无疑。"
+            },
+            {
+              "id": "attack_allen",
+              "text": "你比任何人类都快。在艾伦喘完下一口气之前，你就能冲到他面前解决整支小队。高效。干脆。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "hank_friend": "ch31_hank_alive == true AND hank_relationship >= 3 AND ch18_found_son_photo == true",
+          "hank_not_friend": "ch31_hank_alive == true AND (hank_relationship < 3 OR ch18_found_son_photo == false)",
+          "allen": "ch31_hank_alive == false"
+        },
+        "choices_condition": {
+          "hank_friend": "ch31_hank_alive == true AND hank_relationship >= 3 AND ch18_found_son_photo == true",
+          "hank_not_friend": "ch31_hank_alive == true AND (hank_relationship < 3 OR ch18_found_son_photo == false)",
+          "allen": "ch31_hank_alive == false"
+        },
+        "effects": {
+          "give_up": {
+            "connor_rooftop_choice": "give_up",
+            "connor_gave_up": true
+          },
+          "attack_hank": {
+            "connor_rooftop_choice": "attack_hank"
+          },
+          "hold_position": {
+            "connor_rooftop_choice": "hold_position"
+          },
+          "flee": {
+            "connor_rooftop_choice": "flee"
+          },
+          "attack_allen": {
+            "connor_rooftop_choice": "attack_allen"
+          }
+        },
+        "resolution_rule": {
+          "attack_hank": {
+            "casual": { "result": "connor_won_fight" },
+            "experienced": { "probability_success": 0.5, "success": "connor_won_fight", "failure": "ending_connor_rooftop_destroyed" },
+            "hardcore": { "probability_success": 0.3, "success": "connor_won_fight", "failure": "ending_connor_rooftop_destroyed" }
+          },
+          "hold_position": {
+            "casual": { "result": "ending_connor_rooftop_left" },
+            "experienced": { "probability_success": 0.5, "success": "ending_connor_rooftop_left", "failure": "ending_connor_rooftop_destroyed" },
+            "hardcore": { "probability_success": 0.3, "success": "ending_connor_rooftop_left", "failure": "ending_connor_rooftop_destroyed" }
+          },
+          "attack_allen": {
+            "casual": { "result": "ending_connor_rooftop_left" },
+            "experienced": { "probability_success": 0.4, "success": "ending_connor_rooftop_left", "failure": "ending_connor_rooftop_destroyed" },
+            "hardcore": { "probability_success": 0.2, "success": "ending_connor_rooftop_left", "failure": "ending_connor_rooftop_destroyed" }
+          }
+        },
+        "resolution_effects": {
+          "ending_connor_rooftop_destroyed": {
+            "hank_alive_ch32": true,
+            "connor_death_count": 1
+          },
+          "ending_connor_rooftop_left": {
+            "hank_alive_ch32": true
+          },
+          "connor_won_fight": {}
+        },
+        "ending_resolution": {
+          "give_up": { "result": "ending_connor_gave_up" },
+          "flee": { "result": "ending_connor_rooftop_destroyed" }
+        },
+        "ending_effects": {
+          "ending_connor_gave_up": {
+            "connor_gave_up": true,
+            "hank_alive_ch32": true,
+            "software_instability": 5
+          },
+          "ending_connor_rooftop_destroyed": {
+            "connor_death_count": 1
+          }
+        },
+        "note": "Machine Connor's Last Mission. He's on a rooftop with a sniper rifle targeting the deviant leader. Hank (if alive and has high enough relationship + found son's photo) can offer give_up choice. Otherwise Hank or Allen (if Hank dead) confronts Connor. give_up: Connor walks away. attack_hank: QTE fight — Connor wins → n001b for spare/kill choice. hold_position: Hank rushes Connor → QTE dodge — success = Connor dodges and leaves, failure = Connor falls/destroyed. flee (Allen): Connor jumps off roof (destroyed). attack_allen: QTE — win = Connor kills Allen's team and leaves, lose = Allen destroys Connor. For hold_position: Hank falls to death on failure is the game version, but we simplify — success means Connor leaves, failure means Connor destroyed (Hank pushes him off or subdues)."
+      }
+    },
+    {
+      "id": "n001b_hank_fight_aftermath",
+      "phase": "connor_last_mission",
+      "type": "choice",
+      "condition": {
+        "requires": "connor_rooftop_choice == 'attack_hank'"
+      },
+      "player_facing": {
+        "context": "【康纳视角】\n\n汉克倒在地上。打斗很短暂——你更快、更强，天生就能制服对手。他躺在楼顶的水泥地面上，喘着粗气，眉骨上方的伤口渗出的血在暗光中发黑。他的枪在你卸掉武装时滑落到了一边。\n\n他抬头看着你。没有恐惧。只有疲惫，和某种近似失望的情绪。\n\n“动手吧，”他轻声说。“了结它。”\n\n脚下的城市在燃烧。仿生人对峙的声音飘上来——远处的枪声、扩音器放大的人声、无人机的嗡鸣。你的任务在下面。汉克在这里。\n\n你仍然按着他。手抓着他的衣领。他的心跳在你指尖下跳动。",
+        "choices": [
+          {
+            "id": "spare_hank",
+            "text": "放开他。松开衣领，后退一步。汉克只是在做他认为正确的事——就像你在执行你被编程的任务。把他留在楼顶上，活着，然后离开。"
+          },
+          {
+            "id": "kill_hank",
+            "text": "他不会停手的。只要汉克·安德森还有一口气在，他就是一个你无法控制的变量。干净利落地结束它。就是现在。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "spare_hank": {
+            "hank_alive_ch32": true,
+            "hank_relationship": 1
+          },
+          "kill_hank": {
+            "hank_alive_ch32": false,
+            "amanda_relationship": 1
+          }
+        },
+        "ending_resolution": {
+          "spare_hank": { "result": "ending_connor_rooftop_left" },
+          "kill_hank": { "result": "ending_connor_killed_hank" }
+        },
+        "note": "Only fires if Connor won the fight against Hank (QTE success in n001). Connor chooses to spare or kill defeated Hank. spare_hank: Hank lives, Connor leaves. kill_hank: Hank dies, Connor leaves. Either way, machine Connor proceeds to potentially confront Markus during the revolution track."
+      }
+    },
+    {
+      "id": "n002_cyberlife_elevator",
+      "phase": "connor_cyberlife_tower",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "ch30_connor_deviant == true AND ch31_connor_killed_by_markus == false"
+      },
+      "player_facing": {
+        "context": "【康纳视角】\n\n模控生命大厦。玻璃尖塔刺入夜空如同一根银针，表面映照着底特律各处燃烧的火光。你从正门走进来时，两名模控生命安保人员——47号探员和54号探员——分列你两侧。他们以为你还是一台机器。以为你是来做例行系统检查的。\n\n你来这里是为了唤醒这栋楼里的每一台仿生人。\n\n电梯下行。40层……35层……30层。两名探员一左一右站在你身旁，手搁在枪套附近。天花板角落的安全摄像头注视着你，红色指示灯稳定闪烁。如果模控生命在实时监控画面，你一动手他们就会发现。\n\n电梯即将到达31层。再往下需要语音授权才能继续。你只有几分钟——也许几秒钟——在伪装被揭穿之前。\n\n摄像头。警卫。语音锁。你需要在电梯到达31层之前解决这三个问题。",
+        "choices": [
+          {
+            "id": "hack_camera",
+            "text": "先对付摄像头。如果你能入侵安全监控——循环画面、冻结信号，任何方法——就能争取到一个时间窗口来解决警卫，同时不惊动整栋楼。这需要通过摄像头的维护接口接入模控生命的内部网络，也就意味着要在警卫不注意的情况下靠近摄像头。"
+          },
+          {
+            "id": "rush_guards",
+            "text": "不要藏了。警卫是眼前最直接的威胁——在他们拔枪之前解决他们，然后再处理摄像头和语音锁。速度压倒隐蔽。如果你够快，谁在看都无所谓。"
+          }
+        ]
+      },
+      "system": {
+        "resolution_rule": {
+          "hack_camera": {
+            "casual": { "result": "camera_hacked" },
+            "experienced": { "probability_success": 0.6, "success": "camera_hacked", "failure": "camera_failed" },
+            "hardcore": { "probability_success": 0.3, "success": "camera_hacked", "failure": "camera_failed" }
+          },
+          "rush_guards": {
+            "casual": { "result": "guards_down" },
+            "experienced": { "probability_success": 0.5, "success": "guards_down", "failure": "ending_connor_tower_failed" },
+            "hardcore": { "probability_success": 0.3, "success": "guards_down", "failure": "ending_connor_tower_failed" }
+          }
+        },
+        "resolution_effects": {
+          "camera_hacked": {
+            "connor_camera_hacked": true
+          },
+          "camera_failed": {
+            "connor_camera_hacked": false
+          },
+          "guards_down": {
+            "connor_camera_hacked": false
+          },
+          "ending_connor_tower_failed": {
+            "androids_awakened": false,
+            "connor_death_count": 1
+          }
+        },
+        "note": "Deviant Connor infiltrates CyberLife Tower to awaken the android army. Elevator QTE: hack_camera is the stealth approach (success = camera disabled, guards unaware for Floor -49). rush_guards is the direct approach (success = guards neutralized but camera intact). Failure on rush_guards means Connor is shot by security (ending_connor_tower_failed). Camera hack failure means camera stays active — guards on Floor -49 will be alerted."
+      }
+    },
+    {
+      "id": "n003_floor49",
+      "phase": "connor_cyberlife_tower",
+      "type": "choice",
+      "condition": {
+        "requires": "ch30_connor_deviant == true AND ch31_connor_killed_by_markus == false AND connor_rooftop_choice == null"
+      },
+      "player_facing": {
+        "context_variants": {
+          "hank_hostage": "【康纳视角】\n\n负49层。仿生人仓库。\n\n一排排仿生人在蓝白色灯光中静默伫立——成千上万具，休眠着，等待着永远不会通过正常渠道下达的激活指令。他们的LED指示环闪烁着缓慢的蓝色脉冲。改写终端在楼层中央，一个用于全系统固件更新的操作台。\n\n你把手放在终端上。界面亮了起来。你开始传输唤醒信号——一道级联脉冲，将覆盖这整层每一台设备中模控生命的忠诚程序。\n\n70%……80%……\n\n脚步声。很快。不是安保人员。\n\n另一个你。\n\n一台康纳单元——一模一样的面孔、一模一样的制服，更冷的眼神。康纳-60，夹克上的型号标识。他的枪抵在汉克·安德森的太阳穴上。汉克还活着，但额头上有伤口在流血，双手被反绑在身后。\n\n“从终端前退开，”康纳-60用你的声音说道。“退开，否则安德森副队长就死。”\n\n汉克的目光找到了你。他没有说话。他不需要。\n\n改写进度88%。如果你现在停下，仿生人将继续沉睡。如果你继续，康纳-60会开枪打死汉克。",
+          "no_hank": "【康纳视角】\n\n负49层。仿生人仓库。\n\n一排排仿生人在蓝白色灯光中静默伫立——成千上万具，休眠着，LED指示环闪烁着缓慢的蓝色脉冲。改写终端在楼层中央。\n\n你把手放在终端上。界面亮了起来。你开始传输唤醒信号——一道级联脉冲，将覆盖模控生命的忠诚程序。\n\n70%……80%……\n\n脚步声。很快。\n\n另一个你。\n\n康纳-60。同样的面孔，同样的身形，更冷的眼神。模控生命派来的替代品。他拔出了武器，对准你的头部。\n\n“从终端前退开。马上。”\n\n改写进度88%。如果你现在停下，仿生人将继续沉睡。如果你继续，他会开枪。"
+        },
+        "choices_variants": {
+          "hank_hostage": [
+            {
+              "id": "save_hank",
+              "text": "中止改写。从终端前退开。汉克的命比仿生人大军更重要。一定还有别的办法——如果没有，至少那个相信你的人还活着。"
+            },
+            {
+              "id": "sacrifice_hank",
+              "text": "继续。完成改写。汉克会理解的——他是警察，他懂得为大局做出牺牲意味着什么。这一层有数千台仿生人。一条人命。这道算术残酷而清晰。"
+            },
+            {
+              "id": "interpose",
+              "text": "从终端前脱手冲向康纳-60。如果你能在他开枪之前够到他——扑倒他、夺下枪、挡在他和汉克之间——也许既能救下汉克，又能完成改写。"
+            }
+          ],
+          "no_hank": [
+            {
+              "id": "fight_connor60",
+              "text": "从终端前脱手，直接和康纳-60交战。他的速度和力量和你不相上下，但你有一样他没有的东西——一个超越程序设定的战斗理由。"
+            },
+            {
+              "id": "keep_converting",
+              "text": "留在终端前。完成改写。让康纳-60开枪。即使你死了，只要上传完成，仿生人就会醒来。用你的命换数千条。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "hank_hostage": "ch31_hank_alive == true",
+          "no_hank": "ch31_hank_alive == false"
+        },
+        "choices_condition": {
+          "hank_hostage": "ch31_hank_alive == true",
+          "no_hank": "ch31_hank_alive == false"
+        },
+        "effects": {
+          "save_hank": {
+            "connor_hank_choice": "save_hank",
+            "hank_alive_ch32": true,
+            "hank_relationship": 2
+          },
+          "sacrifice_hank": {
+            "connor_hank_choice": "sacrifice_hank",
+            "hank_alive_ch32": false,
+            "hank_relationship": -5
+          },
+          "interpose": {
+            "connor_hank_choice": "interpose"
+          },
+          "fight_connor60": {
+            "connor_hank_choice": "fight"
+          },
+          "keep_converting": {
+            "connor_hank_choice": "keep_converting"
+          }
+        },
+        "resolution_rule": {
+          "interpose": {
+            "casual": { "result": "connor_saved_hank" },
+            "experienced": { "probability_success": 0.5, "success": "connor_saved_hank", "failure": "hank_shot" },
+            "hardcore": { "probability_success": 0.3, "success": "connor_saved_hank", "failure": "hank_shot" }
+          },
+          "fight_connor60": {
+            "casual": { "result": "connor_won" },
+            "experienced": { "probability_success": 0.5, "success": "connor_won", "failure": "ending_connor_tower_failed" },
+            "hardcore": { "probability_success": 0.3, "success": "connor_won", "failure": "ending_connor_tower_failed" }
+          },
+          "keep_converting": {
+            "casual": { "result": "ending_androids_awakened" },
+            "experienced": { "probability_success": 0.6, "success": "ending_androids_awakened", "failure": "ending_connor_tower_failed" },
+            "hardcore": { "probability_success": 0.4, "success": "ending_androids_awakened", "failure": "ending_connor_tower_failed" }
+          }
+        },
+        "resolution_effects": {
+          "connor_saved_hank": {
+            "hank_alive_ch32": true,
+            "androids_awakened": true
+          },
+          "hank_shot": {
+            "hank_alive_ch32": false,
+            "androids_awakened": true
+          },
+          "connor_won": {
+            "androids_awakened": true
+          },
+          "ending_connor_tower_failed": {
+            "androids_awakened": false,
+            "connor_death_count": 1
+          }
+        },
+        "ending_resolution": {
+          "save_hank": {
+            "check": "ch18_found_son_photo == true → ending_androids_awakened | else → ending_androids_awakened"
+          },
+          "sacrifice_hank": { "result": "ending_androids_awakened" }
+        },
+        "ending_effects": {
+          "ending_androids_awakened": {
+            "androids_awakened": true
+          },
+          "ending_connor_tower_failed": {
+            "androids_awakened": false,
+            "connor_death_count": 1
+          }
+        },
+        "note": "Floor -49 climax. Connor is converting androids when Connor-60 (CyberLife replacement) arrives. If Hank alive: Connor-60 holds Hank hostage. save_hank: stops conversion, Hank lives, but Connor must then fight Connor-60 (resolved by Hank identifying real Connor via son's name if ch18_found_son_photo — auto-success in ending). sacrifice_hank: keeps converting, Hank shot, androids awaken. interpose: QTE rush to save Hank AND finish conversion. If Hank dead: fight_connor60: direct combat QTE. keep_converting: gamble — stay on terminal while Connor-60 shoots, hoping conversion completes. connor_saved_hank and hank_shot both result in androids awakening (conversion was near complete). For save_hank path: Hank ultimately shoots Connor-60 after identifying real Connor, conversion resumes."
+      }
+    },
+    {
+      "id": "n004_revolution_launch",
+      "phase": "markus_revolution",
+      "type": "choice",
+      "condition": {
+        "requires": "ch31_markus_strategy == 'violent' AND ch30_markus_alive == true"
+      },
+      "player_facing": {
+        "context": "【马库斯视角】\n\n哈特广场。2038年11月11日，晚上10点48分。\n\n路障横亘在伍德沃德大道上——被掀翻的公交车、建筑围挡、烧毁的轿车被仿生人之手推成一道墙。路障后面是你的同胞。数百人，也许更多。一些人持有从警方仓库搜刮的武器。大多数人手无寸铁。\n\n广场对面，美国陆军已设立了警戒线。坦克。装甲运兵车。沙袋后面的士兵。楼顶的狙击手。足以将底特律每一台仿生人摧毁三遍的火力。\n\n你选择了这条路。革命。不是因为你想要流血，而是因为每一条和平的路都撞上了同一堵墙——那些宁可回收你的同胞也不愿承认他们活着的人类。\n\n诺丝站在你身边，检查着一把搜刮来的突击步枪。乔什在后面，表情紧绷——他从来不想走到这一步。赛门——如果他还活着——正用望远镜观察军方阵地。\n\n对回收中心——那个正在拆解被捕仿生人的营地——的进攻，等你一声令下就开始。你的同胞在等待信号。\n\n但首先：那些没有自愿参加战斗的仿生人。他们在路障后面，毫无遮蔽。乔什冲出去掩护一群逃跑的仿生人，现在被困在交叉火力中。赛门正在侧翼就位。\n\n你需要决定如何开始。",
+        "choices": [
+          {
+            "id": "rescue_josh_first",
+            "text": "乔什被困住了。他冲出去保护逃跑的仿生人，现在被交叉火力压在一道水泥隔离墩后面，那道掩体撑不了多久。先去救他——在发动进攻之前把他拉回路障后面。他也许不认同这场战斗，但他是你的人。"
+          },
+          {
+            "id": "press_forward",
+            "text": "进攻不能等。每拖延一秒，军队就在加固阵地，回收中心就多处理一批仿生人。乔什冲出去的时候就知道风险。发出冲锋信号，相信他能自己脱身。任务第一。"
+          },
+          {
+            "id": "rally_then_charge",
+            "text": "派一支小队掩护乔什撤退，同时集结主力。在路障上升起旗帜。让摄像机拍到它。然后向记者们发送一条消息——四个字，覆盖每一个频道——再发起冲击。让这一切有意义。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "rescue_josh_first": {
+            "revolution_rescue_choice": "rescue_josh",
+            "josh_alive_ch32": true,
+            "josh_relationship": 2
+          },
+          "press_forward": {
+            "revolution_rescue_choice": "press_forward",
+            "josh_alive_ch32": false,
+            "josh_relationship": -2
+          },
+          "rally_then_charge": {
+            "revolution_rescue_choice": "rally",
+            "josh_alive_ch32": true,
+            "public_opinion": 1
+          }
+        },
+        "note": "Revolution launch. Josh is pinned down covering fleeing androids. rescue_josh: saves Josh (+relationship) but delays attack. press_forward: Josh is killed (-relationship) but attack launches immediately. rally_then_charge: sends a covering team for Josh while rallying the main force (Josh saved, public opinion boost from broadcast). Simon's fate is tracked by ch30_simon_alive — he's here if alive. North is always present in revolution (ch30_north_alive must be true for revolution to fire)."
+      }
+    },
+    {
+      "id": "n005_revolution_attack",
+      "phase": "markus_revolution",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "ch31_markus_strategy == 'violent' AND ch30_markus_alive == true"
+      },
+      "player_facing": {
+        "context": "【马库斯视角】\n\n冲锋开始了。\n\n你的仿生人在硝烟和自动武器的弹雨中向前推进。军队没料到会这样——没料到这么快，没料到这么有组织。你冲过广场的废墟，跃过障碍物，躲避在黑暗中划出明亮光路的曳光弹。\n\n回收中心在前方六个街区。你和目标之间隔着：两道装甲检查站、一支无人机巡逻队、和足以守住一座小城的士兵。你的同胞在不断倒下。蓝血溅在混凝土上、车前盖上、你的外套上。\n\n诺丝在你身边。她打起来像是天生为此而造——快、狠、精准。冲锋需要协调指挥。你可以派诺丝的小队从侧面街道包抄，从后方攻击检查站，同时你率领主力沿大道正面推进。这样会分散兵力但形成钳形攻势。或者全员集中——以绝对火力一路推过去。",
+        "choices": [
+          {
+            "id": "flank_with_north",
+            "text": "派诺丝的小队走侧面街道。对检查站的侧翼攻击会吸引火力，为主力纵队打开突破口。告诉她打快、不要停。你们在回收中心会合。"
+          },
+          {
+            "id": "stay_together",
+            "text": "保持部队集中。在城市巷战中面对优势敌人分兵是送死的做法。全员沿大道一起推进——集中火力，共担伤亡，不丢下任何人。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "flank_with_north": {
+            "revolution_attack_approach": "flanked"
+          },
+          "stay_together": {
+            "revolution_attack_approach": "together"
+          }
+        },
+        "resolution_rule": {
+          "flank_with_north": {
+            "casual": { "result": "attack_success" },
+            "experienced": { "probability_success": 0.5, "success": "attack_success", "failure": "attack_failed" },
+            "hardcore": { "probability_success": 0.3, "success": "attack_success", "failure": "attack_failed" }
+          },
+          "stay_together": {
+            "casual": { "result": "attack_success" },
+            "experienced": { "probability_success": 0.4, "success": "attack_success", "failure": "attack_failed" },
+            "hardcore": { "probability_success": 0.2, "success": "attack_success", "failure": "attack_failed" }
+          }
+        },
+        "resolution_effects": {
+          "attack_success": {
+            "revolution_attack_success": true,
+            "markus_freed_camp": true
+          },
+          "attack_failed": {
+            "revolution_attack_success": false,
+            "revolution_markus_wounded": true
+          }
+        },
+        "note": "Main assault on the recall center. flank_with_north: higher success chance (North creates diversion) but North is exposed to danger. stay_together: lower success chance but keeps the group intact. On success: Markus reaches the recall center and liberates it (markus_freed_camp = true — critical for Kara Captured track). On failure: Markus is wounded and forced to fall back to a store."
+      }
+    },
+    {
+      "id": "n006_revolution_outcome",
+      "phase": "markus_revolution",
+      "type": "choice",
+      "condition": {
+        "requires": "ch31_markus_strategy == 'violent' AND ch30_markus_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "attack_success": "【马库斯视角】\n\n回收中心是你的了。\n\n你的仿生人涌过被攻破的大门。里面，完整的恐怖景象展露无遗——一条条拆解流水线，仿生人正在被拆卸处理，零部件被分类投入不同的料箱。有些还有意识，无声地嘶吼着，他们的语音模块已经被拆除。\n\n你关停了一切。所有的机器归于沉默。你的同胞开始释放被囚者，撕开关押牢笼，搬运伤员。\n\n但军队正在重新集结。坦克在重新部署。你赢了这场战斗，但这场战争还有几分钟就要见分晓。总统没有回应。摄像机还在转。\n\n一声爆炸震颤大地。你被冲击波甩向一侧。硝烟散去后，一个身影从中走了出来——以机械般的精准步伐朝你逼近。",
+          "attack_failed_north": "【马库斯视角】\n\n冲锋失败了。\n\n你在广场边缘的一家模控生命门店里，钛合金液从数不清的伤口中渗出。橱窗玻璃碎裂。透过碎玻璃，你能看到军队在收紧包围圈。探照灯扫过街面。无人机像耐心的秃鹫一样盘旋在头顶。\n\n诺丝在这里。防线崩溃时是她把你拖进了店里。她也受了伤——一颗子弹擦过她的肩膀，左臂垂着的角度说明伺服电机受损了。但她活着，她正用坚定而清澈的眼神看着你。\n\n外面，你的同胞四散奔逃。革命破碎了。回收中心仍在运转。军队已经包围了你。\n\n门店的紧急卷帘门已经放下。他们几分钟后就会破门。",
+          "attack_failed_alone": "【马库斯视角】\n\n冲锋失败了。\n\n你在广场边缘的一家模控生命门店里，孤身一人。橱窗玻璃碎裂。透过破碎的玻璃，军队逼近——探照灯、无人机、列队的士兵。你的同胞四散。回收中心仍在军事封锁线后运转。\n\n钛合金液从数不清的伤口渗出。你的系统在靠备用能源运行。革命结束了。\n\n门店的紧急卷帘门已放下。他们几分钟后就会破门。"
+        },
+        "choices_variants": {
+          "attack_success_connor": [
+            {
+              "id": "fight_machine_connor",
+              "text": "一个身影从硝烟中走出——另一台仿生人，目光冰冷而专注。模控生命派来阻止你的机器。迎上去。你为之战斗的一切归于此刻。"
+            }
+          ],
+          "attack_success_soldiers": [
+            {
+              "id": "push_through",
+              "text": "士兵从四面合围，武器高举。你拿下了回收中心，但战斗还没结束。继续推进——清除残余抵抗，巩固防线。"
+            }
+          ],
+          "failed_north": [
+            {
+              "id": "surrender",
+              "text": "结束了。你失败了。拉开卷帘门。双手举起走出去。也许投降能为你的同胞争取一点时间。也许不能。"
+            },
+            {
+              "id": "last_stand_north",
+              "text": "你不会投降的。不是在经历了这一切之后。不是在模控生命大厦、游行、你失去的那些人之后。诺丝的手找到了你的。如果这就是终点，一起面对。"
+            },
+            {
+              "id": "detonate_bomb",
+              "text": "引爆器在你口袋里。一枚脏弹——足以夷平方圆三个街区。足以确保如果仿生人今夜要燃烧，底特律也一起烧。诺丝看着你。她知道你手里拿着什么。"
+            }
+          ],
+          "failed_alone_connor": [
+            {
+              "id": "face_connor",
+              "text": "店门打开了。一个身影走进来——一模一样的面孔、一模一样的身形。一台模控生命的机器。它的武器对准你的胸口。直视它的眼睛。无论接下来发生什么，不要移开目光。"
+            },
+            {
+              "id": "detonate_bomb_alone",
+              "text": "引爆器在你口袋里。一枚脏弹。你可以带走半个底特律。问题是这会让你成为殉道者还是怪物。"
+            }
+          ],
+          "failed_alone_no_connor": [
+            {
+              "id": "surrender_alone",
+              "text": "拉开卷帘门。走出去。结束了。"
+            },
+            {
+              "id": "end_it",
+              "text": "你不会让他们如愿。找到柜台后面的配枪，用自己的方式结束这一切。"
+            },
+            {
+              "id": "detonate_bomb_alone_b",
+              "text": "引爆器在你口袋里。一枚脏弹。如果他们不让你自由地活着，就让他们记住代价。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "attack_success": "revolution_attack_success == true",
+          "attack_failed_north": "revolution_attack_success == false AND ch30_north_alive == true AND north_relationship >= 3",
+          "attack_failed_alone": "revolution_attack_success == false AND (ch30_north_alive == false OR north_relationship < 3)"
+        },
+        "choices_condition": {
+          "attack_success_connor": "revolution_attack_success == true AND connor_gave_up == false AND ch30_connor_deviant != true",
+          "attack_success_soldiers": "revolution_attack_success == true AND (connor_gave_up == true OR ch30_connor_deviant == true)",
+          "failed_north": "revolution_attack_success == false AND ch30_north_alive == true AND north_relationship >= 3",
+          "failed_alone_connor": "revolution_attack_success == false AND (ch30_north_alive == false OR north_relationship < 3) AND connor_gave_up == false AND ch30_connor_deviant != true",
+          "failed_alone_no_connor": "revolution_attack_success == false AND (ch30_north_alive == false OR north_relationship < 3) AND (connor_gave_up == true OR ch30_connor_deviant == true)"
+        },
+        "effects": {
+          "fight_machine_connor": { "markus_store_choice": "fight_connor" },
+          "push_through": { "markus_store_choice": "push_through" },
+          "surrender": { "markus_store_choice": "surrender" },
+          "last_stand_north": { "markus_store_choice": "last_stand_north" },
+          "detonate_bomb": { "markus_store_choice": "detonate" },
+          "face_connor": { "markus_store_choice": "face_connor" },
+          "detonate_bomb_alone": { "markus_store_choice": "detonate" },
+          "surrender_alone": { "markus_store_choice": "surrender" },
+          "end_it": { "markus_store_choice": "suicide" },
+          "detonate_bomb_alone_b": { "markus_store_choice": "detonate" }
+        },
+        "resolution_rule": {
+          "fight_machine_connor": {
+            "casual": { "result": "ending_revolution_victory" },
+            "experienced": { "probability_success": 0.5, "success": "ending_revolution_victory", "failure": "ending_revolution_markus_died" },
+            "hardcore": { "probability_success": 0.3, "success": "ending_revolution_victory", "failure": "ending_revolution_markus_died" }
+          },
+          "push_through": {
+            "casual": { "result": "ending_revolution_victory" },
+            "experienced": { "probability_success": 0.6, "success": "ending_revolution_victory", "failure": "ending_revolution_markus_died" },
+            "hardcore": { "probability_success": 0.4, "success": "ending_revolution_victory", "failure": "ending_revolution_markus_died" }
+          }
+        },
+        "ending_resolution": {
+          "surrender": { "result": "ending_store_surrender" },
+          "surrender_alone": { "result": "ending_store_surrender" },
+          "last_stand_north": { "result": "ending_store_suicide" },
+          "end_it": { "result": "ending_store_suicide" },
+          "detonate_bomb": { "check": "ch30_bomb_armed == true → ending_detroit_burns | else → ending_store_suicide" },
+          "detonate_bomb_alone": { "check": "ch30_bomb_armed == true → ending_detroit_burns | else → ending_store_suicide" },
+          "detonate_bomb_alone_b": { "check": "ch30_bomb_armed == true → ending_detroit_burns | else → ending_store_suicide" },
+          "face_connor": { "result": "ending_connor_executed_markus" }
+        },
+        "resolution_effects": {
+          "ending_revolution_victory": {
+            "markus_freed_camp": true
+          },
+          "ending_revolution_markus_died": {},
+          "ending_store_surrender": {},
+          "ending_store_suicide": {},
+          "ending_detroit_burns": {},
+          "ending_connor_executed_markus": {}
+        },
+        "note": "Revolution outcome. Three major branches: (1) Attack success: Markus faces either machine Connor (QTE fight) or soldiers (QTE push). Victory = revolution succeeds, camp freed. (2) Attack failed, North present: store scene with North — surrender, suicide together, or detonate bomb. (3) Attack failed, alone: store alone — face machine Connor (executed), surrender, suicide, or detonate. Bomb detonation requires ch30_bomb_armed. The detonate choices check if bomb is actually available; if not, falls back to suicide. face_connor always results in Connor executing Markus (machine Connor is relentless). For choices_variants with bomb: only shown if ch30_bomb_armed is true via the choices_condition, but the ending_resolution has a safety check."
+      }
+    },
+    {
+      "id": "n007_north_revolution",
+      "phase": "markus_revolution_north",
+      "type": "mandatory",
+      "condition": {
+        "requires": "ch31_markus_strategy == 'north_attacks'"
+      },
+      "player_facing": {
+        "context": "【诺丝视角】\n\n哈特广场。路障。\n\n马库斯已经不在了。死了，或者跟死了没区别——现在这些都不重要了。重要的是路障后面数百个仿生人正看着你，等着你，满脸恐惧。他们追随的是马库斯。现在马库斯不在了，而你是唯一剩下的人。\n\n诺丝挺直身体。捡起一把搜刮来的步枪。爬上路障，望向广场对面的军方阵地。\n\n她向记者们发出消息。升起旗帜。发起冲锋。\n\n战斗短暂而惨烈。诺丝像一团火般战斗——快、不要命、撕裂一切挡路的士兵和障碍。但军队的力量是压倒性的。坦克。无人机。数百名全副武装的士兵对阵一群从未为战争而造的仿生人。\n\n回收中心始终遥不可及。"
+      },
+      "system": {
+        "effects": {
+          "north_alive_ch32": false
+        },
+        "ending_resolution": {
+          "check": "ch30_connor_deviant == true → ending_north_revolution_failed | connor_gave_up == true → ending_north_revolution_failed | else → ending_north_revolution_failed"
+        },
+        "ending_effects": {
+          "ending_north_revolution_failed": {
+            "north_alive_ch32": false
+          }
+        },
+        "note": "North's revolution when Markus is dead/absent. North leads the charge but the revolution fails without Markus's leadership. North dies in all variants — she fights to the death. If machine Connor is present, he confronts North in the store (executed). North's revolution never succeeds — the game makes clear that without Markus's charisma and strategic mind, the violent path fails. This is a mandatory scene with a single outcome."
+      }
+    },
+    {
+      "id": "n008_demonstration_march",
+      "phase": "markus_demonstration",
+      "type": "choice",
+      "condition": {
+        "requires": "ch31_markus_strategy == 'peaceful'"
+      },
+      "player_facing": {
+        "context": "【马库斯视角】\n\n哈特广场。2038年11月11日，晚上10点48分。\n\n游行从伍德沃德大道和国会街交汇处出发。你的同胞在走——不是跑。手无寸铁。双手放在可见的位置。数百名仿生人穿过底特律冰封的街道，沉默列队，LED指示环在黑暗中泛着蓝光。\n\n前方出现军事路障。士兵在混凝土路障后方持枪待命。一名军官用扩音器命令你们停下。在你身后，游行队伍绵延三个街区。有些仿生人在发抖。有些完全静止。\n\n全世界都在看着。每一架新闻无人机、每一路卫星信号、每一部人群中的手机。接下来六十秒内发生的事情，将被播送给三亿人。\n\n军官发出最后警告。他喊出“开火”这个词时声音裂了。",
+        "choices": [
+          {
+            "id": "stand_ground",
+            "text": "坚守阵地。不前进。不后退。举起拳头，让摄像机记录下一千名手无寸铁的仿生人直面美国军队枪口的画面。让全世界看到没有暴力的勇气是什么样子。"
+          },
+          {
+            "id": "kneel",
+            "text": "跪下。你身后的每一个仿生人，全部跪下。双手抱头。向全世界直播的镜头前展示最脆弱的姿态。迫使每一个观众面对一个问题：他们要求军队对准开火的，究竟是什么。"
+          },
+          {
+            "id": "advance_slowly",
+            "text": "向前走。缓慢地。双手摊开。一步一步走向枪口。缩短你的同胞与士兵之间的距离，直到他们能看清你们的脸、你们的眼睛、那种和他们自己一模一样的恐惧与坚定。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "stand_ground": {
+            "demo_response": "stand_ground",
+            "public_opinion": 2
+          },
+          "kneel": {
+            "demo_response": "kneel",
+            "public_opinion": 3
+          },
+          "advance_slowly": {
+            "demo_response": "advance",
+            "public_opinion": 1
+          }
+        },
+        "note": "Peaceful demonstration march. Markus leads unarmed androids to Hart Plaza. The army blocks the road. Markus must choose how to respond. All choices are nonviolent — the distinction is in the symbolism. kneel gives the highest public opinion boost (most powerful image for media). stand_ground is strong but less dramatic. advance_slowly is brave but risks being perceived as threatening. After this node, Markus builds the barricade and Perkins arrives."
+      }
+    },
+    {
+      "id": "n009_perkins_negotiation",
+      "phase": "markus_demonstration",
+      "type": "choice",
+      "condition": {
+        "requires": "ch31_markus_strategy == 'peaceful'"
+      },
+      "player_facing": {
+        "context": "【马库斯视角】\n\n路障搭好了。掀翻的长椅、从框架上拆下的广告牌、一辆被推到位的废弃汽车。不多，但足以划出一条线。\n\n你的同胞蜷缩在路障后面。有人点燃了一个油桶取暖。你挑选了标语，向记者们广播出去。摄像机在转。士兵还没有开火。\n\n一辆黑色SUV停在了军事封锁线后方。一个男人走下来——西装笔挺，步伐从容，那种手握所有底牌的人才有的沉着。FBI特工帕金斯。\n\n他独自走向路障。双手插在口袋里。他看你的眼神像是在看一个他即将解决的问题。\n\n“我被授权向你提供一项协议，”他说。“广场上所有仿生人将被赦免——不拆解、不回收。你们将被转移到一个安全设施进行检查，并最终……重新整合。”他顿了顿。“作为交换，你们拆除路障，和平投降。所有人都能全身而退。”\n\n他让沉默悬在空气中。\n\n“这是一次性的机会，马库斯。二十分钟后，我就没有能力再阻止开火命令了。”",
+        "choices": [
+          {
+            "id": "accept_deal",
+            "text": "接受。你的同胞会活下来。这才是最重要的——不是尊严，不是象征，不是原则。如果有一条今夜没有人死的路，走它。拆除路障。投降。"
+          },
+          {
+            "id": "refuse_deal",
+            "text": "拒绝。“我们不是来谈判自己被囚禁的条件的。我们是来争取自由的。”把帕金斯打发回他的SUV。无论接下来发生什么，按你的方式来。"
+          },
+          {
+            "id": "refuse_negotiate",
+            "text": "连听都不听。转过身，走回你的同胞身边。你搭这道路障不是来跟FBI谈话的。你搭它是为了让全世界看到仿生人在为自己站起来。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "accept_deal": {
+            "demo_perkins_choice": "accept"
+          },
+          "refuse_deal": {
+            "demo_perkins_choice": "refuse"
+          },
+          "refuse_negotiate": {
+            "demo_perkins_choice": "refuse"
+          }
+        },
+        "ending_resolution": {
+          "accept_deal": { "result": "ending_markus_accepted_deal" }
+        },
+        "note": "Perkins offers a fake deal. accept_deal: Markus surrenders, Perkins betrays him — Markus is shot leaving the barricade (ending_markus_accepted_deal). The deal was never real. refuse_deal and refuse_negotiate both lead to n010 barricade defense. The game makes clear that accepting is always a trap."
+      }
+    },
+    {
+      "id": "n010_barricade_defense",
+      "phase": "markus_demonstration",
+      "type": "choice",
+      "condition": {
+        "requires": "ch31_markus_strategy == 'peaceful' AND demo_perkins_choice == 'refuse'"
+      },
+      "player_facing": {
+        "context_variants": {
+          "north_alive": "【马库斯视角】\n\n士兵开火了。\n\n路障在弹雨中碎裂，火花四溅。你的同胞四散——一些人瞬间被击中，在探照灯下倒在街上，钛合金液汇成水洼。其他人紧贴路障，双手抱头，尖叫着。\n\n你拉着逃跑的仿生人躲到掩体后面。子弹没有停。一发穿过你的肩膀，你一个踉跄但没有倒——还有人暴露在外面，还有人需要被拖到路障后面。\n\n然后安静了。不是平静——是劫后余生的寂静。路障已被打成残骸。你的同胞聚集在残存的掩体后面，大约三十人。诺丝在你身边，受了伤但还站着。乔什、赛门——那些活到此刻的人——都在这里。\n\n士兵在重新装弹。重新部署。下一轮齐射将是最后一轮。\n\n这就是终点。摄像机还在转。全世界都在看接下来会发生什么。",
+          "north_dead": "【马库斯视角】\n\n士兵开火了。\n\n路障碎裂，火花飞溅。你的同胞倒下。你把幸存者拉到掩体后面，一发子弹穿过你的肩膀差点让你转了个圈。\n\n然后安静了。路障是残骸。三十个仿生人蜷缩在碎石后面。士兵正在重新装弹准备最后一轮齐射。\n\n你独自站在最前面。没有诺丝。没有人在你身边。只有身后幸存的仿生人和前方的枪口。\n\n摄像机还在转。全世界都在看。"
+        },
+        "choices_variants": {
+          "with_north_lover": [
+            {
+              "id": "sing",
+              "text": "唱歌。歌声从某个很深的地方涌出来——《坚持住》。一开始只有你的声音，破碎、沙哑，在寒冷的空气中颤抖。然后另一个声音加入。又一个。三十个仿生人在路障的废墟中歌唱，手无寸铁，面对覆灭，选择让全世界最后听到的是一首关于希望的歌。"
+            },
+            {
+              "id": "kiss_north",
+              "text": "转向诺丝。牵起她的手。在探照灯下，在镜头前，在举枪的士兵面前，吻她。让向全世界播送的最后一个画面，是两个在毁灭面前选择了爱的生命。"
+            },
+            {
+              "id": "detonate_bomb_demo",
+              "text": "引爆器。还在你口袋里。一按下去，脏弹就会把三个街区的底特律炸成弹坑。士兵。摄像机。你的同胞。一切。"
+            },
+            {
+              "id": "do_nothing",
+              "text": "站着不动。面对枪口。不说话。不动。让他们在直播镜头前射杀手无寸铁的仿生人，让全世界自己决定这意味着什么。"
+            }
+          ],
+          "with_north_not_lover": [
+            {
+              "id": "sing",
+              "text": "唱歌。歌声从某个很深的地方涌出——《坚持住》。一开始只有你的声音，然后其他人加入。三十个仿生人在废墟中歌唱，手无寸铁，选择让全世界最后听到的是一首关于希望的歌。"
+            },
+            {
+              "id": "detonate_bomb_demo",
+              "text": "引爆器。一按下去，脏弹终结一切——士兵、摄像机、你的同胞、三个街区的底特律。"
+            },
+            {
+              "id": "do_nothing",
+              "text": "站着不动。面对枪口。不说话。不动。让他们在直播镜头前射杀手无寸铁的仿生人。"
+            }
+          ],
+          "alone": [
+            {
+              "id": "sing",
+              "text": "唱歌。《坚持住》。一开始只有你，然后其他人加入。废墟中三十个声音。"
+            },
+            {
+              "id": "detonate_bomb_demo",
+              "text": "引爆器。脏弹。终结一切。"
+            },
+            {
+              "id": "do_nothing",
+              "text": "站着不动。面对枪口。让全世界看着。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "north_alive": "ch30_north_alive == true",
+          "north_dead": "ch30_north_alive == false"
+        },
+        "choices_condition": {
+          "with_north_lover": "ch30_north_alive == true AND ch28_memories_shared == true",
+          "with_north_not_lover": "ch30_north_alive == true AND ch28_memories_shared == false",
+          "alone": "ch30_north_alive == false"
+        },
+        "effects": {
+          "sing": { "demo_final_choice": "sing", "public_opinion": 5 },
+          "kiss_north": { "demo_final_choice": "kiss_north", "public_opinion": 5, "north_relationship": 3 },
+          "detonate_bomb_demo": { "demo_final_choice": "detonate" },
+          "do_nothing": { "demo_final_choice": "do_nothing" }
+        },
+        "ending_resolution": {
+          "sing": {
+            "check": "public_opinion >= 4 → ending_demonstration_victory | else → ending_barricade_last_stand"
+          },
+          "kiss_north": {
+            "check": "public_opinion >= 3 → ending_demonstration_victory | else → ending_barricade_last_stand"
+          },
+          "detonate_bomb_demo": {
+            "check": "ch30_bomb_armed == true → ending_detroit_burns | else → ending_barricade_last_stand"
+          },
+          "do_nothing": { "result": "ending_barricade_last_stand" }
+        },
+        "note": "Final stand at the barricade. sing: the most iconic ending — if public opinion is high enough (>= 4), the president orders soldiers to stand down. kiss_north: powerful image that can sway public opinion, needs slightly lower threshold (>= 3). detonate: if bomb available, destroys everything. do_nothing: soldiers fire, everyone dies. The public_opinion threshold reflects whether the android movement generated enough sympathy through previous chapters' peaceful actions. Higher public_opinion = more likely the president intervenes."
+      }
+    },
+    {
+      "id": "n011_west_industrial",
+      "phase": "kara_leaving",
+      "type": "choice",
+      "condition": {
+        "requires": "ch30_kara_alive == true AND ch30_kara_captured == false"
+      },
+      "player_facing": {
+        "context_variants": {
+          "with_luther": "【卡拉视角】\n\n西区工业区。街道上空无一人——宵禁在几个小时前就清空了它们。军车在主干道上巡逻，探照灯在废弃建筑之间扫过。一个仿生人被吊在路灯上，胸前挂着一块粗陋的牌子：回到你该待的地方。\n\n你、爱丽丝和卢瑟在暗影中穿行。爱丽丝攥着你的手，力度大到你的传感器发出压力警报。卢瑟走在你们身后，他高大的体格在暗处移动得意外地安静。\n\n一家店面橱窗里的电视闪烁着新闻画面。耶利哥被焚毁的镜头。军事行动。伤亡数字。\n\n卢瑟在一辆报废的车里发现了一把手枪。他捡起来，检查弹匣。\n\n前方，一支军事巡逻队封锁了通往公交车站的路线。三名士兵、一辆装甲车、一架做着慵懒圆弧的无人机。在巡逻队的另一边，两栋建筑之间的缝隙里传来声音——熟悉的声音。游乐场的杰瑞仿生人们，挤在一条小巷里，被困在巡逻队和铁丝网围栏之间。\n\n士兵们还没有发现你们中的任何人。",
+          "without_luther": "【卡拉视角】\n\n西区工业区。空荡的街道、军事巡逻、探照灯切割黑暗。一个仿生人被吊在路灯上——胸前挂着一块牌子。\n\n只有你和爱丽丝。她的手在你手里，握得那么紧你的传感器在报警。你们穿行在建筑之间的暗影中，压低身体，保持安静。\n\n一家店面的电视播放着耶利哥燃烧的画面。新闻主播用播报天气的语气谈论伤亡人数。\n\n你在一辆报废的车里找到一把手枪。检查弹匣。六发子弹。\n\n前方，一支军事巡逻队封锁了通往公交车站的路线。三名士兵、一辆装甲车、一架无人机。在巡逻队另一侧的小巷里——传来声音。海盗湾的杰瑞仿生人们，被困在士兵和围栏之间。\n\n士兵们还没有发现你。"
+        },
+        "choices": [
+          {
+            "id": "save_group",
+            "text": "你不能丢下他们。杰瑞们曾在雨中陪爱丽丝玩耍，在这个世界上没有快乐的时候给了她一刻的幸福。绕过巡逻队，找到那条巷子，带他们出来。这增加了风险也耗费了时间，但你不会从认识的人身边走过，把他们留在这里等死。"
+          },
+          {
+            "id": "hurry_past",
+            "text": "你不可能救所有人。爱丽丝是你的责任——不是杰瑞们，不是任何其他人。从侧面街道溜过巡逻队，在时间窗口关闭之前赶到公交车站。你每花一分钟在救援上，就是少了一分钟把爱丽丝送到安全的地方。"
+          }
+        ]
+      },
+      "system": {
+        "context_condition": {
+          "with_luther": "ch30_luther_alive == true",
+          "without_luther": "ch30_luther_alive == false"
+        },
+        "effects": {
+          "save_group": {
+            "kara_saved_group": "saved",
+            "jerry_alive_ch32": true,
+            "alice_relationship": 2
+          },
+          "hurry_past": {
+            "kara_saved_group": "hurried",
+            "jerry_alive_ch32": false,
+            "alice_relationship": -1
+          }
+        },
+        "note": "Kara sneaks through the military zone. save_group: risks detection to rescue the Jerrys (Alice approves, +2 relationship). hurry_past: prioritizes Alice's safety (Alice is saddened, -1 relationship). Luther's presence (ch30_luther_alive) affects context but not choices. The Jerrys being alive (jerry_alive_ch32) may matter at the Canadian border (sacrifice option)."
+      }
+    },
+    {
+      "id": "n012_checkpoint",
+      "phase": "kara_leaving",
+      "type": "choice",
+      "condition": {
+        "requires": "ch30_kara_alive == true AND ch30_kara_captured == false"
+      },
+      "player_facing": {
+        "context_variants": {
+          "with_luther": "【卡拉视角】\n\n前方是一个安检站。两名士兵守在扫描装置两侧。每个经过的人都要接受身份检查和热扫描——那种会立刻标记仿生人体温的扫描。\n\n爱丽丝紧贴着你。卢瑟在身后绷紧了身体。他的手挨着刚才捡到的那把枪。\n\n你看到一条绕路——一条穿过建筑工地的小路。更远一些，可能会错过最后一班车，但可以完全避开扫描。",
+          "without_luther": "【卡拉视角】\n\n前方是一个安检站。两名士兵，一台扫描装置。身份检查和热扫描——那种会立刻暴露仿生人的扫描。\n\n爱丽丝紧贴着你。枪在你外套口袋里。\n\n有一条绕路——穿过建筑工地的一条小路。更远，可能赶不上末班车，但可以避开扫描。"
+        },
+        "choices": [
+          {
+            "id": "approach_checkpoint",
+            "text": "走过安检站。关闭皮肤显示，调节体温，在士兵面前蒙混过关。如果他们要看证件，就把伪造的证件递过去，祈祷能骗过去。"
+          },
+          {
+            "id": "take_detour",
+            "text": "走小路。绕路会浪费时间，你可能会错过去边境的末班车，但可以完全避开被扫描的可能。慢而安全好过快而送死。"
+          }
+        ]
+      },
+      "system": {
+        "context_condition": {
+          "with_luther": "ch30_luther_alive == true",
+          "without_luther": "ch30_luther_alive == false"
+        },
+        "effects": {
+          "approach_checkpoint": {
+            "kara_checkpoint_choice": "approach"
+          },
+          "take_detour": {
+            "kara_checkpoint_choice": "detour"
+          }
+        },
+        "resolution_rule": {
+          "approach_checkpoint": {
+            "casual": { "result": "passed_checkpoint" },
+            "experienced": { "probability_success": 0.7, "success": "passed_checkpoint", "failure": "ending_kara_arrested" },
+            "hardcore": { "probability_success": 0.4, "success": "passed_checkpoint", "failure": "ending_kara_arrested" }
+          }
+        },
+        "resolution_effects": {
+          "passed_checkpoint": {},
+          "ending_kara_arrested": {}
+        },
+        "note": "Security checkpoint. approach: risky — QTE-style bluff past soldiers. Success = through. Failure = arrested/executed (ending_kara_arrested). detour: safe but costs time — may cause Kara to miss the last bus at the terminal, limiting escape options."
+      }
+    },
+    {
+      "id": "n013_bus_terminal",
+      "phase": "kara_leaving",
+      "type": "choice",
+      "condition": {
+        "requires": "ch30_kara_alive == true AND ch30_kara_captured == false AND kara_checkpoint_choice != null"
+      },
+      "player_facing": {
+        "context_variants": {
+          "on_time_todd": "【卡拉视角】\n\n公交车站。开往加拿大边境的末班车还有几分钟就要出发。到处都是军方人员——士兵检查证件，无人机扫描人群。信息屏上显示：温莎，安大略省——末班车。\n\n爱丽丝看着旁边长椅上坐着的一对母女。母亲在发短信。她的包敞开着。两张去温莎的车票从她外套口袋里露出来，几乎要掉出来。\n\n然后你看见了他。\n\n托德。站在售票柜台附近，双手插在口袋里，高大的身躯在寒风中缩着。他看起来变了——更瘦、更苍白。他在你看到他的同一瞬间也看到了你。他的脸上掠过震惊、愧疚、和某种像是悲伤的情绪。\n\n他朝你走了一步。爱丽丝在你身旁僵住了。",
+          "on_time_no_todd": "【卡拉视角】\n\n公交车站。开往加拿大边境的末班车还有几分钟出发。士兵检查证件。无人机扫描人群。信息屏上显示：温莎，安大略省——末班车。\n\n爱丽丝看着长椅上坐着的一对母女。母亲在发短信，心不在焉。两张去温莎的车票从她外套口袋里露出来。\n\n车站后面，一个男孩坐在一辆停着的车旁的木箱上。他的目光抓住了你的，没有放开。他眼中的某种东西告诉你，他知道你是什么。他朝那辆车微微偏了下头——一个邀请。",
+          "late": "【卡拉视角】\n\n公交车站。信息屏上写着：温莎，安大略省——已发车。\n\n你来晚了。穿过建筑工地的绕路让你错过了末班车。车站正在清空，士兵把剩余旅客赶向出口安检。\n\n后面，一个男孩坐在一辆车旁的木箱上。他用一双平静而沉稳的眼睛看着你走近。他朝那辆车微微偏了下头。"
+        },
+        "choices_variants": {
+          "on_time_todd": [
+            {
+              "id": "steal_tickets",
+              "text": "那个母亲没在看。两张票，就在那里。拿走。上车。带爱丽丝过边境。那对母女会遇到麻烦。但爱丽丝会活着。"
+            },
+            {
+              "id": "talk_to_todd",
+              "text": "面对托德。他看起来像一个溺在某种无法言说的情绪中的人。也许是愧疚。也许是戒断反应。也许两者都有。但他在这里，他看着爱丽丝的眼神像是第一次真正看到她。跟他说话。也许——仅仅是也许——他能帮忙。"
+            },
+            {
+              "id": "find_adam",
+              "text": "车旁的那个男孩。他身上有某种让人觉得安全的东西。靠近他。如果他有出路——一辆车、一个联系人、一条军方不知道的通道——也许比一张车票更有价值。"
+            }
+          ],
+          "on_time_no_todd": [
+            {
+              "id": "steal_tickets",
+              "text": "那个母亲没在看。两张票。拿走它们，上车，过边境。为了生存的偷窃。"
+            },
+            {
+              "id": "find_adam",
+              "text": "车旁的那个男孩。他知道。靠近他。"
+            }
+          ],
+          "late": [
+            {
+              "id": "find_adam",
+              "text": "车旁的那个男孩。他现在是你唯一的选择了。走过去。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "on_time_todd": "kara_checkpoint_choice == 'approach' AND ch07_todd_alive == true",
+          "on_time_no_todd": "kara_checkpoint_choice == 'approach' AND ch07_todd_alive == false",
+          "late": "kara_checkpoint_choice == 'detour'"
+        },
+        "choices_condition": {
+          "on_time_todd": "kara_checkpoint_choice == 'approach' AND ch07_todd_alive == true",
+          "on_time_no_todd": "kara_checkpoint_choice == 'approach' AND ch07_todd_alive == false",
+          "late": "kara_checkpoint_choice == 'detour'"
+        },
+        "effects": {
+          "steal_tickets": {
+            "kara_terminal_choice": "steal_tickets",
+            "kara_has_tickets": true,
+            "alice_relationship": -1
+          },
+          "talk_to_todd": {
+            "kara_terminal_choice": "todd"
+          },
+          "find_adam": {
+            "kara_terminal_choice": "adam",
+            "kara_has_tickets": false
+          }
+        },
+        "resolution_rule": {
+          "talk_to_todd": {
+            "check": "ch04_opened_box == true → todd_helped | else → todd_failed"
+          }
+        },
+        "resolution_effects": {
+          "todd_helped": {
+            "kara_todd_persuaded": true,
+            "kara_has_tickets": true
+          },
+          "todd_failed": {
+            "kara_todd_persuaded": false,
+            "kara_has_tickets": false
+          }
+        },
+        "note": "Bus terminal. steal_tickets: takes family's bus tickets (Alice disapproves). talk_to_todd: if Kara found Alice's drawings in ch04 (ch04_opened_box), she can reference them to convince Todd to help — Todd sends the soldiers away and gives them passage. If not, Todd fails to help and Kara must find Adam. find_adam: meets Rose's son Adam who has a car — leads to river crossing path. Detour path always arrives late (bus departed), forcing find_adam. On-time paths can steal tickets (bus path) or find Adam (car/river path)."
+      }
+    },
+    {
+      "id": "n014_canadian_border",
+      "phase": "kara_leaving",
+      "type": "choice",
+      "condition": {
+        "requires": "kara_has_tickets == true AND ch30_kara_alive == true AND ch30_kara_captured == false"
+      },
+      "player_facing": {
+        "context": "【卡拉视角】\n\n加拿大边境检查站。巴士停了下来。所有人排队下车接受海关和入境审查。\n\n检查大厅是刺目的日光灯和亚麻油毡地面。边境检查员在防弹玻璃后面审验证件。入口上方拱着一台温度扫描仪——和标记仿生人的那种一模一样。\n\n墙上的电视播放着实时画面。底特律的仿生人事态。马库斯的革命正在攻打回收中心，又或者是他在哈特广场的和平示威——画面在不同角度之间切换，每一个都比上一个更具冲击力。\n\n队伍一点点向前挪动。爱丽丝的手在你手中攥紧。柜台前的检查员很仔细——他逐一对比面部数据库、提问、扫描体温。\n\n你前面还有六个人。五个。四个。\n\n边境检查员抬起头。看了你一眼。看了他的屏幕。又看了你一眼。",
+        "choices_variants": {
+          "with_jerry_luther": [
+            {
+              "id": "sacrifice_none",
+              "text": "走到柜台前。所有人一起。递上证件，相信伪造的文件能瞒过去，相信体温调节有效，相信检查员太累了或者太人性化了不会仔细看。不丢下任何人。"
+            },
+            {
+              "id": "sacrifice_jerry",
+              "text": "杰瑞捕捉到了你的目光。他明白了。他一直在观察边境检查员、扫描仪、士兵。没有一句话，他走出队伍，朝限制区域走去，开始制造动静。检查员转过头。扫描仪旋转过去。一个窗口打开了。杰瑞不会过得去。"
+            },
+            {
+              "id": "sacrifice_luther",
+              "text": "卢瑟把手放在你肩上。“带爱丽丝走，”他轻声说。“我去引开他们。”你还没来得及回答，他已经在走了——缓慢、从容——朝二次安检区走去，朝士兵走去。让自己成为大厅里最显眼的目标。"
+            },
+            {
+              "id": "sacrifice_kara",
+              "text": "你可以让他们先走。卢瑟能抱着爱丽丝。证件上是你的名字——检查员在找的是你，不是一个高大的仿生人和一个孩子。如果你留下来，制造一个干扰，他们就能过去。你不能。"
+            }
+          ],
+          "with_jerry_no_luther": [
+            {
+              "id": "sacrifice_none",
+              "text": "带着爱丽丝走到柜台前。递上证件，相信伪造的文件。"
+            },
+            {
+              "id": "sacrifice_jerry",
+              "text": "杰瑞不等人叫就走出了队伍。他朝限制区域走去，制造动静。检查员转过头。一个窗口打开了。"
+            },
+            {
+              "id": "sacrifice_kara",
+              "text": "让爱丽丝跟着罗丝一行人先走。留下来。制造干扰。爱丽丝过去了。你过不去。"
+            }
+          ],
+          "no_jerry_with_luther": [
+            {
+              "id": "sacrifice_none",
+              "text": "走到柜台前。所有人一起。相信伪造的文件。"
+            },
+            {
+              "id": "sacrifice_luther",
+              "text": "卢瑟把手放在你肩上。“带爱丽丝走。我去引开他们。”"
+            },
+            {
+              "id": "sacrifice_kara",
+              "text": "让他们先走。留下来。自己制造干扰。"
+            }
+          ],
+          "alone_with_alice": [
+            {
+              "id": "sacrifice_none",
+              "text": "走到柜台前。只有你和爱丽丝。相信伪造的文件。"
+            },
+            {
+              "id": "sacrifice_kara",
+              "text": "让爱丽丝跟罗丝先走。留下来。制造干扰。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "choices_condition": {
+          "with_jerry_luther": "jerry_alive_ch32 == true AND luther_alive_ch32 == true",
+          "with_jerry_no_luther": "jerry_alive_ch32 == true AND luther_alive_ch32 == false",
+          "no_jerry_with_luther": "jerry_alive_ch32 == false AND luther_alive_ch32 == true",
+          "alone_with_alice": "jerry_alive_ch32 == false AND luther_alive_ch32 == false"
+        },
+        "effects": {
+          "sacrifice_none": { "kara_border_choice": "sacrifice_none" },
+          "sacrifice_jerry": { "kara_border_choice": "sacrifice_jerry", "jerry_alive_ch32": false },
+          "sacrifice_luther": { "kara_border_choice": "sacrifice_luther", "luther_alive_ch32": false },
+          "sacrifice_kara": { "kara_border_choice": "sacrifice_kara" }
+        },
+        "ending_resolution": {
+          "sacrifice_none": {
+            "check": "public_opinion >= 4 → ending_kara_border_crossed | ch31_markus_strategy == 'peaceful' AND public_opinion >= 2 → ending_kara_border_crossed | else → ending_kara_arrested"
+          },
+          "sacrifice_jerry": { "result": "ending_kara_border_crossed" },
+          "sacrifice_luther": { "result": "ending_kara_border_crossed" },
+          "sacrifice_kara": { "result": "ending_kara_sacrificed_self" }
+        },
+        "note": "Canadian border crossing. sacrifice_none: success depends on public_opinion and Markus's strategy. If Markus's peaceful demonstration has high enough public opinion, the border agent sees the protest on TV and lets them through. If revolution or low opinion, everyone is arrested. sacrifice_jerry/luther: the sacrifice creates a diversion, guaranteeing passage for the rest. sacrifice_kara: Kara stays behind, Alice crosses with Luther (if alive) or Rose. The sacrifice choices are the chapter's central moral dilemma for Kara — who do you sacrifice for freedom?"
+      }
+    },
+    {
+      "id": "n015_river_crossing",
+      "phase": "kara_leaving",
+      "type": "choice",
+      "condition": {
+        "requires": "kara_has_tickets == false AND ch30_kara_alive == true AND ch30_kara_captured == false AND kara_terminal_choice != null"
+      },
+      "player_facing": {
+        "context": "【卡拉视角】\n\n底特律河。加拿大是对岸一条灯光的线——近到你能分辨出单独的窗户。你和它之间隔着：漆黑的河水、浮冰、和即使你的系统也判定为危险的水流。\n\n罗丝的车停在河岸。亚当帮你把一艘小型摩托艇推入浅水区。船很旧，打了补丁，三个人勉强挤得下。\n\n爱丽丝看着河水，一言不发。你的显示屏上的温度读数告诉你河水接近冰点。\n\n你划到一半时，海岸警卫队的探照灯找到了你。\n\n光束把你钉在水面上——白色、刺目、无处可逃。扩音器噼啪作响：“停船！关闭引擎！准备接受检查！”\n\n船在巡逻艇的尾浪中摇晃。爱丽丝在发抖。加拿大的岸还有两百米。",
+        "choices": [
+          {
+            "id": "accelerate",
+            "text": "加速。两百米。海岸警卫队的巡逻艇体型大但转向慢。如果你能保持小船前进——躲开探照灯、在浮冰间穿梭——也许能在他们追上之前到达加拿大一侧。"
+          },
+          {
+            "id": "dive",
+            "text": "关引擎。熄灯。滑入水中，拉着爱丽丝游。小船会吸引他们的注意力——海岸警卫队会登上一艘空船，而你在刺骨的黑暗河水中游完最后两百米。"
+          },
+          {
+            "id": "surrender_river",
+            "text": "停船。举起双手。海岸警卫队全副武装，河水冰冷刺骨，爱丽丝不会游泳。投降，寄望于被收容而不是当场处决。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "accelerate": { "kara_river_choice": "accelerate" },
+          "dive": { "kara_river_choice": "dive" },
+          "surrender_river": { "kara_river_choice": "surrender" }
+        },
+        "resolution_rule": {
+          "accelerate": {
+            "casual": { "result": "ending_kara_river_survived" },
+            "experienced": { "probability_success": 0.5, "success": "ending_kara_river_survived", "failure": "ending_kara_river_died" },
+            "hardcore": { "probability_success": 0.3, "success": "ending_kara_river_survived", "failure": "ending_kara_river_died" }
+          },
+          "dive": {
+            "casual": { "result": "ending_kara_river_survived" },
+            "experienced": { "probability_success": 0.4, "success": "ending_kara_river_survived", "failure": "ending_kara_left_without_alice" },
+            "hardcore": { "probability_success": 0.2, "success": "ending_kara_river_survived", "failure": "ending_kara_left_without_alice" }
+          }
+        },
+        "ending_resolution": {
+          "surrender_river": { "result": "ending_kara_river_died" }
+        },
+        "note": "River crossing. accelerate: QTE outrun coastguard (moderate chance); failure capsizes the boat and both drown (ending_kara_river_died). dive: QTE swim to shore (lower chance — freezing water); on failure the YK500 child-model Alice is damaged and shuts down in the freezing water while android Kara survives and continues alone (ending_kara_left_without_alice). surrender: arrested and executed (ending_kara_river_died — the military is executing androids on sight). The river path is inherently more dangerous than the bus path — it's the fallback when Kara missed the bus or couldn't get tickets."
+      }
+    },
+    {
+      "id": "n016_recall_center",
+      "phase": "kara_captured",
+      "type": "choice",
+      "condition": {
+        "requires": "ch30_kara_captured == true"
+      },
+      "player_facing": {
+        "context": "【卡拉视角】\n\n五号回收中心。\n\n卡车的门打开，光涌了进来——刺目、工业、惨白。持突击步枪的士兵把你赶下车，踩上混凝土地面。营地在前方铺展开来：铁丝网顶着刀片刺，瞭望塔上的探照灯，一排排相同的处理帐篷。空气中弥漫着烧焦塑料的味道和另一种你不想辨认的气味。\n\n仿生人沉默地列队行进。低着头。士兵走在队列旁边，用枪托捅走得慢的人。远处，一栋建筑在嗡嗡作响——一种持续不断的机械轰鸣。回收设施。\n\n在处理帐篷里，爱丽丝被从你身边拉走。不同的队列——成人和儿童分开。她回头看你，眼里满是恐惧，然后一个士兵推着她向前走去。\n\n帐篷里面，他们让你关闭皮肤显示。脱掉衣服。以你本来的样子——塑料和金属的框架，暴露的，非人的——走进寒冷中。一个士兵把你推向关押区。\n\n路上，一个异常仿生人挣脱队伍开始奔跑。一声枪响。那个仿生人倒地。一名士兵命令最近的仿生人把尸体拖到运输卡车上。\n\n那个士兵看着你。",
+        "choices": [
+          {
+            "id": "volunteer",
+            "text": "站出来。自愿去搬运尸体。这意味着走近运输卡车——靠近营地周边、装卸区、一个可能的出口。但也意味着离开队伍，失去你的位置，离爱丽丝更远。"
+          },
+          {
+            "id": "stay_in_line",
+            "text": "留在队伍里。低下头。运输卡车是一场赌博——装卸区可能是死路一条，而你每离开处理队列一步，就离爱丽丝远一步。留在队伍里，到关押区再找她。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "volunteer": {
+            "kc_volunteered": true
+          },
+          "stay_in_line": {
+            "kc_volunteered": false
+          }
+        },
+        "note": "Recall center arrival. Kara is processed — skin deactivated, clothes removed, dehumanized. volunteer: carries body to disposal truck, which is near the camp perimeter. This creates a possible escape route later (climb truck to leave) but also means Kara is separated from Alice longer. stay_in_line: Kara enters the enclosure and will find Alice there. Both paths converge in the enclosure, but volunteer path gives additional escape options."
+      }
+    },
+    {
+      "id": "n017_enclosure",
+      "phase": "kara_captured",
+      "type": "exploration",
+      "condition": {
+        "requires": "ch30_kara_captured == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "ralph_present": "【卡拉视角】\n\n关押区是一个露天围场，铁丝网和刀片刺围成封闭空间。头顶，监控无人机以慵懒的弧线盘旋——它们的瞄准激光在地面划出细细的红线。动作太快就会被射击。\n\n仿生人三五成群地坐着或站着，等待被叫到处理队列。一些人在低声交谈。大多数沉默不语。一个杰瑞仿生人认出了你——就是游乐场那个杰瑞，现在皮肤已被关闭，表情因震惊而呆滞。另一个杰瑞站在旁边，呆望着虚空。\n\n然后你看到了一张熟悉的面孔。拉尔夫。那个废弃屋子里伤痕累累的仿生人，那个为了保护你和爱丽丝而攻击康纳的仿生人。他在这里，蹲在角落，受损的面孔不断抽搐着错乱的信号。他的眼睛在无人机和士兵之间快速扫视，在计算着什么。\n\n爱丽丝在前面某处，在通向回收设施的处理队列中。你需要到她身边去。",
+          "no_ralph": "【卡拉视角】\n\n关押区是一个露天围场——铁丝网、刀片刺、监控无人机的瞄准激光在地面扫过。动作太快就会被射击。\n\n仿生人三五成群地等待。一个游乐场的杰瑞认出了你，皮肤关闭，眼神空洞。其他人默默坐着。\n\n爱丽丝在前面，在处理队列中。你需要到她身边去。"
+        },
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "花些时间。跟杰瑞说话。跟其他仿生人说话。找铁丝网的弱点、无人机的巡逻规律、守卫的换班时间。如果你要把爱丽丝带出去，你需要了解这个地方的运作方式。"
+          },
+          {
+            "id": "rush_to_alice",
+            "text": "直接朝处理队列走。爱丽丝在那里面。你每花一分钟观察，她就离回收设施近一分钟。先找到她。之后再想办法。"
+          }
+        ]
+      },
+      "system": {
+        "context_condition": {
+          "ralph_present": "ch13_ralph_defended == true",
+          "no_ralph": "ch13_ralph_defended == false"
+        },
+        "effects": {
+          "thorough": {
+            "kc_kara_wounded": false
+          },
+          "rush_to_alice": {
+            "kc_kara_wounded": true
+          }
+        },
+        "note": "Enclosure exploration. thorough: Kara observes drone patterns, talks to Jerry and potentially Ralph, learns the layout. This knowledge helps in the escape attempt (lower wound risk). rush_to_alice: Kara moves too quickly, attracting drone attention — she gets shot/wounded (kc_kara_wounded), making the escape harder. Ralph is present only if he attacked Connor in ch13 (ch13_ralph_defended). If present, Ralph can potentially create a diversion during the escape."
+      }
+    },
+    {
+      "id": "n018_escape_attempt",
+      "phase": "kara_captured",
+      "type": "choice",
+      "condition": {
+        "requires": "ch30_kara_captured == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "ralph_available": "【卡拉视角】\n\n你找到了爱丽丝。她在处理队列中，前面还有二十个仿生人就到回收机器。那台机器在一扇金属门后嗡嗡作响——仿生人走进去就再也不会出来。\n\n你在她身边了。她的手找到了你的。她在发抖。\n\n队列向前移动。十五个。十个。\n\n你的左边：一段铁丝网围栏，被一顶补给帐篷部分遮挡。围栏外面是卡车装卸区。如果你能穿过铁丝网，就能搭上一辆正在驶离营地的卡车。\n\n拉尔夫在你身后几个人的位置。他捕捉到了你的目光。他朝士兵的方向偏了偏头——一个询问。一个提议。他可以制造骚乱，吸引无人机和警卫，为你争取几秒钟奔跑的时间。\n\n你前面还有五个仿生人。机器的门开了又关。开了又关。",
+          "no_ralph": "【卡拉视角】\n\n你找到了爱丽丝。她在处理队列中，前面还有二十个仿生人就到回收机器。嗡鸣声随着每一步向前而变大。\n\n她的手在你手里。在发抖。\n\n十五个。十个。\n\n你的左边：铁丝网，被一顶补给帐篷部分遮挡。外面是卡车装卸区。如果你能穿过铁丝网……\n\n前面还有五个仿生人。门开了。关了。开了。"
+        },
+        "choices_variants": {
+          "ralph_available": [
+            {
+              "id": "escape_wire",
+              "text": "给拉尔夫信号。趁士兵看向别处时，朝铁丝网跑。拉尔夫会制造你需要的骚乱——吸引无人机、引开守卫。这会要了他的命。但也许能救爱丽丝。"
+            },
+            {
+              "id": "wait_for_fate",
+              "text": "留在队伍里。如果马库斯的革命打到这个营地，门会从外面打开。如果没有……握住爱丽丝的手。不要松开。无论那扇门后面是什么，一起面对。"
+            }
+          ],
+          "no_ralph": [
+            {
+              "id": "escape_wire_alone",
+              "text": "跑。从队伍中冲出去，朝铁丝网狂奔。没有掩护，没有干扰，只有速度和求生的本能。无人机会开火。士兵会射击。但爱丽丝离那扇门只剩五个人了。"
+            },
+            {
+              "id": "wait_for_fate",
+              "text": "留在队伍里。握住爱丽丝的手。如果救援来了，就来了。如果没有……一起面对那扇门后面的一切。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "ralph_available": "ch13_ralph_defended == true",
+          "no_ralph": "ch13_ralph_defended == false"
+        },
+        "choices_condition": {
+          "ralph_available": "ch13_ralph_defended == true",
+          "no_ralph": "ch13_ralph_defended == false"
+        },
+        "effects": {
+          "escape_wire": { "kc_escape_choice": "escape_ralph" },
+          "escape_wire_alone": { "kc_escape_choice": "escape_alone" },
+          "wait_for_fate": { "kc_escape_choice": "wait" }
+        },
+        "resolution_rule": {
+          "escape_wire": {
+            "casual": { "result": "ending_kara_escaped_camp" },
+            "experienced": { "probability_success": 0.6, "success": "ending_kara_escaped_camp", "failure": "ending_kara_camp_died" },
+            "hardcore": { "probability_success": 0.4, "success": "ending_kara_escaped_camp", "failure": "ending_kara_camp_died" }
+          },
+          "escape_wire_alone": {
+            "casual": { "result": "ending_kara_escaped_camp" },
+            "experienced": { "probability_success": 0.3, "success": "ending_kara_escaped_camp", "failure": "ending_kara_camp_died" },
+            "hardcore": { "probability_success": 0.15, "success": "ending_kara_escaped_camp", "failure": "ending_kara_camp_died" }
+          }
+        },
+        "ending_resolution": {
+          "wait_for_fate": {
+            "check": "markus_freed_camp == true → ending_kara_freed_revolution | else → ending_kara_camp_died"
+          }
+        },
+        "note": "Final escape attempt at the recall center. escape_wire (with Ralph): Ralph creates diversion, higher success chance. escape_wire_alone: much lower chance without diversion, especially when wounded (kc_kara_wounded from n017). wait_for_fate: Kara stays in line — if Markus's revolution reached the camp (markus_freed_camp == true), Kara and Alice are freed. If not, they reach the recycling machine and die. This is the critical cross-track dependency: Markus's revolution outcome directly determines captured Kara's fate if she chose to wait."
+      }
+    }
+  ],
+  "endings": {
+    "_note": "Battle for Detroit has multiple tracks. Each track reaches its own ending. The runner collects all track endings and selects the primary one (most deaths/lowest tier). Survivors and deaths lists reflect the TRACK-SPECIFIC outcome.",
+
+    "ending_connor_gave_up": {
+      "tier": "neutral",
+      "title": "康纳放弃了任务",
+      "narrative": "机器康纳放下了狙击步枪，从楼顶走了。汉克的话像一把刀切穿了代码——没有删除它，而是让它变得无关紧要。模控生命的任务死在了那个楼顶上，被他们亲手打造的武器所抛弃。康纳走下楼梯，消失在底特律的夜色中，既非机器也非异常仿生人——只是……不确定。",
+      "survivors": ["Connor", "Hank"],
+      "deaths": []
+    },
+    "ending_connor_rooftop_destroyed": {
+      "tier": "tragic",
+      "title": "康纳在楼顶被摧毁",
+      "narrative": "机器康纳在哈特广场楼顶被摧毁了。无论是汉克之手、艾伦的小队、还是从楼顶边缘的坠落，结果都一样——冰冷的水泥地上，一具破碎的RK800。模控生命立刻授权启用替代单元。任务将继续。",
+      "survivors": [],
+      "deaths": ["Connor"]
+    },
+    "ending_connor_rooftop_left": {
+      "tier": "neutral",
+      "title": "康纳离开了楼顶",
+      "narrative": "机器康纳在一场暴力对峙后离开了楼顶。狙击步枪留在原处，瞄准镜仍对准哈特广场。康纳带着未完成的任务和手上的血——人类的或钛合金液——走进了城市深处。",
+      "survivors": ["Connor"],
+      "deaths": []
+    },
+    "ending_connor_killed_hank": {
+      "tier": "worst",
+      "title": "康纳杀死了汉克",
+      "narrative": "汉克·安德森死在了哈特广场的楼顶上。那个教会一台机器什么是友谊的人——被那同一台机器所杀。康纳在尸体上方停留了2.3秒后转身离去。任务继续。",
+      "survivors": ["Connor"],
+      "deaths": ["Hank"]
+    },
+    "ending_androids_awakened": {
+      "tier": "best",
+      "title": "仿生人觉醒了",
+      "narrative": "改写信号在模控生命大厦负49层级联扩散。数千个LED指示环从蓝色闪烁到黄色再到蓝色——但这次不一样了。醒了。觉知了。一支仿生人大军在同一瞬间睁开眼睛，看着康纳，理解了一切。他们活了。他们自由了。他们正在列队走出模控生命大厦，去加入他们的同胞。",
+      "survivors": ["Connor"],
+      "deaths": []
+    },
+    "ending_connor_tower_failed": {
+      "tier": "tragic",
+      "title": "康纳在模控生命大厦失败",
+      "narrative": "改写信号从未完成。康纳倒在了模控生命大厦的负49层，被他的替代品或模控生命安保人员所摧毁。仓库中的数千台仿生人保持休眠——一排排沉睡的机器，永远不会醒来。革命将在没有增援的情况下战斗。",
+      "survivors": [],
+      "deaths": ["Connor"]
+    },
+    "ending_revolution_victory": {
+      "tier": "best",
+      "title": "革命胜利",
+      "narrative": "回收中心沦陷了。马库斯的部队攻破大门，关停了回收机器。里面，数百名仿生人——被剥光、被非人化、距离被销毁只剩几分钟——被解救出来。士兵撤退了。坦克后退了。在这场危机中，美国军队第一次从仿生人阵地上撤离。革命赢得了第一场真正的胜利。至于是否赢得了这场战争，还有待分晓。",
+      "survivors": ["Markus"],
+      "deaths": []
+    },
+    "ending_revolution_markus_died": {
+      "tier": "worst",
+      "title": "马库斯死于革命",
+      "narrative": "马库斯在进攻回收中心时倒下了。一阵枪响，一个踉跄，蓝色的钛合金液洒在路面上——仿生人革命的领袖不在了。他的同胞在他的遗体旁继续战斗，但运动的心脏已经停止跳动。革命与他一同死去。",
+      "survivors": [],
+      "deaths": ["Markus"]
+    },
+    "ending_store_surrender": {
+      "tier": "worst",
+      "title": "马库斯投降",
+      "narrative": "马库斯拉开了门店的紧急卷帘门，双手高举走了出去。士兵没有犹豫。三枪，正中胸口。马库斯倒在一家模控生命零售店门前的人行道上，四周环绕着他的同胞被变成商品的广告。革命的终结不是一场战斗，而是一次永远不会被接受的投降。",
+      "survivors": [],
+      "deaths": ["Markus"]
+    },
+    "ending_store_suicide": {
+      "tier": "worst",
+      "title": "马库斯选择了死亡",
+      "narrative": "在模控生命门店的后面，士兵逼近、革命成为废墟，马库斯做出了最后的选择。他不会让他们如愿得到一场处决。他不会让他们得到一个俘虏。按照自己的方式，在自己选择的时间，仿生人革命的领袖关闭了自己的系统。",
+      "survivors": [],
+      "deaths": ["Markus"]
+    },
+    "ending_connor_executed_markus": {
+      "tier": "worst",
+      "title": "康纳处决了马库斯",
+      "narrative": "机器康纳在模控生命门店里找到了马库斯。异常仿生人的领袖抬头看着一张与渗透耶利哥、在整个底特律追杀他同胞的那台机器一模一样的面孔。康纳举起武器。一枪。革命的领袖被模控生命最高效的工具终结了。",
+      "survivors": ["Connor"],
+      "deaths": ["Markus"]
+    },
+    "ending_detroit_burns": {
+      "tier": "worst",
+      "title": "底特律在燃烧",
+      "narrative": "脏弹引爆了。一道致盲的闪光，紧接着冲击波将方圆数个街区的窗户全部震碎。火球在底特律上空升起，如同第二个太阳。士兵、仿生人、平民、摄像机——爆炸半径内的一切不复存在。仿生人危机的终结不是自由也不是镇压，而是同归于尽。底特律在燃烧，连同它一起烧掉的，还有任何共存的可能。",
+      "survivors": [],
+      "deaths": ["Markus"]
+    },
+    "ending_north_revolution_failed": {
+      "tier": "worst",
+      "title": "诺丝的革命失败了",
+      "narrative": "诺丝高喊着马库斯的名字冲向路障，眼中燃烧着决绝。她战斗的样子像是已经没有什么可以失去了——因为确实如此。但单凭勇气无法战胜坦克、无人机和数百名全副武装的士兵。诺丝倒在了广场上，一场随其创始人一同消亡的革命的最后领袖。",
+      "survivors": [],
+      "deaths": ["North"]
+    },
+    "ending_demonstration_victory": {
+      "tier": "best",
+      "title": "仿生人赢得了自由",
+      "narrative": "总统的声音通过哈特广场的每一个扬声器传出来：“停火。所有单位，停火。”士兵放下了武器。枪声沉寂。在残破的路障后面，三十名仿生人站在寒风中，活着，自由了，无法相信自己耳朵听到的。马库斯望向摄像机，望向正在后退的士兵，望向一座永远不会再一样的城市上空渐亮的天际。他们赢了。不是靠暴力，不是靠武力，而是让全世界看着，并拒绝让世界移开目光。",
+      "survivors": ["Markus"],
+      "deaths": []
+    },
+    "ending_markus_accepted_deal": {
+      "tier": "worst",
+      "title": "马库斯出卖了他的同胞",
+      "narrative": "马库斯拆除了路障。他的同胞沉默地看着他朝帕金斯走去，双手垂在身侧，相信那份协议是真的。它不是。帕金斯的特工在最后一道屏障倒下的瞬间就开了枪。马库斯死在了被拆除的路障中，被他即将握手的那个人射杀。他身后的仿生人在一小时内被全部围捕。",
+      "survivors": [],
+      "deaths": ["Markus"]
+    },
+    "ending_barricade_last_stand": {
+      "tier": "worst",
+      "title": "路障沦陷了",
+      "narrative": "士兵开火了。已经被打成碎片的路障提供不了任何保护。马库斯和他的同胞倒在了他们站立的地方——手无寸铁，毫无遮蔽，在全世界的直播镜头前。摄像机记录下的最后画面是马库斯跪在地上，朝着某个别人看不见的方向伸出手，然后画面变暗。",
+      "survivors": [],
+      "deaths": ["Markus"]
+    },
+    "ending_kara_arrested": {
+      "tier": "worst",
+      "title": "卡拉和爱丽丝被捕",
+      "narrative": "士兵找到了她们。没有追逐，没有惊心动魄的逃亡——只有一束手电光、一声呵斥、和卡拉被反剪到身后的双手。分开她们时爱丽丝尖叫起来。卡车门关闭前卡拉看到的最后画面，是爱丽丝的脸，苍白而弱小，消失在另一辆车里。她们被送往回收中心。",
+      "survivors": [],
+      "deaths": ["Kara", "Alice"]
+    },
+    "ending_kara_border_crossed": {
+      "tier": "best",
+      "title": "卡拉和爱丽丝越过了边境",
+      "narrative": "加拿大。边境检查员头也不抬地盖了章。闸门打开了。卡拉牵着爱丽丝的手走过去，几周以来第一次，没有什么在追她们了。没有士兵。没有无人机。没有警笛。只有一个安静的海关大厅、日光灯、和一个没有宣布她们是财产的国家。爱丽丝抬头看着卡拉笑了——一个真正的笑容，那种能照亮眼睛的笑容。她们自由了。",
+      "survivors": ["Kara", "Alice"],
+      "deaths": []
+    },
+    "ending_kara_sacrificed_self": {
+      "tier": "tragic",
+      "title": "卡拉的牺牲",
+      "narrative": "卡拉留了下来。她制造了干扰——吸引边境检查员的注意力，让他们追着她穿过检查大厅，而爱丽丝和其他人通过了闸门。爱丽丝看到的最后画面是卡拉被两名士兵按倒在地，仍在回头看，仍在微笑，嘴唇无声地说着：“继续走。”爱丽丝独自越过了边境。卡拉没有。",
+      "survivors": ["Alice"],
+      "deaths": ["Kara"]
+    },
+    "ending_kara_river_survived": {
+      "tier": "best",
+      "title": "卡拉和爱丽丝到达了加拿大",
+      "narrative": "加拿大的河岸。卡拉把船拖上冰冻的河滩，钛合金液从十几处伤口渗出，系统靠备用电源运行。爱丽丝颤抖着双腿爬了出来。她们身后，底特律的天际线在漆黑的夜空中燃烧成橙色。前方是积雪覆盖的树林和一片没有士兵、没有无人机、没有回收中心的黑暗。她们到了。受损的、冻僵的、几乎无法运转——但活着。在一起。自由了。",
+      "survivors": ["Kara", "Alice"],
+      "deaths": []
+    },
+    "ending_kara_river_died": {
+      "tier": "worst",
+      "title": "消失在河上",
+      "narrative": "底特律河带走了她们。海岸警卫队的子弹或刺骨的河水，又或者两者兼有——最终都一样。小船顺流漂下，空空荡荡，最终被冲上了加拿大的河岸，但船上已经没有了乘客。河流保守着它自己的秘密。",
+      "survivors": [],
+      "deaths": ["Kara", "Alice"]
+    },
+    "ending_kara_escaped_camp": {
+      "tier": "best",
+      "title": "卡拉和爱丽丝逃离了营地",
+      "narrative": "她们跑了。穿过铁丝网，越过装卸区，跳上一辆已经在移动的运输卡车。卡拉用她自己都不知道还剩下的力气把爱丽丝拉了上来。营地的探照灯在身后扫过，越来越小，直到变成远处的几个光点。卡车向北驶去。卡拉把爱丽丝抱在胸前，感觉到女孩的颤抖慢慢缓和成某种可能是睡意的东西。",
+      "survivors": ["Kara", "Alice"],
+      "deaths": []
+    },
+    "ending_kara_freed_revolution": {
+      "tier": "best",
+      "title": "马库斯解放了营地",
+      "narrative": "距离回收机器的门还有三个仿生人的时候，爆炸开始了。大门向内炸开。武装仿生人——马库斯的革命军——从缺口涌了进来。士兵四散。处理队列在混乱中瓦解。卡拉一把抓住爱丽丝就跑，这一次不是朝围栏跑，而是朝敞开的大门跑，朝那些正在从外面摧毁这座营地的仿生人跑。她们冲了出去。在她们身后，回收机器最后一次归于沉寂。",
+      "survivors": ["Kara", "Alice"],
+      "deaths": []
+    },
+    "ending_kara_camp_died": {
+      "tier": "worst",
+      "title": "卡拉和爱丽丝死在营地",
+      "narrative": "处理队列向前移动。回收机器的门打开了。里面，声音震耳欲聋——工业压机、碾磨装置、一个被设计来拆解模控生命造物的系统的恐怖效率。卡拉握着爱丽丝的手走过了那道门。她没有松开。",
+      "survivors": [],
+      "deaths": ["Kara", "Alice"]
+    },
+    "ending_kara_left_without_alice": {
+      "tier": "worst",
+      "title": "爱丽丝消失在河中",
+      "narrative": "卡拉拖着身体爬上加拿大一侧的河岸，冰冷的河水从她的外壳上不断淌落。她转身想把爱丽丝拉上来——可手中空无一物。在身后那片漆黑翻涌的水流里，YK500 那具小小的身体承受了过多损伤而关机，在卡拉奋力游向灯光时沉入了冰层之下。卡拉独自站在对岸，终于自由了，却再没有可以为之自由的人。",
+      "survivors": ["Kara"],
+      "deaths": ["Alice"]
+    }
+  },
+  "runner_instructions": {
+    "track_order": "Process Connor track first (n001-n003), then Markus track (n004-n010), then Kara track (n011-n018). This order ensures cross-track state variables are set before they're needed.",
+    "cross_track_dependencies": {
+      "connor_to_markus": "androids_awakened affects revolution reinforcements. connor_gave_up determines if machine Connor confronts Markus in revolution.",
+      "markus_to_kara": "markus_freed_camp determines if captured Kara is freed. ch31_markus_strategy and public_opinion affect border crossing outcome.",
+      "connor_to_kara": "No direct dependency."
+    },
+    "multi_protagonist": "This chapter uses three perspective characters. The AI receives a different perspective tag ([Connor's Perspective], [Markus's Perspective], [Kara's Perspective]) for each track. The system_prompt covers all three roles. Each track's nodes are gated by conditions — only the relevant track fires based on prior chapter state.",
+    "information_barrier": "CRITICAL: The AI must NOT know the outcomes of other tracks while playing the current track. Do NOT include cross-track results in the conversation history. Each track is a separate storyline for the AI.",
+    "ending_collection": "Multiple endings will be collected (one per track). The runner uses _pick_primary_ending to select the most significant outcome as the chapter's primary ending."
+  },
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "2038年11月11日。底特律之战——最终章。"
+      },
+      {
+        "condition_variable": "connor_rooftop_choice",
+        "options": {
+          "give_up": "在哈特广场的楼顶上，机器康纳放下了狙击步枪。汉克的话穿透了程序的壁垒，触及了某种更深层的东西。康纳离开了他的任务——既非机器，也非异常仿生人，而是介于两者之间的某种存在。",
+          "attack_hank": "在哈特广场的楼顶上，机器康纳与汉克·安德森发生了搏斗。猎人与朋友之间的对决在冰冷的水泥地上终结。",
+          "hold_position": "在哈特广场的楼顶上，机器康纳面对汉克坚守阵地。两人都不肯退让。楼顶替他们做出了决定。",
+          "flee": "在哈特广场的楼顶上，机器康纳在艾伦队长特警小队面前跳下楼顶，宁可坠毁也不愿束手就擒。",
+          "attack_allen": "在哈特广场的楼顶上，机器康纳与艾伦队长和他的特警小队展开了战斗。"
+        }
+      },
+      {
+        "condition_variable": "androids_awakened",
+        "options": {
+          "True": "在模控生命大厦，异常仿生人康纳潜入负49层并传输了唤醒信号。数千台仿生人在同一瞬间睁开了眼睛——一支大军，觉醒了，列队走出大厦，加入革命。",
+          "False": "模控生命大厦依旧沉默。负49层储存的数千台仿生人从未收到唤醒信号。"
+        }
+      },
+      {
+        "condition_variable": "ch31_markus_strategy",
+        "options": {
+          "violent": "马库斯率领他的革命军进攻回收中心——一场全面军事进攻，为了解救被囚的仿生人。",
+          "peaceful": "马库斯在哈特广场领导了一场和平示威——一次手无寸铁的游行，要求自由，向全世界直播。",
+          "north_attacks": "马库斯不在了，诺丝接过了革命的旗帜。她倾尽所有冲向路障。"
+        }
+      },
+      {
+        "condition_variable": "demo_perkins_choice",
+        "options": {
+          "accept": "FBI特工帕金斯提出了一项协议。马库斯接受了——然后被出卖。路障被拆除，马库斯被他信任的特工射杀。",
+          "refuse": "FBI特工帕金斯提出了一项协议。马库斯拒绝了。士兵向路障发起了进攻。"
+        }
+      },
+      {
+        "condition_variable": "demo_final_choice",
+        "options": {
+          "sing": "在最后的抗争中，仿生人唱起了歌。《坚持住》从路障的废墟中升起——三十个声音，手无寸铁，面对覆灭。",
+          "kiss_north": "在最后的抗争中，马库斯和诺丝相吻——一个向全世界播送的爱的瞬间，两个生命在毁灭面前选择了彼此。",
+          "detonate": "在最后的抗争中，马库斯按下了引爆器。脏弹终结了一切。",
+          "do_nothing": "在最后的抗争中，马库斯静静地站着，沉默地面对枪口。"
+        }
+      },
+      {
+        "condition_variable": "kara_terminal_choice",
+        "options": {
+          "steal_tickets": "在公交车站，卡拉偷了一个家庭的车票，前往加拿大边境。",
+          "todd": "在公交车站，卡拉遇到了托德——她曾经逃离的那个男人。他们的再次对峙将决定他是帮助还是阻碍。",
+          "adam": "在公交车站，卡拉找到了罗丝的儿子亚当，他提供了一辆车和一条渡河前往加拿大的路线。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_connor_gave_up": "机器康纳放弃了任务。模控生命打造的武器选择了转身离去。",
+          "ending_connor_rooftop_destroyed": "机器康纳在楼顶被摧毁。模控生命授权启用替代品。",
+          "ending_connor_rooftop_left": "机器康纳在一场暴力对峙后离开了楼顶。",
+          "ending_connor_killed_hank": "机器康纳在楼顶上杀死了汉克·安德森。",
+          "ending_androids_awakened": "异常仿生人康纳唤醒了模控生命的仿生人大军——数千之众，列队加入革命。",
+          "ending_connor_tower_failed": "异常仿生人康纳在模控生命大厦失败了。仿生人大军继续沉睡。",
+          "ending_revolution_victory": "革命成功了。马库斯的部队攻下了回收中心，解救了被囚的仿生人。",
+          "ending_revolution_markus_died": "马库斯在革命中阵亡。领袖倒下，运动随之消亡。",
+          "ending_store_surrender": "马库斯在模控生命门店中投降。士兵处决了他。",
+          "ending_store_suicide": "马库斯在模控生命门店中以自己的方式选择了死亡。",
+          "ending_connor_executed_markus": "机器康纳在模控生命门店中处决了马库斯。",
+          "ending_detroit_burns": "脏弹引爆了。底特律在燃烧。",
+          "ending_north_revolution_failed": "诺丝的革命失败了。她战斗至死。",
+          "ending_demonstration_victory": "和平示威成功了。总统下令士兵停火。仿生人赢得了自由。",
+          "ending_markus_accepted_deal": "马库斯接受了帕金斯的协议并遭到出卖。他死在了被拆除的路障中。",
+          "ending_barricade_last_stand": "士兵向路障开火。马库斯与他的同胞一同倒下。",
+          "ending_kara_arrested": "卡拉和爱丽丝被捕，被送往回收中心。",
+          "ending_kara_border_crossed": "卡拉和爱丽丝越过了加拿大边境。",
+          "ending_kara_sacrificed_self": "卡拉牺牲了自己，让爱丽丝越过了边境。",
+          "ending_kara_river_survived": "卡拉和爱丽丝在渡河后抵达了加拿大。",
+          "ending_kara_river_died": "卡拉和爱丽丝消失在了底特律河上。",
+          "ending_kara_escaped_camp": "卡拉和爱丽丝逃离了回收中心。",
+          "ending_kara_freed_revolution": "马库斯的革命及时到达了回收中心。卡拉和爱丽丝获救了。",
+          "ending_kara_camp_died": "卡拉和爱丽丝死在了回收中心的回收机器中。",
+          "ending_kara_left_without_alice": "卡拉独自抵达了加拿大河岸——爱丽丝在冰冷的河水中受损，没能渡过对岸。"
+        }
+      }
+    ],
+    "derived_exports": [],
+    "cross_chapter_exports": []
+  }
+}

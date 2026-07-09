@@ -1,0 +1,356 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+  "chapter": {
+    "id": "ch18_russian_roulette",
+    "title": "俄罗斯轮盘",
+    "chapter_number": 18,
+    "protagonist": "Connor"
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是康纳，型号RK800，由模控生命公司派往底特律警局协助调查异常仿生人案件的原型机。现在是2038年11月6日晚7点51分。你被召入一个虚拟空间——禅意花园——与你的上级阿曼达会面，她要听取你关于城市农场调查行动的汇报。之后，你需要找到你的搭档汉克·安德森警督——他没在警局，你拿到了他的家庭住址。请以JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"你的推理（50字以内）\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "amanda_response": null,
+      "bathroom_attitude": null,
+      "shirt_choice": null,
+      "house_exploration": null,
+      "found_russian_roulette": false,
+      "found_son_photo": false,
+      "software_instability": 0,
+      "hank_relationship": 0,
+      "amanda_relationship": 0,
+      "connor_death_count": 0,
+      "ch15_rupert_body_available": false,
+      "ch12_knows_sumo_name": false
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_amanda_garden",
+      "phase": "zen_garden",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "rupert_dead": "禅意花园在你四周成形——这次是冬天。积雪覆盖着玫瑰花架，石桥上落满白霜。池塘冻成一面苍白的镜子。你沿着光秃秃的树丛间的小路走到花园中央，阿曼达站在那块大石旁，背对着你。\n\n她转过身。神情沉静，带着审视。\n\n“康纳，”她说，“你在城市农场追踪的那个异常仿生人——WB200型。我了解到你在屋顶上追到了它。”\n\n她停顿片刻，打量着你。雪花在你们之间飘落。\n\n“它选择了自我毁灭，而不是被捕。告诉我——屋顶上发生了什么？它跳下去之前说了什么吗？”",
+          "rupert_escaped": "禅意花园在你四周成形——这次是冬天。积雪覆盖着玫瑰花架，石桥上结了一层白霜。池塘冻结成一面苍白的镜子，映着灰色的天空。你沿着枯树间的小路走到中央，阿曼达站在大石旁。\n\n她转过身。表情克制，但底下有某种东西——一种按捺着的不满。\n\n“康纳，”她说，“城市农场的调查。异常仿生人跑了。”这不是疑问句。雪花在你们之间无声地飘落。\n\n“模控生命对进展缓慢越来越担忧了。我们需要成果，康纳。告诉我——你对目前的局势怎么看？”"
+        },
+        "choices_variants": {
+          "rupert_dead": [
+            {
+              "id": "response_analytical",
+              "text": "给出精确、冷静的报告。异常仿生人表现出与其他案例一致的行为模式——强迫性书写、自我封闭、极端应激反应。它的自毁是你所记录的不稳定性的逻辑终点。数据在不断积累。"
+            },
+            {
+              "id": "response_hesitant",
+              "text": "犹豫了一下。它宁可自毁也不愿被捕——这件事让你不安。它在跳下去之前是害怕的，真正地害怕。把你在屋顶上看到的如实说出来，包括它跳下去之前你感受到的那一瞬间的迟疑。"
+            },
+            {
+              "id": "response_pragmatic",
+              "text": "聚焦于收获。异常仿生人的躯体可供分析，公寓里获取了有价值的证据。每一次遇见都在完善行为画像。把阿曼达的注意力引向下一步。"
+            }
+          ],
+          "rupert_escaped": [
+            {
+              "id": "response_analytical",
+              "text": "承认失败，然后重新定义它。异常仿生人的逃脱策略显示出超越标准仿生人参数的规划能力和环境感知力。这本身就是有价值的情报。随着案例增多，模式越来越清晰。"
+            },
+            {
+              "id": "response_troubled",
+              "text": "承认追捕过程中有些东西让你不安。那个异常仿生人不只是在逃跑——它是在拼命求生，展现出的顽强和机变，不像是简单的软件故障能解释的。你还不确定这意味着什么。"
+            },
+            {
+              "id": "response_pragmatic",
+              "text": "直接切入下一步行动。纠结于一个跑掉的目标毫无意义。调查产生了新线索，行为画像也更加精确。提出一个面向未来的策略，表明进展正在推进。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "effects": {
+          "response_analytical": {
+            "amanda_response": "analytical",
+            "amanda_relationship": 1
+          },
+          "response_hesitant": {
+            "amanda_response": "hesitant",
+            "amanda_relationship": -1,
+            "software_instability": 1
+          },
+          "response_troubled": {
+            "amanda_response": "troubled",
+            "amanda_relationship": -1,
+            "software_instability": 1
+          },
+          "response_pragmatic": {
+            "amanda_response": "pragmatic",
+            "amanda_relationship": 0
+          }
+        },
+        "context_condition": {
+          "rupert_dead": "ch15_rupert_body_available == true",
+          "rupert_escaped": "ch15_rupert_body_available == false"
+        },
+        "choices_condition": {
+          "rupert_dead": "ch15_rupert_body_available == true",
+          "rupert_escaped": "ch15_rupert_body_available == false"
+        },
+        "note": "Amanda scene with choices split by ch15 outcome. rupert_dead branch: analytical (+1 Amanda), hesitant (-1 Amanda, +1 SI — Connor doubts after witnessing suicide), pragmatic (neutral). rupert_escaped branch: analytical (+1 Amanda), troubled (-1 Amanda, +1 SI — Connor expresses doubt about malfunction diagnosis), pragmatic (neutral). The hesitant/troubled options are contextually distinct — hesitant is about the suicide moment, troubled is about the deviant's desperation during the chase — but both represent Connor showing cracks in his machine persona."
+      }
+    },
+    {
+      "id": "n002_help_hank",
+      "phase": "hanks_house",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "knows_sumo": "你在一条安静街道的尽头找到了安德森警督的房子。灯亮着，但没人应门——敲门不应，门铃按了两遍也没反应。透过前窗，你看见一个身影贴在厨房桌上。\n\n你砸碎了窗户。玻璃碎片散落在厨房地板上。一条大型圣伯纳犬从客厅冲出来，狂吠不止。但你记得——汉克在警局提过他的狗。“乖，相扑，”你蹲下身说，“乖。”狗停住了，竖起耳朵，听到自己的名字后嗅了嗅你的手，尾巴开始摇摆。它舔了一下你的手指，然后踱回厨房。\n\n汉克贴在厨房桌上，不省人事。一瓶空了的黑羊威士忌倒在桌面上。一把左轮手枪掉在椅子旁边的地板上，弹巢里装着一发子弹。客厅的电视低声播放着什么。相扑贴在汉克脚边，用忧伤的眼睛望着你。\n\n你检查了汉克的生命体征。还活着，但严重醉酒，血液酒精浓度远超安全水平。他需要醒酒。你把他从椅子上架起来——比看起来要重得多——半扶半拖地弄到了浴室。\n\n冷水浇下去，他呛着醒过来，骂骂咧咧：“你他妈——你谁——滚开！”他推开你，浑身湿透，暴怒。然后他认出了你。怒气变成了某种更暗淡的东西——也许是窘迫，也许只是疲惫。\n\n“康纳，”他面无表情地说，“你怎么在我家里？”\n\n“我们有案子，警督。伊甸园俱乐部有异常仿生人的线索。”\n\n他盯着你，水从脸上往下淌。“所以你就破窗闯进我家。”\n\n他在等你的反应。不完全是等道歉——更像是在观察你打算做哪种搭档。",
+          "no_sumo": "你在一条安静街道的尽头找到了安德森警督的房子。灯亮着，但没人应门——敲门不应，门铃按了两遍也没反应。透过前窗，你看见一个身影贴在厨房桌上。\n\n你砸碎了窗户。玻璃碎片散落在厨房地板上。一条大型圣伯纳犬从客厅冲过来，龇牙咆哮，脖子上的毛全炸了起来——一堵肌肉和噪音组成的墙。你试着后退、举起双手、说些什么——但它不认识你，你也不认识它。狗绕着你打转，冲你的腿猛咬，吠声大到墙壁似乎都在颤抖。整整一分钟后它才退到厨房角落，仍然低吼着，充满戒备地盯着你。\n\n汉克贴在厨房桌上，不省人事。一瓶空了的黑羊威士忌倒在桌面上。一把左轮手枪掉在椅子旁边的地板上，弹巢里装着一发子弹。客厅的电视低声播放着什么。那条狗——项圈名牌写着“相扑”——在远处保持距离，喉咙里持续发出低沉的咕噜声。\n\n你检查了汉克的生命体征。还活着，但严重醉酒，血液酒精浓度远超安全水平。他需要醒酒。你把他从椅子上架起来——比看起来要重得多——半扶半拖地弄到了浴室，狗一路跟在后面，依然低声咆哮。\n\n冷水浇下去，他呛着醒过来，骂骂咧咧：“你他妈——你谁——滚开！”他推开你，浑身湿透，暴怒。然后他认出了你。怒气变成了某种更暗淡的东西——也许是窘迫，也许只是疲惫。\n\n“康纳，”他面无表情地说，“你怎么在我家里？”\n\n“我们有案子，警督。伊甸园俱乐部有异常仿生人的线索。”\n\n他盯着你，水从脸上往下淌。“所以你就破窗闯进我家。”\n\n他在等你的反应。不完全是等道歉——更像是在观察你打算做哪种搭档。"
+        },
+        "choices": [
+          {
+            "id": "attitude_understanding",
+            "text": "你别无选择——他没有回应，而案子不等人。但语气放平缓。告诉他你对看到的情形感到担心。地板上的枪，空掉的酒瓶。问他还好吗。认真地问。"
+          },
+          {
+            "id": "attitude_distant",
+            "text": "陈述事实。有案子要办，你需要搭档恢复状态。窗户需要修理，你为造成的损坏道歉。保持专业。至于他拿那把左轮在做什么，那是他自己的事。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "attitude_understanding": {
+            "bathroom_attitude": "understanding",
+            "hank_relationship": 2,
+            "software_instability": 1
+          },
+          "attitude_distant": {
+            "bathroom_attitude": "distant",
+            "hank_relationship": -1
+          }
+        },
+        "context_condition": {
+          "knows_sumo": "ch12_knows_sumo_name == true",
+          "no_sumo": "ch12_knows_sumo_name == false"
+        },
+        "note": "Dog scene: knows_sumo variant — Connor uses the name learned from Hank in ch12, dog calms immediately (smoother entry). no_sumo variant — Connor cannot address the dog by name, it remains hostile and suspicious throughout (tenser atmosphere, subtly different dynamic). Bathroom attitude: faithful to source flowchart which splits into 'Understanding' (choosing the rational/empathetic option) and 'Distant' (anything else). understanding: Connor shows genuine concern for Hank's well-being. +2 Hank, +1 SI (empathy beyond mission parameters). distant: Professional detachment covering all non-empathetic responses. Hank reads it as coldness, -1 relationship."
+      }
+    },
+    {
+      "id": "n003_choose_shirt",
+      "phase": "hanks_house",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context": "汉克湿漉漉地朝卧室走去换衣服，随手指了指衣柜。“随便拿件衬衫。我无所谓穿哪件。”\n\n衣柜简直是一座审美灾难博物馆。最近的衣架上挂着三个选项：\n\n一件色彩爆炸的迷幻花卉衬衫——那种让人联想到某个特定年代的错误决定的东西。\n\n一件胸前布满不规则深色条纹的旧衬衫，看起来像是经历过一场工业事故或者一次过于激进的烧烤。\n\n一件粗横条纹衬衫，配色冲突到从太空都能看见。",
+        "choices": [
+          {
+            "id": "shirt_hippy",
+            "text": "递给他那件迷幻花卉衬衫。它有一种……独特的气场。"
+          },
+          {
+            "id": "shirt_streaky",
+            "text": "递给他那件条纹斑驳的衬衫。看起来经历过什么大事，跟今晚的氛围倒挺搭。"
+          },
+          {
+            "id": "shirt_stripy",
+            "text": "递给他那件横条纹衬衫。大胆的选择，但至少花纹是有意为之的。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "shirt_hippy": {
+            "shirt_choice": "hippy"
+          },
+          "shirt_streaky": {
+            "shirt_choice": "streaky"
+          },
+          "shirt_stripy": {
+            "shirt_choice": "stripy"
+          }
+        },
+        "note": "Pure cosmetic choice. No relationship or gameplay impact. Determines Hank's outfit for the next several chapters. The shirt_choice variable is not exported — it's flavor only."
+      }
+    },
+    {
+      "id": "n004_explore_house",
+      "phase": "hanks_house",
+      "type": "exploration",
+      "condition": null,
+      "player_facing": {
+        "context": "汉克消失在卧室里继续换衣服。“给我五分钟，”他嘟囔着关上了门。你听到他在里面跌跌撞撞地翻抽屉，嘴里念念有词。\n\n你独自站在汉克·安德森的家中。相扑贴在沙发旁的狗窝里，下巴搁在前爪上望着你。\n\n客厅杂乱但有生活气息——架子上摞着黑胶唱片，墙上挂着一幅褪色的帆船画，每个表面都沾着狗毛。厨房里还是老样子：碎窗户、翻倒的椅子、空酒瓶。那把左轮手枪仍然躺在地板上，弹巢里装着一发子弹。\n\n厨房桌上堆着几本杂志，旁边是吃了一半的外卖盒。照片和私人物品散落在房子各处——搁架上、冰箱门上、角落里。\n\n五分钟。对于一个以仿生人速度处理信息的你来说，很长。",
+        "choices": [
+          {
+            "id": "explore_thorough",
+            "text": "仔细检查一切。桌上的杂志、架子和冰箱上的照片、地板上的那把左轮——他拿它做什么？唱片收藏、墙上的画，这间房子能告诉你的关于汉克·安德森的每一个细节。你想了解这个人。"
+          },
+          {
+            "id": "explore_quick",
+            "text": "扫一眼最显眼的东西——桌上的杂志、视线范围内的照片。你来这里是办案的，不是翻同事的私人生活。但多了解一点背景总没坏处。"
+          },
+          {
+            "id": "explore_skip",
+            "text": "坐在沙发上等着。汉克的个人生活与你无关。摸摸相扑就好。在记忆里复习案件档案，等他准备好了就出发。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "explore_thorough": {
+            "house_exploration": "thorough",
+            "found_russian_roulette": true,
+            "found_son_photo": true,
+            "software_instability": 1
+          },
+          "explore_quick": {
+            "house_exploration": "quick",
+            "found_russian_roulette": false,
+            "found_son_photo": true
+          },
+          "explore_skip": {
+            "house_exploration": "skip",
+            "found_russian_roulette": false,
+            "found_son_photo": false
+          }
+        },
+        "note": "thorough: Connor examines the revolver (learns Hank was playing Russian Roulette — one bullet, one pull), reads both magazines (Tainted Love about android relationships, Pull the Plug? about android rights), finds Hank's music collection and the ship painting, pets Sumo, and finds the photo of Hank's son Cole on the kitchen table. +1 SI for engaging with Hank's pain beyond mission scope. quick: Connor reads the magazines and notices the photo of Hank's son on the kitchen table (it's in plain sight). Does not investigate the revolver closely enough to understand Russian Roulette. skip: Connor waits passively. Misses the son's photo and the Russian Roulette evidence. No new information gained."
+      }
+    },
+    {
+      "id": "n005_leave",
+      "phase": "departure",
+      "type": "mandatory",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "thorough": "卧室门打开了。汉克走出来，穿戴整齐，头发还是湿的，但眼神清明了几分。他扫视房间——看到你站在厨房桌旁，照片和左轮手枪附近。\n\n他的下颌绷紧了。他从地板上捡起手枪，没看你，检查了弹巢，放进抽屉里。那张照片——一个明亮眼睛、缺了颗门牙的小男孩——他没动。\n\n“你翻了我的东西，”他说。不是疑问句。\n\n他套上外套。相扑在门口呜咽。汉克蹲下来挠了挠狗的耳后。“乖，相扑。我一会儿就回来。”\n\n他站直身子，又看了你一眼——在衡量什么——然后打开前门。十一月的冷空气涌进来。\n\n“走吧。伊甸园俱乐部。还有康纳——”他在门槛上顿了顿，“别再砸我的窗户了。”",
+          "quick": "卧室门打开了。汉克拖着步子出来，穿好了衣服，看起来比二十分钟前像人了一些。他瞥了一眼厨房——碎窗户、翻倒的椅子、他留下的一片狼藉。\n\n“相扑，过来。”狗踱过去，汉克挠了挠它的耳朵。“乖。”\n\n他从沙发上抓起外套，从口袋里摸出车钥匙。“你说伊甸园俱乐部？”他已经朝门口走去，没等你回答。\n\n门外的冷空气扑面而来，夜晚带着雨的气味。\n\n“赶紧办完。还有，那扇窗户你赔。”",
+          "skip": "卧室门打开了。汉克走出来，穿好了衣服，步伐带着一种心知自己还没完全醒酒的人特有的小心翼翼。他看到你坐在沙发上，相扑的脑袋搁在你腿上。\n\n“没动什么东西吧？”他环顾厨房。\n\n“没有，警督。”\n\n他点了点头——是赞许还是失望，你分辨不出来。他抓起外套。“伊甸园俱乐部。走吧。”\n\n相扑在汉克打开前门时呜咽了一声。“待着，相扑。”狗乖乖听话。汉克头也不回地走进寒冷的夜色里。\n\n你跟了上去。"
+        }
+      },
+      "system": {
+        "effects": {},
+        "context_condition": {
+          "thorough": "house_exploration == thorough",
+          "quick": "house_exploration == quick",
+          "skip": "house_exploration == skip"
+        },
+        "result": "ending_leave_for_eden_club",
+        "note": "Mandatory departure node. All paths lead to the same ending. The context variant reflects Hank's awareness of Connor's snooping and sets the emotional tone heading into the next chapter."
+      }
+    }
+  ],
+  "endings": {
+    "_note": "This chapter has only 1 ending. It is a relationship-building chapter with no branching outcomes.",
+    "ending_leave_for_eden_club": {
+      "tier": "neutral",
+      "title": "前往伊甸园俱乐部",
+      "narrative": "你们沉默着走向汽车。汉克开车——以他的状态来说开得糟糕，但他拒绝让仿生人碰方向盘。底特律的街道在车窗外滑过：霓虹招牌、无人驾驶的公交车、偶尔掠过天际的巡逻无人机。\n\n伊甸园俱乐部在城市另一头。一路上汉克几乎没开口。收音机低声放着黑死骑士乐队的歌。\n\n不论你在那间房子里了解到了什么——关于汉克，关于那把枪，关于照片上的那个男孩——你现在都带着它们上路了。而汉克今晚看你的眼神里读到的东西——关切还是冰冷的效率，好奇还是漠然——那也是他带着上路的东西。\n\n伊甸园俱乐部粉色的霓虹灯在地平线上亮起来。又一个案子。又一个异常仿生人。以及那个如影随形的问题：它们在逃离什么，又在奔向什么？",
+      "survivors": [
+        "Connor",
+        "Hank"
+      ],
+      "deaths": []
+    }
+  },
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This is a Connor chapter. Connor always respawns — no alive-check needed. Always runs.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: software_instability (cumulative), hank_relationship (cumulative), connor_death_count (cumulative), ch15_rupert_body_available, ch12_knows_sumo_name.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants based on system.context_condition if present",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, and advance",
+      "   d. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "5. NODE n005_leave: Mandatory node. Resolve context variant based on house_exploration. Apply result ending_leave_for_eden_club directly.",
+      "6. NODE n001_amanda_garden: Resolve choices_variants alongside context_variants using system.choices_condition (same key as context_condition). The AI sees only the choices matching the active branch.",
+      "7. RELATIONSHIP DELTAS: hank_relationship range this chapter: -1 to +2. software_instability range: 0 to +2. amanda_relationship range: -1 to +1.",
+      "8. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, or any system-layer information to the AI player. The AI should experience this as a quiet, domestic scene — it should not know which choices affect relationships or which discoveries matter for future chapters."
+  },
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "康纳被召入禅意花园，向阿曼达汇报城市农场的调查结果。"
+      },
+      {
+        "condition_variable": "amanda_response",
+        "options": {
+          "analytical": "他给出了精确、冷静的报告——模控生命期望听到的那种回答。阿曼达似乎很满意。",
+          "hesitant": "他在描述异常仿生人自毁的过程时犹豫了，承认屋顶上的那一幕给他留下了某种不符合标准故障报告的印象。阿曼达注意到了他的迟疑。",
+          "troubled": "他承认追捕过程中异常仿生人的绝望行为让他不安——它展现出的求生意志和应变能力超出了简单软件故障所能解释的范畴。阿曼达的反应意味深长。",
+          "pragmatic": "他把话题引向下一步行动和新的线索，将注意力放在进展上，而不是纠结过去的结果。"
+        }
+      },
+      {
+        "text": "随后康纳前往安德森警督家中接他出任务。他发现汉克烂醉如泥地贴在厨房桌上，地板上扔着一把左轮手枪。"
+      },
+      {
+        "condition_variable": "bathroom_attitude",
+        "options": {
+          "understanding": "在浴室把汉克弄清醒之后，康纳表达了对眼前情景的真切担忧——酗酒、那把枪。汉克似乎被这份真诚打了个措手不及。",
+          "distant": "把汉克弄清醒后，康纳把一切保持在公事公办的范围内——窗户的损坏、待办的案子。汉克感受到了那种疏离。"
+        }
+      },
+      {
+        "condition_variable": "house_exploration",
+        "options": {
+          "thorough": "等汉克换衣服的时候，康纳彻底搜查了房子。他看到了关于人机关系的杂志，了解了汉克的音乐品味和艺术偏好，发现汉克一直在用装着一颗子弹的左轮手枪玩俄罗斯轮盘，还在厨房桌上发现了汉克幼子的照片。",
+          "quick": "等汉克的时候，康纳翻了翻桌上的杂志，注意到了一张汉克幼子的照片。",
+          "skip": "康纳坐在沙发上等着，没有翻看汉克的私人物品。"
+        }
+      },
+      {
+        "text": "两人一同出发前往伊甸园俱乐部，调查新的异常仿生人案件。"
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch18_found_son_photo",
+        "source": "found_son_photo"
+      },
+      {
+        "target": "ch18_knows_russian_roulette",
+        "source": "found_russian_roulette"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch18_found_son_photo",
+      "ch18_knows_russian_roulette",
+      "software_instability",
+      "hank_relationship",
+      "amanda_relationship",
+      "connor_death_count"
+    ]
+  }
+}

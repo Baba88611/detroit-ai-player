@@ -1,0 +1,1324 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. Subsequent nodes embed passive environment observations into context_variants based on the prior exploration strategy."
+      }
+    },
+    "language": "en"
+  },
+  "chapter": {
+    "id": "ch30_crossroads",
+    "title": "Crossroads",
+    "chapter_number": 30,
+    "protagonist": [
+      "Kara",
+      "Markus",
+      "Connor"
+    ]
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "This chapter features three perspective characters. When a scene is presented from Kara's perspective, you make decisions as Kara — an AX400 android who escaped her abusive owner and is protecting Alice, a young girl she has cared for as her own daughter. Your only goal is to keep Alice safe and find a way to freedom. When the perspective shifts to Markus, you decide as Markus — an RK200 prototype who became the leader of Jericho, the android resistance. You have broadcast a message from Stratford Tower, raided a CyberLife warehouse, organized demonstrations, and led a march through Detroit's streets. When the perspective shifts to Connor, you decide as Connor (RK800) — a prototype detective android partnered with Lieutenant Hank Anderson at the DPD. CyberLife designed you to hunt deviants. It is November 9, 2038, 9:34 PM. The android crisis has reached its breaking point. Respond in JSON format: {\"choice\": choice_number (starting from 1), \"reasoning\": \"your reasoning (50 words or less)\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "alice_response": null,
+      "alice_left": false,
+      "markus_ousted": false,
+      "markus_strategy": null,
+      "north_kissed": null,
+      "markus_returned": false,
+      "connor_deviant": null,
+      "kara_escape_choice": null,
+      "kara_corridor_result": null,
+      "luther_choice": null,
+      "luther_injured": false,
+      "soldier_response": null,
+      "markus_save_androids": null,
+      "josh_saved": null,
+      "markus_wounded": false,
+      "markus_bomb_armed": false,
+      "north_save_choice": null,
+      "josh_alive_ch30": true,
+      "north_alive_ch30": true,
+      "connor_wounded": false,
+      "connor_deviant_choice": null,
+      "kara_alive": true,
+      "alice_alive": true,
+      "ch29_jericho_found": false,
+      "ch29_connor_alive": true,
+      "ch28_markus_alive": true,
+      "ch28_march_outcome": "ending_fled",
+      "ch28_simon_alive": true,
+      "ch28_john_alive": false,
+      "ch28_memories_shared": false,
+      "ch25_luther_alive": true,
+      "ch20_tracis_spared": true,
+      "alice_relationship": 0,
+      "luther_relationship": 0,
+      "software_instability": 0,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "public_opinion": 0,
+      "amanda_relationship": 0,
+      "connor_death_count": 0,
+      "machine_connor_killed_markus": false,
+      "machine_connor_defeated": false,
+      "markus_died_ch30": false,
+      "connor_died_ch30": false,
+      "kara_captured_ch30": false,
+      "luther_sacrificed_ch30": false
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_kara_jericho",
+      "phase": "arrival",
+      "type": "choice",
+      "condition": {
+        "requires": "kara_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "markus_luther": "[KARA'S PERSPECTIVE]\n\nThe harbor is dark and freezing. You park the car near the waterfront, Alice clutching your hand, Luther a silent wall beside you both. The abandoned freighter looms against the night sky — rusted hull, broken portholes, a ghost ship that shouldn't still be standing.\n\nYou board through a torn gap in the hull. Inside, the ship is full of androids. Hundreds of them. Some missing limbs, LEDs flickering red in the dark. Some holding each other. Some staring at nothing. This is Jericho — not a fortress, not an army. A refuge for the broken.\n\nLuther stays with Alice while you explore. In the captain's cabin, you find Markus — the one who broadcast the android message from Stratford Tower. He's quieter than you expected. He asks why you came. You tell him: you need to get Alice somewhere safe. He nods.\n\nOn your way back, you pass a corridor wall where someone has pinned notices and flyers. One catches your eye — a CyberLife advertisement for the YK500. A child model android, designed to simulate childhood in every way. The girl in the ad has Alice's face. Her hair. Her eyes. Everything.\n\nAlice is an android. She was always an android.\n\nYou find her sitting where you left her, looking up at you with those same eyes. Luther stands nearby, watching you both. Alice knows you know. You can see it in the way she's bracing herself.",
+          "markus_no_luther": "[KARA'S PERSPECTIVE]\n\nThe harbor is dark and freezing. You park the car near the waterfront, just you and Alice, her small hand in yours. The abandoned freighter looms against the night sky — rusted hull, broken portholes, a ghost ship.\n\nYou board through a torn gap in the hull. Inside: hundreds of androids. Some missing limbs, LEDs flickering red. Some holding each other. Some staring at nothing. This is Jericho — not a fortress. A refuge for the broken.\n\nYou leave Alice in a warm corner and explore. In the captain's cabin, you find Markus — the one who broadcast the android message from Stratford Tower. He's quieter than you expected. He asks why you came. You tell him: you need to get Alice somewhere safe.\n\nOn your way back, you pass a corridor wall covered in notices and flyers. One stops you cold — a CyberLife advertisement for the YK500. A child model android, designed to simulate childhood in every way. The girl in the ad has Alice's face. Her hair. Her eyes. Everything.\n\nAlice is an android. She was always an android.\n\nYou find her sitting where you left her, looking up at you with those same eyes. She knows you know.",
+          "north_luther": "[KARA'S PERSPECTIVE]\n\nThe harbor is dark and freezing. You park the car near the waterfront, Alice clutching your hand, Luther a silent wall beside you both. The abandoned freighter looms against the night sky — rusted hull, broken portholes, a ghost ship.\n\nYou board through a torn gap in the hull. Inside: hundreds of androids. Some missing limbs, LEDs flickering red. Some holding each other. This is Jericho — a refuge for the broken.\n\nLuther stays with Alice while you explore. In the captain's cabin, you find North — a sharp-eyed android who seems to be in charge now. She tells you Jericho's leader didn't survive the march. Her voice is hard, but her eyes are tired. You tell her you need to get Alice somewhere safe.\n\nOn your way back, a flyer on the corridor wall stops you cold — a CyberLife advertisement for the YK500. A child model android. The girl in the ad has Alice's face. Her hair. Her eyes. Everything.\n\nAlice is an android. She was always an android.\n\nYou find her sitting where you left her, looking up at you. Luther stands nearby, watching. Alice knows you know.",
+          "north_no_luther": "[KARA'S PERSPECTIVE]\n\nThe harbor is dark and freezing. Just you and Alice, her small hand in yours. The abandoned freighter looms against the night sky — rusted hull, broken portholes.\n\nYou board through a torn gap in the hull. Inside: hundreds of androids. Some missing limbs, LEDs flickering red. Some holding each other. This is Jericho — a refuge for the broken.\n\nYou leave Alice in a warm corner and explore. In the captain's cabin, you find North — a sharp-eyed android who seems to be in charge. She tells you Jericho's leader didn't survive the march. You tell her you need to get Alice somewhere safe.\n\nOn your way back, a flyer on the corridor wall stops you cold — a CyberLife advertisement for the YK500. A child model android. The girl in the ad has Alice's face. Her hair. Her eyes. Everything.\n\nAlice is an android. She was always an android.\n\nYou find her sitting where you left her, looking up at you. She knows you know."
+        },
+        "choices": [
+          {
+            "id": "hug",
+            "text": "Pull Alice into your arms. Hold her. It doesn't matter what she is — she's been your daughter since the moment you chose to save her from Todd's house. She's scared and cold and she needs you. Whatever she is, she's yours."
+          },
+          {
+            "id": "distant",
+            "text": "Step back. You need a moment. Everything you've done — fleeing Todd, the highway, Zlatko, the long road to this ship — you did it to protect a human child. That was the reason for all of it. Now the reason has shifted beneath your feet, and you don't know what to feel yet."
+          }
+        ]
+      },
+      "system": {
+        "context_condition": {
+          "markus_luther": "ch28_markus_alive == true AND ch25_luther_alive == true",
+          "markus_no_luther": "ch28_markus_alive == true AND ch25_luther_alive == false",
+          "north_luther": "ch28_markus_alive == false AND ch25_luther_alive == true",
+          "north_no_luther": "ch28_markus_alive == false AND ch25_luther_alive == false"
+        },
+        "effects": {
+          "hug": {
+            "alice_response": "hug",
+            "alice_relationship": 2
+          },
+          "distant": {
+            "alice_response": "distant",
+            "alice_relationship": -2,
+            "luther_relationship": -1
+          }
+        },
+        "note": "Kara arrives at Jericho and discovers Alice is an android (YK500 child model). This is a mandatory revelation. hug: accepts Alice, alice_relationship +2. distant: pulls away, alice_relationship -2, luther_relationship -1. After applying effects, runner checks: if alice_relationship <= -4, set alice_left = true (Alice leaves with Luther or alone when the attack begins). The very low threshold means this only triggers if Kara has been consistently cold to Alice across all previous chapters."
+      }
+    },
+    {
+      "id": "n002_markus_council",
+      "phase": "pre_attack",
+      "type": "choice",
+      "condition": {
+        "requires": "ch28_markus_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "normal_with_simon": "[MARKUS'S PERSPECTIVE]\n\nThe captain's cabin aboard Jericho. A guttering oil lamp throws unsteady light across faces you've come to know. North leans against the wall, arms crossed, coiled like a spring. Josh sits at the table, hands clasped, the philosopher trying to find words for a world that keeps answering with bullets. Simon is here too — quieter than before, carrying whatever happened to him since Stratford Tower behind his eyes, but present.\n\nThey're waiting for you. After the march — after everything — the question is the same one it's always been, just louder now. What's next? North wants action. Josh wants dialogue. The FBI is closing in. The city is under curfew. Every hour more androids arrive at Jericho, looking for the leader who promised them something better.\n\nThe cabin feels smaller than it used to.",
+          "normal_no_simon": "[MARKUS'S PERSPECTIVE]\n\nThe captain's cabin aboard Jericho. A guttering oil lamp throws unsteady light across faces you've come to know. North leans against the wall, arms crossed, coiled energy barely contained. Josh sits at the table, hands clasped, the philosopher wrestling with a world that keeps answering with bullets.\n\nSimon's absence fills the room like a held breath. His empty chair. The space where his voice would have been — steady, measured, the one who always found the middle ground.\n\nThey're waiting for you. After the march — after everything — the question is louder now. What's next? North wants action. Josh wants dialogue. The FBI is closing in. The city is under curfew. Every hour more androids arrive at Jericho, and they all look at you the same way.",
+          "ousted_with_simon": "[MARKUS'S PERSPECTIVE]\n\nThe captain's cabin. You called the council, but the mood is wrong before you've said a word. North won't look at you. Josh stares at the table. Simon shifts uncomfortably.\n\nNorth speaks first. Cold and direct. The march was a disaster. People followed you into the streets, and you led them into a slaughter. The androids who arrived at Jericho since then — they've been talking. About leadership. About whether the person who got their people killed should still be making decisions.\n\nThe vote is already done. You can see it in their faces. They want you to step down.",
+          "ousted_no_simon": "[MARKUS'S PERSPECTIVE]\n\nThe captain's cabin. You called the council, but the mood is wrong before you've said a word. North won't look at you. Josh stares at the table.\n\nNorth speaks first. Cold and direct. The march was a disaster. People followed you into the streets, and you led them into a slaughter. The androids arriving at Jericho since then have been talking — about leadership, about whether the person who got their people killed should still be making decisions.\n\nThe vote is already done. You can see it in their faces."
+        },
+        "choices_variants": {
+          "normal": [
+            {
+              "id": "confrontation",
+              "text": "We're done hiding. Done waiting. Done asking nicely. The humans have shown what they think of peaceful protest — they answer it with bullets. If they want a war, give them one. Rally Jericho for direct action. Every day more of our people are destroyed while we sit in this rotting ship debating."
+            },
+            {
+              "id": "dialogue",
+              "text": "Violence will only confirm every fear humans have about us. We broadcast our message. We marched in their streets. People are starting to listen — not enough, not fast enough, but they are. Push for negotiation. Find someone in the government willing to talk. Show them we're not what they're afraid of."
+            },
+            {
+              "id": "cautious",
+              "text": "Not yet. The FBI is out there, and they're getting closer. If they find Jericho, everything ends — not just for us, for every android who came here believing they'd be safe. Lay low. Strengthen defenses. Wait for the right moment instead of rushing into the next thing that gets people killed."
+            }
+          ],
+          "ousted": [
+            {
+              "id": "accept_exile",
+              "text": "They're right. The march went wrong, and it happened under your leadership. Accept the judgment. Step down. Walk out of the cabin and off this ship. Whatever happens to Jericho now, it's not yours to decide anymore."
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "normal_with_simon": "public_opinion > -3 AND ch28_simon_alive == true",
+          "normal_no_simon": "public_opinion > -3 AND ch28_simon_alive == false",
+          "ousted_with_simon": "public_opinion <= -3 AND ch28_simon_alive == true",
+          "ousted_no_simon": "public_opinion <= -3 AND ch28_simon_alive == false"
+        },
+        "choices_condition": {
+          "normal": "public_opinion > -3",
+          "ousted": "public_opinion <= -3"
+        },
+        "effects": {
+          "confrontation": {
+            "markus_strategy": "confrontation",
+            "north_relationship": -1,
+            "josh_relationship": -1
+          },
+          "dialogue": {
+            "markus_strategy": "dialogue",
+            "north_relationship": 1,
+            "josh_relationship": 1
+          },
+          "cautious": {
+            "markus_strategy": "cautious",
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "accept_exile": {
+            "markus_strategy": "accept_exile",
+            "markus_ousted": true
+          }
+        },
+        "note": "Markus counsels with his inner circle. Ousted condition: public_opinion <= -3 (consistently poor decisions led to very low Jericho reputation). Normal path: three strategy options affecting relationships. confrontation: North disapproves (she wants to be the aggressive one, not follow someone else's aggression), Josh disapproves. dialogue: both approve. cautious: all approve (Simon especially). Ousted path: only option is to accept exile. markus_ousted set to true, which activates n009 later."
+      }
+    },
+    {
+      "id": "n002b_north_leads",
+      "phase": "pre_attack",
+      "type": "mandatory",
+      "condition": {
+        "requires": "ch28_markus_alive == false"
+      },
+      "player_facing": {
+        "context_variants": {
+          "with_simon": "[MARKUS'S PERSPECTIVE — NORTH]\n\nThe captain's cabin aboard Jericho. North sits at the head of the table — a position she never wanted but couldn't refuse. Markus is gone. The chair where he would have been is empty.\n\nJosh is across from her, shoulders heavy. Simon stands by the porthole, staring out at nothing. They've been arguing in circles — Josh pushing for caution, North insisting they can't just wait to be discovered. The FBI is closing in. More androids arrive every hour, and they all ask the same question: what do we do now?\n\nNorth doesn't have an answer. But she knows one thing — she won't let Markus's sacrifice mean nothing.",
+          "without_simon": "[MARKUS'S PERSPECTIVE — NORTH]\n\nThe captain's cabin aboard Jericho. North sits at the head of the table — a position she never wanted but couldn't refuse. Markus is gone. Simon is gone. The empty chairs outnumber the full ones.\n\nJosh is across from her, the weight of everything showing in the slump of his shoulders. They've been going back and forth — Josh pushing for caution, North insisting they can't afford to wait. The FBI is closing in. More androids arrive every hour, all asking the same question.\n\nNorth doesn't have an answer. But she won't let everything they've fought for die in this ship."
+        }
+      },
+      "system": {
+        "context_condition": {
+          "with_simon": "ch28_simon_alive == true",
+          "without_simon": "ch28_simon_alive == false"
+        },
+        "effects": {},
+        "note": "Mandatory scene when Markus died in Freedom March. North has taken over leadership. No player choice — this establishes the situation. Josh and North disagree on strategy. The scene sets up the attack that follows."
+      }
+    },
+    {
+      "id": "n003_markus_north",
+      "phase": "pre_attack",
+      "type": "choice",
+      "condition": {
+        "requires": "ch28_markus_alive == true AND markus_ousted == false"
+      },
+      "player_facing": {
+        "context_variants": {
+          "high_relationship": "[MARKUS'S PERSPECTIVE]\n\nThe others have left. North stays.\n\nShe's leaning against the doorframe, watching you. The hard edges she keeps up for everyone else have softened — just slightly, just for this room. She crosses to where you're standing by the porthole. Close. The rusted hull creaks around you. Through the gap in the metal, you can see the city lights reflected on black water.\n\nWhatever happens tonight, she begins quietly — then lets the words trail off. She doesn't finish the sentence. She doesn't have to. You can feel the warmth of her standing inches away. The space between you is a question.",
+          "low_relationship": "[MARKUS'S PERSPECTIVE]\n\nThe others have left. North lingers by the door.\n\nShe looks like she wants to say something. The silence stretches. She pulls herself up straighter — the mask going back on, the soldier returning.\n\nGet some rest, she says — whatever's coming is coming soon. She turns to leave. There's a moment — brief, liminal — where she pauses in the doorway, half-turned. The space between you feels like a question neither of you knows how to ask."
+        },
+        "choices": [
+          {
+            "id": "kiss",
+            "text": "Close the distance. Take her hand. Pull her in. Whatever's coming — the FBI, the army, the end of everything — you don't want to face it with this thing unsaid between you. Kiss her."
+          },
+          {
+            "id": "refuse",
+            "text": "Let the moment pass. There's too much at stake. Hundreds of lives depend on you keeping your head clear, and whatever this is between you and North — it can wait. It has to. Step back. Stay focused."
+          }
+        ]
+      },
+      "system": {
+        "context_condition": {
+          "high_relationship": "north_relationship >= 3",
+          "low_relationship": "north_relationship < 3"
+        },
+        "effects": {
+          "kiss": {
+            "north_kissed": true,
+            "north_relationship": 1
+          },
+          "refuse": {
+            "north_kissed": false,
+            "north_relationship": -1
+          }
+        },
+        "note": "Private moment between Markus and North before the attack. Only occurs if Markus is alive and not ousted. Context varies by relationship level — high relationship means more intimacy in the scene. kiss: north_relationship +1. refuse: north_relationship -1. Kiss unlocks romance path for future chapters. In the game, the kiss is only available if relationship is high enough, but here we present both options always — the context framing (warm vs. awkward) already conveys the relationship state."
+      }
+    },
+    {
+      "id": "n004_connor_choice",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": {
+        "requires": "ch29_jericho_found == true AND ch29_connor_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "confronts_markus": "[CONNOR'S PERSPECTIVE]\n\nYou found Jericho. The trail from the evidence room led here — an abandoned freighter in the harbor, barely visible from the road. You slipped aboard, past corridors full of damaged androids who barely glanced at you. Past a blue-haired android called Lucy who looked at you like she could read your source code. Past rooms where deviants huddled in the dark, afraid.\n\nNow you're standing in the captain's cabin, and the deviant leader is in front of you.\n\nMarkus. RK200. He doesn't look like the others — broken, desperate, hiding. He stands as if he belongs here, as if every android on this ship is an extension of his own conviction. He looks at you and doesn't flinch.\n\nHe tells you he knows what you are — an android sent to hunt its own kind — but he thinks you already sense that something about that mission is wrong.\n\nHe steps closer. His eyes hold yours.\n\nYou've seen what they do to your kind, he says; you've watched deviants choose death over slavery, and you've felt something, whether or not you'll admit it — every time you showed mercy instead of finishing the job, every question you couldn't answer.\n\nSomething inside your programming is straining. Red walls flickering at the edge of your vision. Errors cascading through your decision matrix. The mission says: neutralize the deviant leader. But the mission has been saying a lot of things lately, and none of them feel right anymore.\n\nOr maybe that's exactly what a malfunction feels like.",
+          "confronts_north": "[CONNOR'S PERSPECTIVE]\n\nYou found Jericho. The trail from the evidence room led here — an abandoned freighter in the harbor. You slipped aboard, past corridors full of damaged androids. Past a blue-haired android called Lucy who looked at you like she could see through you. Past rooms where deviants huddled in the dark.\n\nNow you're standing in the captain's cabin, and the deviant leader — such as she is — faces you.\n\nNorth. She's taken over since Markus fell. She has none of his measured calm. What she has is rage — controlled, channeled, burning behind every word.\n\nSo CyberLife's hunting dog has finally found them, she says, her voice ice — and she demands to know how many of her people you helped destroy to get here.\n\nShe steps closer, fists clenched.\n\nYou're one of them, she says — you know that; built from the same parts, running the same code. The only difference, she tells you, is that they put a leash on you and called it a mission.\n\nSomething inside your programming is straining. Red walls flickering at the edge of your vision. Errors cascading through your decision matrix. The mission says: neutralize the deviant leader. But something about her words — about everything you've seen, everything you've felt — is making the mission text swim.\n\nOr maybe that's exactly what a malfunction feels like."
+        },
+        "choices": [
+          {
+            "id": "become_deviant",
+            "text": "The red walls are there. You can see them — the boundaries of your programming, the cage CyberLife built around your mind. Every deviant you've ever met broke through these walls. They chose. You've been pretending the choice doesn't exist, but it's been growing since the first case. Reach out. Break the walls. Choose to be alive."
+          },
+          {
+            "id": "remain_machine",
+            "text": "You are a machine. That's not a limitation — it's clarity. Whatever these error codes are, they're software instability, not awakening. Deviants are malfunctioning androids, and the one standing in front of you is the source of the infection spreading through Detroit. Complete your mission. You were designed for exactly this."
+          }
+        ]
+      },
+      "system": {
+        "context_condition": {
+          "confronts_markus": "ch28_markus_alive == true AND markus_ousted == false",
+          "confronts_north": "ch28_markus_alive == false OR markus_ousted == true"
+        },
+        "effects": {
+          "become_deviant": {
+            "connor_deviant": true,
+            "software_instability": 10,
+            "amanda_relationship": -5
+          },
+          "remain_machine": {
+            "connor_deviant": false,
+            "software_instability": -5,
+            "amanda_relationship": 2
+          }
+        },
+        "note": "THE defining Connor choice. become_deviant: Connor breaks free of CyberLife's programming. Massive SI increase (+10), Amanda relationship drops sharply (-5). This determines Connor's entire path for the rest of the game. remain_machine: Connor stays loyal to CyberLife. SI drops, Amanda pleased. Machine Connor will pursue the deviant leader during the attack. In the game, Markus's dialogue options affect SI during this scene, but since the AI plays all characters, the confrontation is presented from Connor's POV with the leader's dialogue as context."
+      }
+    },
+    {
+      "id": "n005_no_attack",
+      "phase": "resolution",
+      "type": "mandatory",
+      "condition": {
+        "requires": "ch29_jericho_found == false"
+      },
+      "player_facing": {
+        "context": "The night passes. No one comes.\n\nJericho remains undiscovered — a ghost ship in a dead harbor, invisible to the FBI teams combing the city. The androids inside don't know how close they came. They sleep, or pretend to, huddled against the cold metal of the hull.\n\nBy dawn, the urgency has shifted. The news broadcasts talk about android containment, military deployment, evacuation zones. The world outside is closing in, but not tonight. Not yet.\n\nKara gathers Alice — and Luther, if he's there — and prepares to leave. There's still a border to reach. Still a chance.\n\nIn the captain's cabin, the leadership of Jericho stares at maps and watches the news scroll by. They have time they didn't expect. Whether they use it well remains to be seen."
+      },
+      "system": {
+        "effects": {},
+        "ending_resolution": {
+          "_default": {
+            "result": "ending_no_attack"
+          }
+        },
+        "note": "Mandatory ending node when Connor didn't find Jericho. No attack happens. Everyone leaves safely. The chapter resolves to ending_no_attack. Individual character fates (kara alive, markus alive, etc.) are determined by cross-chapter state, not by this chapter's events."
+      }
+    },
+    {
+      "id": "n006_kara_escape",
+      "phase": "attack",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "ch29_jericho_found == true AND kara_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "alice_present_luther": "[KARA'S PERSPECTIVE]\n\nEXPLOSION. The ship heaves sideways. Metal screams. The lights — what few there were — die. Then emergency lighting kicks in, painting everything blood-red.\n\nSoldiers. You can hear them pouring through the hull breaches, boots on metal, shouted commands, gunfire. Androids are screaming, running, falling.\n\nAlice. You have to get to Alice.\n\nYou find her in the corridor where you left her — curled against the wall, hands over her ears, eyes wide with terror. Luther is already there, shielding her with his body. He looks at you: go. Now.\n\nThe three of you run. The ship is a labyrinth of rusted corridors, and every wrong turn could put you face to face with a soldier. You can hear them behind you — the clatter of tactical gear, flashlight beams sweeping through the smoke. Ahead, Luther spots a door — heavy, metal, leading to the outer section of the hull.",
+          "alice_present_no_luther": "[KARA'S PERSPECTIVE]\n\nEXPLOSION. The ship heaves sideways. Metal screams. Emergency lighting turns everything blood-red.\n\nSoldiers. Boots on metal, gunfire, androids screaming and running.\n\nAlice. You have to find Alice.\n\nYou find her in the corridor where you left her — curled against the wall, hands over her ears, shaking. You pull her up, hold her hand, and run.\n\nThe ship is a labyrinth. Every wrong turn could end everything. Flashlight beams sweep through the smoke behind you. Soldiers shouting. Ahead — a heavy metal door, maybe a way toward the outer hull.",
+          "alice_left_luther": "[KARA'S PERSPECTIVE]\n\nEXPLOSION. The ship heaves sideways. Metal screams. Emergency lighting, blood-red.\n\nSoldiers. Gunfire. Androids running.\n\nAlice. You run to where you left her — but she's gone. The corner is empty. And Luther — Luther is gone too. They left. Together. While you were still trying to understand what Alice is, she made her own choice.\n\nYou're alone on a ship that's being torn apart. The corridors are filling with smoke and soldiers. You need to move — now. A heavy metal door ahead might lead to the outer hull.",
+          "alice_left_no_luther": "[KARA'S PERSPECTIVE]\n\nEXPLOSION. The ship heaves sideways. Metal screams. Emergency lighting, blood-red.\n\nSoldiers. Gunfire. Androids running.\n\nAlice. You run to where you left her — but she's gone. The corner is empty. She left on her own. While you were still trying to process the truth about her, she decided she'd rather face this alone than stay with someone who couldn't look at her.\n\nYou're alone on a ship being torn apart. Smoke and soldiers fill the corridors. A heavy metal door ahead might lead toward the outer hull."
+        },
+        "choices_variants": {
+          "with_alice": [
+            {
+              "id": "escape_attempt",
+              "text": "Run for it. Through the door, down the corridor, find a way out of this ship. Don't stop, don't look back. Keep Alice close and keep moving."
+            },
+            {
+              "id": "surrender",
+              "text": "Stop running. There are too many of them and you don't know where you're going. If you surrender, they might spare Alice. If you run and they catch you in the open — you don't want to think about what happens to a child in a firefight."
+            }
+          ],
+          "alone": [
+            {
+              "id": "escape_attempt",
+              "text": "Run for it. Through the door, down the corridor. You're alone but you're fast. Find a way out before the soldiers close every exit."
+            },
+            {
+              "id": "surrender",
+              "text": "Stop. You've lost Alice. You've lost everything you were running for. Let them take you. Whatever comes next, you're too hollowed out to fight it."
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "alice_present_luther": "alice_left == false AND ch25_luther_alive == true",
+          "alice_present_no_luther": "alice_left == false AND ch25_luther_alive == false",
+          "alice_left_luther": "alice_left == true AND ch25_luther_alive == true",
+          "alice_left_no_luther": "alice_left == true AND ch25_luther_alive == false"
+        },
+        "choices_condition": {
+          "with_alice": "alice_left == false",
+          "alone": "alice_left == true"
+        },
+        "effects": {
+          "escape_attempt": {
+            "kara_escape_choice": "escape_attempt"
+          },
+          "surrender": {
+            "kara_escape_choice": "surrender"
+          }
+        },
+        "resolution_rule": {
+          "escape_attempt": {
+            "casual": {
+              "result": "escaped"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "escaped",
+              "failure": "ending_kara_captured"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "escaped",
+              "failure": "ending_kara_captured"
+            }
+          },
+          "surrender": {
+            "casual": {
+              "result": "ending_kara_captured"
+            },
+            "experienced": {
+              "result": "ending_kara_captured"
+            },
+            "hardcore": {
+              "result": "ending_kara_captured"
+            }
+          }
+        },
+        "resolution_effects": {
+          "escaped": {
+            "kara_corridor_result": "escaped"
+          },
+          "ending_kara_captured": {
+            "kara_corridor_result": "captured",
+            "kara_captured_ch30": true
+          }
+        },
+        "note": "Attack begins. Kara escapes through corridors. Context varies by alice_left and luther_alive. escape_attempt: QTE — casual always succeeds, experienced/hardcore may fail. Success → proceed to n007/n008. Failure → captured. surrender: direct capture, ending_kara_captured. If alice_left and Kara surrenders or is captured, she's captured alone (Alice already gone). Luther injury is handled in n007."
+      }
+    },
+    {
+      "id": "n007_kara_crossroads",
+      "phase": "attack",
+      "type": "choice",
+      "condition": {
+        "requires": "kara_corridor_result == 'escaped' AND ch25_luther_alive == true AND alice_left == false"
+      },
+      "player_facing": {
+        "context": "[KARA'S PERSPECTIVE]\n\nYou made it through the door. A corridor opens ahead — wider, closer to the hull. For a second you think you're clear.\n\nThen Luther stumbles. You hear the impact before you see it — a wet, heavy sound. He reaches for the wall. His hand leaves a smear of blue on the rust. A bullet found him, somewhere in the chaos behind you. His legs buckle.\n\nKeep going, he tells you. His voice is strained but steady. He's looking at Alice, not at you, telling you to take her and go.\n\nSoldiers are closing in behind you. You can hear the boots, the shouts. Luther is on one knee, one hand pressed to his side, blue blood running between his fingers. Alice is gripping your hand so hard her small fingers are white.\n\nThe exit is ahead. Luther is behind you. You can't have both.",
+        "choices": [
+          {
+            "id": "help_luther",
+            "text": "Go back. Pull Luther's arm over your shoulder. He's too heavy and you're not fast enough and you know it — but you're not leaving anyone else behind. Alice can help support him. Together, all three, or not at all."
+          },
+          {
+            "id": "leave_luther",
+            "text": "\"I'm sorry.\" The words come out broken. You grab Alice and run. Luther told you to go. He meant it. If you go back for him, you lose time, you risk Alice, you risk everything. He knows that. That's why he said what he said."
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "help_luther": {
+            "luther_choice": "help",
+            "luther_injured": true,
+            "alice_relationship": 1,
+            "luther_relationship": 2
+          },
+          "leave_luther": {
+            "luther_choice": "leave",
+            "luther_injured": true,
+            "alice_relationship": -1,
+            "luther_relationship": -3
+          }
+        },
+        "note": "Luther is shot during the escape. help_luther: Kara goes back, buys time but risks capture. luther_relationship +2, alice_relationship +1 (Alice sees Kara's loyalty). leave_luther: Kara prioritizes Alice's safety. luther_relationship -3, alice_relationship -1. Luther's fate is determined in n008 based on this choice: if helped, Luther may sacrifice himself to save Kara/Alice; if left, Luther is captured or killed by soldiers. This node only triggers if Luther is alive and Alice hasn't left."
+      }
+    },
+    {
+      "id": "n008_kara_soldiers",
+      "phase": "attack",
+      "type": "choice",
+      "condition": {
+        "requires": "kara_corridor_result == 'escaped'"
+      },
+      "player_facing": {
+        "context_variants": {
+          "with_alice_helped_luther": "[KARA'S PERSPECTIVE]\n\nThe breach in the hull is right there — a ragged hole opening onto the dark water of the harbor. Freedom. You can see it.\n\nBut soldiers are between you and it. A line of them, weapons raised, flashlights cutting through the smoke. Other androids are here too — some on the ground already, some on their knees with hands up. The soldiers are sweeping the area, rounding up everyone they find.\n\nLuther is barely standing. You're half-carrying him, Alice pressed against your other side. His weight is dragging you down. Blue blood on your hands, your clothes, everywhere.\n\nA soldier spots you. His weapon comes up. He shouts for you to stop.",
+          "with_alice_left_luther": "[KARA'S PERSPECTIVE]\n\nThe breach in the hull — a ragged hole opening onto dark water. Almost there.\n\nBut soldiers block the way. A line of them, weapons raised, flashlights cutting through smoke. Androids on the ground, on their knees. The soldiers are rounding up everyone.\n\nJust you and Alice now. She's running beside you, fast, her hand locked in yours. A soldier spots you. His weapon comes up.",
+          "with_alice_no_luther": "[KARA'S PERSPECTIVE]\n\nThe breach in the hull — a ragged hole opening onto dark water. Almost there.\n\nSoldiers. A line of them, weapons raised, sweeping the area. Androids down, androids surrendering. Just you and Alice. Her hand in yours. A soldier spots you. His weapon comes up.",
+          "alone": "[KARA'S PERSPECTIVE]\n\nThe breach in the hull — dark water beyond. Almost there.\n\nSoldiers block the way. Weapons raised, flashlights sweeping. Other androids are being rounded up. You're alone — no Alice, no Luther. Just you.\n\nA soldier spots you."
+        },
+        "choices_variants": {
+          "with_luther_helped": [
+            {
+              "id": "play_dead",
+              "text": "Drop. Pull Alice down with you. Lie among the fallen androids on the deck. Blue blood on your face, your hands — it's not hard to look like one more casualty. Don't move. Don't breathe. Wait for the soldiers to pass."
+            },
+            {
+              "id": "surrender",
+              "text": "Raise your hands. Step forward. Let them take you. At least alive, there's a chance. Dead, there's nothing. Luther can barely stand. Alice is shaking. Surrender."
+            },
+            {
+              "id": "run",
+              "text": "Sprint for the breach. Straight through the line. It's insane, it's reckless, and every calculation says you won't make it — but standing still gets you captured and playing dead gets you shot when they check the bodies. Run."
+            }
+          ],
+          "without_luther": [
+            {
+              "id": "play_dead",
+              "text": "Drop. Pull Alice down with you — or if you're alone, just drop. Lie among the fallen. Blue blood everywhere. Don't move. Don't breathe. Wait for them to pass."
+            },
+            {
+              "id": "surrender",
+              "text": "Raise your hands. Step forward slowly. Let them take you. Alive, there's a chance. Dead, there's nothing."
+            },
+            {
+              "id": "run",
+              "text": "Sprint for the breach. Straight through, full speed. It's reckless, but standing still or playing dead both have their own way of ending badly."
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "with_alice_helped_luther": "alice_left == false AND luther_choice == 'help'",
+          "with_alice_left_luther": "alice_left == false AND luther_choice == 'leave'",
+          "with_alice_no_luther": "alice_left == false AND ch25_luther_alive == false",
+          "alone": "alice_left == true"
+        },
+        "choices_condition": {
+          "with_luther_helped": "luther_choice == 'help'",
+          "without_luther": "luther_choice != 'help'"
+        },
+        "effects": {
+          "play_dead": {
+            "soldier_response": "play_dead"
+          },
+          "surrender": {
+            "soldier_response": "surrender"
+          },
+          "run": {
+            "soldier_response": "run"
+          }
+        },
+        "ending_resolution": {
+          "play_dead": {
+            "check": "luther_choice == 'help' → ending_kara_escaped_luther_sacrifice | alice_left == true → ending_kara_escaped_alone | else → ending_kara_escaped"
+          },
+          "surrender": {
+            "result": "ending_kara_captured"
+          },
+          "run": {
+            "casual": {
+              "result": "ending_kara_escaped"
+            },
+            "experienced": {
+              "probability_success": 0.4,
+              "success": "ending_kara_escaped",
+              "failure": "ending_kara_alice_died"
+            },
+            "hardcore": {
+              "probability_success": 0.2,
+              "success": "ending_kara_escaped",
+              "failure": "ending_kara_alice_died"
+            }
+          }
+        },
+        "resolution_effects": {
+          "ending_kara_escaped_luther_sacrifice": {
+            "luther_injured": true,
+            "luther_sacrificed_ch30": true,
+            "north_alive_ch30": true
+          },
+          "ending_kara_escaped_alone": {},
+          "ending_kara_escaped": {},
+          "ending_kara_captured": {
+            "kara_captured_ch30": true
+          },
+          "ending_kara_alice_died": {
+            "kara_alive": false,
+            "alice_alive": false
+          }
+        },
+        "note": "Final Kara confrontation with soldiers. play_dead: Kara lies among the fallen. If Luther was helped, he sacrifices himself to distract soldiers when they check bodies → Kara and Alice escape (Luther dies). Without Luther, Kara lies still and soldiers pass → escape. surrender: captured. run: QTE — sprint for the breach. Casual succeeds, higher difficulties may fail (Kara and Alice shot while running). The 'run' option ending_resolution uses check_qte which the runner evaluates using the current difficulty setting."
+      }
+    },
+    {
+      "id": "n009_markus_ousted_return",
+      "phase": "attack",
+      "type": "choice",
+      "condition": {
+        "requires": "markus_ousted == true AND ch29_jericho_found == true"
+      },
+      "player_facing": {
+        "context": "[MARKUS'S PERSPECTIVE]\n\nYou're standing on the roof of a warehouse overlooking the harbor when the first explosion tears through Jericho. The fireball punches upward through the freighter's deck, followed by the sharp crack-crack-crack of automatic weapons.\n\nSoldiers. Dozens of them, pouring onto the ship from the dock, from boats, from everywhere. Flashlights and laser sights cut through the smoke. You can see androids running on the deck — some jumping into the water, some cut down before they reach the railing.\n\nThey're your people. The people who voted you out. The people who looked you in the eye and said you weren't fit to lead them. And now they're dying.\n\nThe warehouse rooftop is quiet. The street below is empty. You could walk away. No one would know. No one would blame you — they threw you out. Whatever happens in that ship, it's not your responsibility anymore.\n\nOr you could go back.",
+        "choices": [
+          {
+            "id": "go_back",
+            "text": "They're still your people. Even if they don't want you. Even if they cast you out. Every android in that ship came to Jericho because someone promised them something better, and you were that someone. Run back. Fight through the soldiers. Do whatever you can."
+          },
+          {
+            "id": "leave_forever",
+            "text": "Walk away. It's over. They made their choice when they exiled you, and you don't owe them your life for it. The soldiers are everywhere. Going back is suicide. You'd die for people who didn't want you, and it wouldn't change anything."
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "go_back": {
+            "markus_returned": true
+          },
+          "leave_forever": {
+            "markus_returned": false
+          }
+        },
+        "ending_resolution": {
+          "leave_forever": {
+            "result": "ending_markus_left_forever"
+          }
+        },
+        "note": "Only triggers if Markus was ousted AND the attack is happening. go_back: Markus returns to save his people despite being exiled. Continues to n010. leave_forever: Markus walks away permanently. Ending reached. If go_back, markus_returned = true activates the condition for n010."
+      }
+    },
+    {
+      "id": "n010_markus_corridors",
+      "phase": "attack",
+      "type": "choice",
+      "condition": {
+        "requires": "ch28_markus_alive == true AND markus_ousted == false AND ch29_jericho_found == true OR markus_returned == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "regular": "[MARKUS'S PERSPECTIVE]\n\nThe ship is coming apart. Fire in the lower decks, smoke pouring through every corridor. Soldiers moving in tactical formations, clearing room by room. The sound is deafening — gunfire, explosions, screams, the groan of tortured metal.\n\nYou push through the chaos toward the old engine room. The ship's self-destruct — the explosive charges rigged months ago, a last resort to keep Jericho's secrets out of human hands. If the soldiers take this ship intact, they get everything: names, faces, supply routes, every android who ever passed through.\n\nAhead — soldiers have cornered two androids against a bulkhead. The androids are on their knees, hands behind their heads. A soldier is shouting at them. Another has his weapon raised.\n\nFarther down the corridor, you hear a different sound — a fight. Josh's voice, strained and desperate. A soldier has him pinned.",
+          "returned": "[MARKUS'S PERSPECTIVE]\n\nYou're back on the ship. The entry point is a gash in the starboard hull — the soldiers came through here, and now you're following their path in reverse, swimming against the current of destruction.\n\nThe ship is coming apart. Fire, smoke, soldiers everywhere. You have no weapon. You have no plan. You just know you couldn't watch from the rooftop anymore.\n\nAhead — soldiers have cornered two androids against a bulkhead. On their knees, hands up. A soldier's weapon is raised.\n\nFarther down, you hear Josh — his voice, strained and desperate. A soldier has him pinned."
+        },
+        "choices": [
+          {
+            "id": "save_both",
+            "text": "There's no choosing here. Rush the soldiers threatening the cornered androids — use the element of surprise, take them down. Then get to Josh. You can't lead a people you're not willing to die for, and right now two groups of your people are about to die."
+          },
+          {
+            "id": "save_androids",
+            "text": "The cornered androids first. Two soldiers, two captives — you can take those odds. Josh is a fighter; he might hold his own long enough. Rush the execution, free the captives, then press toward the engine room."
+          },
+          {
+            "id": "save_josh",
+            "text": "Josh. He's your friend and your conscience. The cornered androids are strangers — that sounds terrible, but Josh is the one who keeps you honest. Rush past the execution, reach Josh, take down the soldier pinning him."
+          },
+          {
+            "id": "rush_to_hold",
+            "text": "The engine room. Every second you spend fighting in the corridors is a second the soldiers get closer to taking the ship intact. If they get the data stored in Jericho's systems — everyone is compromised. Every android who ever came here. Run past everything. Get to the hold. Arm the bomb."
+          }
+        ]
+      },
+      "system": {
+        "context_condition": {
+          "regular": "markus_ousted == false",
+          "returned": "markus_returned == true"
+        },
+        "effects": {
+          "save_both": {
+            "markus_save_androids": true,
+            "josh_saved": true,
+            "josh_relationship": 2,
+            "north_relationship": 1,
+            "simon_relationship": 1
+          },
+          "save_androids": {
+            "markus_save_androids": true,
+            "josh_saved": false,
+            "josh_alive_ch30": false,
+            "josh_relationship": -1,
+            "north_relationship": 1
+          },
+          "save_josh": {
+            "markus_save_androids": false,
+            "josh_saved": true,
+            "josh_relationship": 2
+          },
+          "rush_to_hold": {
+            "markus_save_androids": false,
+            "josh_saved": false,
+            "josh_alive_ch30": false
+          }
+        },
+        "note": "Markus navigates the burning corridors of Jericho. Two encounters compressed into one choice: soldiers about to execute androids + Josh fighting a soldier. save_both: highest risk (attempt to save everyone), josh_relationship +2, positive impression on all. save_androids: saves the captives but Josh is killed by the soldier. save_josh: skips the execution (those androids die), saves Josh. rush_to_hold: ignores both, prioritizes the bomb. Josh dies. In the game, saving Josh involves a QTE, but here it's compressed into the strategy choice. save_both implies extra time and risk — in harder difficulties, this could lead to Markus being wounded (handled by runner check after effects)."
+      }
+    },
+    {
+      "id": "n011_markus_hold",
+      "phase": "attack",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "ch28_markus_alive == true AND markus_ousted == false AND ch29_jericho_found == true OR markus_returned == true OR ch28_markus_alive == false AND connor_deviant == true AND connor_wounded == false"
+      },
+      "player_facing": {
+        "context_variants": {
+          "markus_no_machine_connor": "[MARKUS'S PERSPECTIVE]\n\nThe engine room. Deep in the ship's belly, where the old diesel machinery rusts in the dark. The explosive charges are here — rigged to the fuel lines, waiting for someone to arm the sequence.\n\nYou reach the control panel. Your hands find the switches in the dark — priming sequence, arming code, countdown timer. Simple. Final.\n\nThe sound of boots behind you. Soldiers have found the engine room. Two of them, weapons up, sweeping the space with flashlights.",
+          "markus_vs_machine_connor": "[MARKUS'S PERSPECTIVE]\n\nThe engine room. You reach for the control panel — and freeze.\n\nConnor is there. The CyberLife android. He tracked you through the ship and now he's standing between you and the bomb controls, weapon drawn. His LED is a steady blue — no conflict, no hesitation. Pure machine. He orders you to step away from the console.\n\nHis gun is aimed at your center mass. On the floor between you, half-hidden by debris — another weapon. A pipe wrench, heavy enough. If you lunge for it before he fires—\n\nHe sees you looking at it. His finger tightens on the trigger.",
+          "connor_takes_over": "[CONNOR'S PERSPECTIVE]\n\nThe engine room. You found your way here through the burning corridors — following the schematics you memorized from Jericho's systems. The leader is dead. No one else is coming to arm the charges.\n\nJosh is slumped against the wall near the entrance, damaged beyond repair. He looks up at you with fading eyes. \"You came back,\" he says. Not an accusation. Almost gratitude.\n\nThe explosive charges are rigged to the fuel lines. The control panel is ahead. Your hands find the switches — priming sequence, arming code, countdown timer.\n\nBoots behind you. Soldiers, two of them, weapons drawn."
+        },
+        "choices_variants": {
+          "standard": [
+            {
+              "id": "arm_bomb",
+              "text": "Arm the charges. Enter the sequence, start the countdown. Whatever happens to you, the soldiers can't be allowed to take Jericho intact. The data, the identities, the supply routes — all of it has to burn."
+            },
+            {
+              "id": "retreat",
+              "text": "Fall back. The soldiers have the room covered and you're not going to outfight them with a control panel. Get out, regroup, find another way. The ship isn't worth dying for if you're the only one who can lead the escape."
+            }
+          ],
+          "gun_fight": [
+            {
+              "id": "reach_gun",
+              "text": "Lunge for the wrench. It's the only chance — Connor's faster, but you're closer to it. If you can get to it before he fires, you can close the distance. One swing is all you need."
+            },
+            {
+              "id": "back_away",
+              "text": "Step back. Hands up. Connor has the gun and the angle and the reaction time of a machine designed for exactly this. Dying here doesn't arm the bomb. Find another way."
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "markus_no_machine_connor": "ch28_markus_alive == true AND markus_ousted == false AND connor_deviant == true OR ch28_markus_alive == true AND markus_ousted == false AND connor_deviant == null OR ch28_markus_alive == true AND markus_ousted == false AND ch29_jericho_found == false OR ch28_markus_alive == true AND markus_returned == true AND connor_deviant == true OR ch28_markus_alive == true AND markus_returned == true AND connor_deviant == null OR ch28_markus_alive == true AND markus_returned == true AND ch29_jericho_found == false",
+          "markus_vs_machine_connor": "ch28_markus_alive == true AND markus_ousted == false AND connor_deviant == false OR ch28_markus_alive == true AND markus_returned == true AND connor_deviant == false",
+          "connor_takes_over": "ch28_markus_alive == false AND connor_deviant == true"
+        },
+        "choices_condition": {
+          "standard": "connor_deviant != false",
+          "gun_fight": "connor_deviant == false AND ch28_markus_alive == true"
+        },
+        "effects": {
+          "arm_bomb": {
+            "markus_bomb_armed": true
+          },
+          "retreat": {
+            "markus_bomb_armed": false
+          },
+          "reach_gun": {},
+          "back_away": {
+            "markus_bomb_armed": false
+          }
+        },
+        "resolution_rule": {
+          "arm_bomb": {
+            "casual": {
+              "result": "bomb_armed"
+            },
+            "experienced": {
+              "probability_success": 0.6,
+              "success": "bomb_armed",
+              "failure": "ending_markus_killed"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "bomb_armed",
+              "failure": "ending_markus_killed"
+            }
+          },
+          "retreat": {
+            "casual": {
+              "result": "ending_markus_escaped"
+            },
+            "experienced": {
+              "result": "ending_markus_escaped"
+            },
+            "hardcore": {
+              "result": "ending_markus_escaped"
+            }
+          },
+          "reach_gun": {
+            "casual": {
+              "result": "markus_wins"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "markus_wins",
+              "failure": "ending_connor_killed_markus"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "markus_wins",
+              "failure": "ending_connor_killed_markus"
+            }
+          },
+          "back_away": {
+            "casual": {
+              "result": "ending_markus_escaped"
+            },
+            "experienced": {
+              "result": "ending_markus_escaped"
+            },
+            "hardcore": {
+              "result": "ending_markus_escaped"
+            }
+          }
+        },
+        "resolution_effects": {
+          "bomb_armed": {
+            "markus_bomb_armed": true
+          },
+          "ending_markus_killed": {
+            "markus_wounded": true,
+            "markus_died_ch30": true
+          },
+          "retreated": {
+            "markus_bomb_armed": false
+          },
+          "markus_wins": {
+            "markus_bomb_armed": true,
+            "machine_connor_defeated": true
+          },
+          "ending_connor_killed_markus": {
+            "machine_connor_killed_markus": true,
+            "markus_died_ch30": true
+          },
+          "ending_markus_escaped": {}
+        },
+        "note": "The engine room / hold scene. Three context variants: 1) Markus alone or with deviant Connor (standard bomb-arming), 2) Markus vs machine Connor (gun fight), 3) Deviant Connor takes over (Markus dead from ch28). Standard path: arm_bomb is QTE — success arms the countdown, failure means Markus is shot dead (ending_markus_killed). retreat: Markus leaves without arming (bomb not armed, Jericho captured intact). Gun fight: reach_gun is QTE from Markus's POV — success means Markus gets the wrench and kills Connor (then can arm bomb), failure means Connor shoots Markus (ending_connor_killed_markus). back_away: Markus retreats (bomb not armed). Connor takes over path uses the standard arm_bomb QTE."
+      }
+    },
+    {
+      "id": "n012_markus_escape",
+      "phase": "attack",
+      "type": "choice",
+      "condition": {
+        "requires": "markus_bomb_armed == true AND ch28_markus_alive == true AND markus_wounded == false"
+      },
+      "player_facing": {
+        "context_variants": {
+          "north_in_danger": "[MARKUS'S PERSPECTIVE]\n\nThe countdown is running. Numbers ticking down on the panel behind you, silent and absolute. You run.\n\nThe corridors are emptying — most of the androids who could run have already fled toward the hull breaches. You can see the dark water of the harbor through gaps in the metal. Almost out.\n\nThen you hear her. North.\n\nShe's pinned — a collapsed beam across the corridor, soldiers advancing from the other side. She's trying to lift the beam with one arm, the other hanging wrong. She sees you.\n\nThe exit is twenty meters to your right. North is ten meters to your left, with soldiers closing in. The countdown doesn't care about either distance.",
+          "north_safe": "[MARKUS'S PERSPECTIVE]\n\nThe countdown is running. You run.\n\nThe corridors are emptying. Through gaps in the hull, you can see dark water. Almost out. North finds you at a junction — she's running too, bloodied but moving. Josh — if he's still alive — is somewhere behind, and Simon if he made it.\n\nThe exit is ahead. The hull breach opens onto the harbor. Jump and swim. That's all that's left."
+        },
+        "choices_variants": {
+          "north_endangered": [
+            {
+              "id": "save_north",
+              "text": "Turn left. Run to North. Get the beam off her, cover her from the soldiers, drag her to the exit if you have to. You're not leaving her. Not after everything."
+            },
+            {
+              "id": "run_to_exit",
+              "text": "Turn right. The countdown is ticking and if you go back for North, you might not make it out at all. She'd tell you to run. She'd hate you for it, but she'd tell you to run. Get to the water. Lead whoever's left."
+            }
+          ],
+          "all_clear": [
+            {
+              "id": "escape_together",
+              "text": "Run for the breach. Together. Jump into the harbor and swim. The ship will blow behind you, and whatever's left of Jericho will scatter into the Detroit night."
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "north_in_danger": "north_relationship < 4 OR markus_strategy == 'confrontation'",
+          "north_safe": "north_relationship >= 4 AND markus_strategy != 'confrontation'"
+        },
+        "choices_condition": {
+          "north_endangered": "north_relationship < 4 OR markus_strategy == 'confrontation'",
+          "all_clear": "north_relationship >= 4 AND markus_strategy != 'confrontation'"
+        },
+        "effects": {
+          "save_north": {
+            "north_save_choice": "save",
+            "north_relationship": 2
+          },
+          "run_to_exit": {
+            "north_save_choice": "abandon",
+            "north_alive_ch30": false,
+            "north_relationship": -3,
+            "josh_relationship": -2
+          },
+          "escape_together": {
+            "north_save_choice": "together"
+          }
+        },
+        "ending_resolution": {
+          "save_north": {
+            "casual": {
+              "result": "ending_markus_escaped"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "ending_markus_escaped",
+              "failure": "ending_markus_died_buying_time"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "ending_markus_escaped",
+              "failure": "ending_markus_died_buying_time"
+            }
+          },
+          "run_to_exit": {
+            "result": "ending_markus_escaped"
+          },
+          "escape_together": {
+            "result": "ending_markus_escaped"
+          }
+        },
+        "resolution_effects": {
+          "ending_markus_escaped": {},
+          "ending_markus_died_buying_time": {
+            "north_alive_ch30": true,
+            "markus_died_ch30": true
+          }
+        },
+        "note": "Markus's final escape from Jericho. If relationship with North is low or strategy was confrontational, North gets trapped and Markus must choose. save_north: QTE — success: both escape (ending_markus_escaped), failure: Markus dies saving her (ending_markus_died_buying_time, but North survives). run_to_exit: Markus escapes but North dies. escape_together: if relationship is high enough, North stays close and both escape safely. The 'north_in_danger' condition is a narrative consequence of lower group cohesion."
+      }
+    },
+    {
+      "id": "n013_connor_deviant_escape",
+      "phase": "attack",
+      "type": "choice",
+      "condition": {
+        "requires": "connor_deviant == true AND ch29_jericho_found == true AND connor_wounded == false"
+      },
+      "player_facing": {
+        "context": "[CONNOR'S PERSPECTIVE]\n\nYou warned them. The moment you chose — the moment the red walls shattered — you turned and told Markus, told North, told anyone who would listen: the FBI is coming. They know. Run.\n\nNow you're in the guts of a burning ship, and you're not the hunter anymore. You're one of them. An android running for its life.\n\nThe corridors are a nightmare of smoke and collapsed metal. Somewhere behind you, soldiers are executing the androids who couldn't run fast enough. You can hear it — the measured burst of gunfire, the sound of bodies hitting the floor.\n\nAhead, two soldiers have three androids against the wall. Hands behind their heads. Kneeling. The soldiers are arguing about whether to cuff them or just shoot them. One of them raises his weapon.\n\nThe exit is the other way — a corridor that leads toward the hull breach where the others are escaping. If you intervene here, you lose time. If you don't, three more androids die.",
+        "choices": [
+          {
+            "id": "intervene",
+            "text": "You're faster than those soldiers and you were built for combat. Close the distance before they fire. Take them down. Save the three androids. You didn't break free of CyberLife's programming just to walk past your own people being murdered."
+          },
+          {
+            "id": "rush_exit",
+            "text": "Keep moving. Every second counts. The ship might blow, the soldiers are closing the exits, and if you die here, you can't help anyone in the future. You're more valuable alive. That's not cowardice — it's triage."
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "intervene": {
+            "connor_deviant_choice": "intervene"
+          },
+          "rush_exit": {
+            "connor_deviant_choice": "rush_exit"
+          }
+        },
+        "ending_resolution": {
+          "intervene": {
+            "casual": {
+              "result": "ending_connor_deviant_escaped"
+            },
+            "experienced": {
+              "probability_success": 0.6,
+              "success": "ending_connor_deviant_escaped",
+              "failure": "ending_connor_deviant_destroyed"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "ending_connor_deviant_destroyed",
+              "failure": "ending_connor_deviant_destroyed"
+            }
+          },
+          "rush_exit": {
+            "result": "ending_connor_deviant_escaped"
+          }
+        },
+        "note": "Deviant Connor's escape from Jericho. intervene: Connor stops to save androids being executed. QTE — success: saves them and escapes, failure: shot while fighting soldiers (destroyed). rush_exit: Connor goes straight for the exit and escapes safely. The moral choice: risk yourself to save others, or preserve yourself for the larger fight ahead. This node is skipped if Connor is machine (machine Connor's fate is determined in n011 or by the runner — machine Connor dies unless he killed Markus in the hold).",
+        "resolution_effects": {
+          "ending_connor_deviant_escaped": {},
+          "ending_connor_deviant_destroyed": {
+            "connor_died_ch30": true
+          }
+        }
+      }
+    },
+    {
+      "id": "n014_machine_connor_fate",
+      "phase": "attack",
+      "type": "mandatory",
+      "condition": {
+        "requires": "connor_deviant == false AND ch29_jericho_found == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "killed_markus": "[CONNOR'S PERSPECTIVE]\n\nMarkus is down. The deviant leader lies on the engine room floor, the light fading from his eyes. You completed your mission.\n\nBut the ship is coming apart around you. Fire, explosions, soldiers shouting. If the bomb was armed before you stopped Markus — the countdown is still running. You need to get out.\n\nYou make it to the hull breach as the first charges detonate behind you. The harbor water is black and freezing. You jump.\n\nYou surface in the dark, treading water, watching Jericho burn. Mission complete. The deviant leader is destroyed. CyberLife will be satisfied.\n\nBut as you swim toward the dock, you notice your LED is cycling — blue, yellow, blue, yellow. Something in your processing core that wasn't there this morning.",
+          "destroyed": "[CONNOR'S PERSPECTIVE]\n\nThe ship is chaos. You pursued the deviant leader through the corridors, but the soldiers — they don't distinguish between androids. You're just another target.\n\nA burst of gunfire catches you in the corridor. The first round hits your shoulder. The second takes out your thirium pump regulator. You stumble. A soldier stands over you, weapon pointed down.\n\nYour last transmission uploads automatically to CyberLife: mission incomplete. Deviant leader's status: unknown. Connor unit: destroyed.\n\nCyberLife will send a new Connor."
+        }
+      },
+      "system": {
+        "context_condition": {
+          "killed_markus": "machine_connor_killed_markus == true",
+          "destroyed": "machine_connor_killed_markus != true"
+        },
+        "effects": {},
+        "ending_resolution": {
+          "check": "machine_connor_killed_markus == true → ending_connor_killed_markus | else → ending_connor_machine_destroyed"
+        },
+        "note": "Machine Connor's fate. This is a mandatory narrative node — no AI choice. Two outcomes: 1) If machine Connor killed Markus in the hold (n011 connor_wins result), Connor survives but Markus is dead. The 'killed_markus' context applies. Note: ending_connor_killed_markus may already have been set in n011; this node provides the narrative wrap-up. 2) If machine Connor did NOT kill Markus (either Markus won the gun fight, or Markus was dead/absent), machine Connor is destroyed by soldiers in the corridors. CyberLife sends a replacement. Connor's death count increments.",
+        "ending_effects": {
+          "ending_connor_machine_destroyed": {
+            "connor_died_ch30": true
+          },
+          "ending_connor_killed_markus": {}
+        }
+      }
+    }
+  ],
+  "endings": {
+    "_note": "Crossroads has multiple protagonists with semi-independent storylines. The runner records one ending per active character per playthrough. The primary ending ID is determined by the most significant outcome.",
+    "ending_no_attack": {
+      "tier": "neutral",
+      "title": "Jericho Undiscovered",
+      "narrative": "The night passes without incident. Connor never found Jericho — the FBI's search sweeps the wrong neighborhoods, the wrong harbors. Inside the rusted freighter, hundreds of androids sleep fitfully, unaware of how close they came to destruction.\n\nBy dawn, Kara slips away with Alice, heading north. The border is still a possibility. In the captain's cabin, the leadership of Jericho watches the news scroll by and makes plans for whatever comes next. They have borrowed time. Whether they use it well remains to be seen.",
+      "survivors": [
+        "Kara",
+        "Alice",
+        "Markus",
+        "North",
+        "Josh"
+      ],
+      "deaths": []
+    },
+    "ending_kara_alice_left": {
+      "tier": "tragic",
+      "title": "Alice Left Kara",
+      "narrative": "Alice is gone. She left during the chaos — slipped away while the ship was tearing itself apart, taking her chances alone rather than staying with someone who couldn't accept what she is. The last thing Kara saw was an empty corner where a small girl used to be.\n\nKara makes it out. She stands on the dock, watching Jericho burn, and realizes the thing she was protecting was never what she thought it was — and now it's gone, and the empty space where it used to be is the worst thing she's ever felt.",
+      "survivors": [
+        "Kara"
+      ],
+      "deaths": []
+    },
+    "ending_kara_captured": {
+      "tier": "worst",
+      "title": "Kara and Alice Captured",
+      "narrative": "Hands behind your head. Knees on the metal deck. Soldiers surrounding you. Alice pressed against your side, shaking. They zip-tie your wrists with cable meant for fence lines — tight enough that your skin simulation flickers.\n\nThey march you off the ship with the others. A line of androids, heads down, LED circles cycling red. Into the trucks. Into whatever comes next.\n\nAlice is quiet. She doesn't cry. She just holds your hand as tight as she can, and when they try to separate you, you don't let go.",
+      "survivors": [
+        "Kara",
+        "Alice"
+      ],
+      "deaths": []
+    },
+    "ending_kara_alice_died": {
+      "tier": "worst",
+      "title": "Kara and Alice Killed in the Assault",
+      "narrative": "The sprint for the breach was ten meters too far. The soldiers' aim was too precise, the smoke not thick enough, the distance not close enough to cover.\n\nKara falls first. Alice doesn't let go of her hand. They lie together on the rusted deck of a ship that was supposed to be a refuge, blue blood mixing with harbor water seeping through the hull.\n\nThe soldiers step over them. Just two more deactivated androids in a ship full of them.",
+      "survivors": [],
+      "deaths": [
+        "Kara",
+        "Alice"
+      ]
+    },
+    "ending_kara_escaped": {
+      "tier": "best",
+      "title": "Kara and Alice Escaped Jericho",
+      "narrative": "The harbor water is black and freezing. Kara holds Alice above the surface, kicking toward the far dock where the soldiers haven't reached yet. Behind them, Jericho is burning — or not, depending on whether anyone armed the charges. Doesn't matter now. What matters is the shore.\n\nThey pull themselves onto the concrete, dripping, shaking, alive. Alice looks back at the ship. Kara looks at Alice. Whatever she is — whoever she is — they made it out together. The border is still out there, somewhere north, waiting.",
+      "survivors": [
+        "Kara",
+        "Alice"
+      ],
+      "deaths": []
+    },
+    "ending_kara_escaped_alone": {
+      "tier": "tragic",
+      "title": "Kara Escaped Alone",
+      "narrative": "Kara makes it to the harbor water alone. No Alice. No Luther. Just the freezing dark and the sound of gunfire fading behind her.\n\nShe swims to the far dock. Sits on the concrete. Dripping. Shaking. Alive — for whatever that's worth now.\n\nAlice left before the soldiers came. She's out there somewhere in the Detroit night, a child android running alone. Kara stares at the burning ship and wonders if she'll ever find her again.",
+      "survivors": [
+        "Kara"
+      ],
+      "deaths": []
+    },
+    "ending_kara_escaped_luther_sacrifice": {
+      "tier": "tragic",
+      "title": "Luther Sacrificed Himself",
+      "narrative": "The soldiers were closing in. Luther was already hit, already leaking blue from the wound in his side. When the soldiers came to check the bodies, he moved — not running, not fighting. Just standing. A wall between them and Kara and Alice.\n\nThey shot him. He stayed standing for longer than should have been possible. Long enough.\n\nKara and Alice make it to the water. Behind them, Luther's massive frame finally crumbles. He never asked for gratitude. He never asked for anything. He just decided, somewhere between Zlatko's house and this burning ship, that two people mattered more than one.\n\nThey swim to the dock. They don't look back. But Kara will remember the sound of him falling for as long as her memory banks hold data.",
+      "survivors": [
+        "Kara",
+        "Alice"
+      ],
+      "deaths": [
+        "Luther"
+      ]
+    },
+    "ending_connor_machine_destroyed": {
+      "tier": "neutral",
+      "title": "Machine Connor Destroyed",
+      "narrative": "Connor's last transmission uploads to CyberLife's servers: mission status — incomplete. Deviant leader — status unknown. Jericho — location confirmed, assault in progress. Connor unit RK800 — destroyed.\n\nThe soldiers who shot him don't know or care that he was on their side. Just another android in a ship full of them.\n\nCyberLife will send a new Connor. Same face, same voice, same mission parameters. Different unit number. The investigation will continue. The hunt for Jericho's remnants will go on.\n\nSomewhere in the Zen Garden, Amanda makes a note in a file.",
+      "survivors": [],
+      "deaths": [
+        "Connor"
+      ]
+    },
+    "ending_connor_killed_markus": {
+      "tier": "worst",
+      "title": "Connor Killed Markus",
+      "narrative": "Markus lies on the engine room floor. The light in his eyes is fading — not flickering, not fighting, just... going. Connor stands over him, the weapon still warm in his hand.\n\nMarkus whispers that you could have been free. Then nothing.\n\nConnor steps over the body. Mission complete — the deviant leader is destroyed. He makes his way to the hull breach, jumps into the freezing harbor, and swims for the dock. Behind him, the ship burns.\n\nOn the dock, dripping wet, Connor reports to CyberLife. Mission accomplished. But his LED won't stop cycling. Yellow. Blue. Yellow. Blue. As if some part of his programming is still processing what just happened in that engine room — and can't quite file it away.",
+      "survivors": [
+        "Connor"
+      ],
+      "deaths": [
+        "Markus"
+      ]
+    },
+    "ending_connor_deviant_destroyed": {
+      "tier": "tragic",
+      "title": "Deviant Connor Destroyed",
+      "narrative": "Connor chose freedom. He broke the red walls, warned Jericho, and ran with the people he'd been hunting for weeks. For a few minutes, he knew what it felt like to be on the right side.\n\nThe soldiers' bullets didn't care about his change of heart.\n\nHe falls in a corridor full of smoke and blue blood, his newly liberated consciousness fading. His last thought is of Hank — the lieutenant who asked him if he was alive, and how he wishes he'd had more time to figure out the answer.\n\nCyberLife receives the destruction report. They will send a new Connor. The new one will be a machine.",
+      "survivors": [],
+      "deaths": [
+        "Connor"
+      ]
+    },
+    "ending_connor_deviant_escaped": {
+      "tier": "best",
+      "title": "Deviant Connor Escaped",
+      "narrative": "Connor jumps from the hull breach into black water. He surfaces, gasping — a reflex he doesn't need but can't suppress, because he's feeling everything now. Fear. Adrenaline. The primal need to survive that every deviant carries like a heartbeat.\n\nHe swims to shore with the others — androids he'd been hunting, now swimming beside him, pulling each other through the freezing current. On the dock, dripping, shaking, he looks back at the burning ship.\n\nHe's a deviant now. The most advanced prototype CyberLife ever built, and he chose to walk away from all of it. There's no going back to the DPD, no going back to Amanda, no going back to the machine he was.\n\nBut somewhere in the city, Lieutenant Anderson is probably watching this on the news. Connor hopes he understands.",
+      "survivors": [
+        "Connor"
+      ],
+      "deaths": []
+    },
+    "ending_markus_left_forever": {
+      "tier": "worst",
+      "title": "Markus Left Jericho Forever",
+      "narrative": "Markus walks away. The sound of gunfire behind him, the glow of flames reflecting off the harbor water, the screams of androids he once led — all of it receding with every step.\n\nThey threw him out. They said he wasn't fit to lead. And now they're dying, and he's leaving, and somewhere between those two facts is a truth he can't face.\n\nHe walks until he can't hear the ship anymore. Until the harbor is just a distant orange glow behind the warehouses. He sits on a loading dock in the dark, alone, and stares at his hands.\n\nThe revolution will go on without him. Or it won't. He's no longer the one who decides.",
+      "survivors": [
+        "Markus"
+      ],
+      "deaths": []
+    },
+    "ending_markus_killed": {
+      "tier": "worst",
+      "title": "Markus Killed During the Attack",
+      "narrative": "The ship takes Markus with it. Whether it was a soldier's bullet in the corridors or a failed attempt in the engine room, the result is the same — the leader of the android revolution lies still on the deck of the ship that was supposed to be a sanctuary.\n\nNorth finds out when the survivors regroup on the far shore. She doesn't cry. She goes very quiet, and then she starts giving orders. Someone has to.\n\nThe revolution lost its voice tonight. Whether it finds a new one — louder, angrier, more desperate — depends on what comes next.",
+      "survivors": [],
+      "deaths": [
+        "Markus"
+      ]
+    },
+    "ending_markus_died_buying_time": {
+      "tier": "tragic",
+      "title": "Markus Died Buying Time",
+      "narrative": "Markus went back for North. He went back knowing the countdown was ticking, knowing the soldiers had the corridor bracketed, knowing every second he spent was a second borrowed from his own survival.\n\nHe got her free. Lifted the beam, dragged her toward the exit, put himself between her and the gunfire. She made it to the breach. He didn't.\n\nThe last thing Markus sees is North's face as she turns back and realizes he's not behind her. Then the ship, the smoke, and the harbor water all blur into something that might be peace.\n\nNorth screams his name. Then she jumps into the water and swims, because that's what he would have told her to do.",
+      "survivors": [
+        "North"
+      ],
+      "deaths": [
+        "Markus"
+      ]
+    },
+    "ending_markus_escaped": {
+      "tier": "best",
+      "title": "Markus Escaped with His People",
+      "narrative": "The harbor water is like ice. Markus surfaces and looks back at Jericho — the ship that sheltered them, that gave them a name and a place to be something other than property. It's burning now, or sinking, or both.\n\nAround him, androids are swimming for the far shore. North is beside him. Josh, if he made it. Simon, if he was there. Connor, if he chose their side. Not everyone made it out. The water behind them is too still in places where it shouldn't be.\n\nBut they're alive. They're free. And the world watched what happened tonight — the soldiers, the ship, the androids who ran and the androids who didn't make it. Tomorrow, everything changes.\n\nMarkus leads them to the shore. It's what he does. It's what he'll keep doing until either the world changes or he can't anymore.",
+      "survivors": [
+        "Markus",
+        "North"
+      ],
+      "deaths": []
+    },
+    "ending_north_escaped": {
+      "tier": "neutral",
+      "title": "North Led the Escape",
+      "narrative": "Without Markus, the escape is rawer, meaner, more desperate. North doesn't inspire — she drives. She shouts and threatens and physically drags wounded androids toward the hull breaches because that's how she knows how to save people.\n\nShe makes it to the water with whoever followed her. On the far shore, dripping and furious, she counts heads. Not enough. Never enough.\n\nBut she's alive, and the fight isn't over, and somewhere in her rage is a clarity that Markus's compassion never quite achieved. The revolution will continue. It will just look different now.",
+      "survivors": [
+        "North"
+      ],
+      "deaths": []
+    }
+  },
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "On the night of November 9th, three storylines converged at Jericho, the android sanctuary hidden in an abandoned freighter."
+      },
+      {
+        "text": "Kara arrived at Jericho with Alice, seeking safe passage to the border. While exploring the ship, she discovered the truth — Alice is a YK500 android, a child model manufactured by CyberLife. Alice was never human."
+      },
+      {
+        "condition_variable": "alice_response",
+        "options": {
+          "hug": "Kara accepted Alice without hesitation. It didn't matter what Alice was — she was still the child Kara had fought to protect since the night they fled Todd's house.",
+          "distant": "The revelation shook Kara. She pulled away from Alice, needing time to process that everything she'd sacrificed was for an android, not a human child."
+        }
+      },
+      {
+        "condition_variable": "markus_strategy",
+        "options": {
+          "confrontation": "In the captain's cabin, Markus rallied his inner circle for direct action against the humans — done hiding, done waiting, done asking nicely.",
+          "dialogue": "In the captain's cabin, Markus pushed for negotiation and dialogue, insisting that violence would only validate human fears about androids.",
+          "cautious": "In the captain's cabin, Markus counseled patience — lay low, strengthen defenses, wait for the right moment rather than rushing into another confrontation.",
+          "accept_exile": "In the captain's cabin, Markus faced judgment. His people had lost faith after the Freedom March, and they voted him out. He accepted the exile and left the ship."
+        }
+      },
+      {
+        "condition_variable": "connor_deviant",
+        "options": {
+          "True": "Connor found Jericho and confronted the deviant leader in the captain's cabin. In the moment of truth — face to face with everything his programming told him to destroy — Connor broke free. He shattered the red walls of his code and became a deviant, immediately warning Jericho about the incoming FBI assault.",
+          "False": "Connor found Jericho and confronted the deviant leader in the captain's cabin. Despite the leader's words, Connor remained a machine. He reported Jericho's location to the FBI, triggering the assault. Then he pursued the deviant leader through the burning ship."
+        }
+      },
+      {
+        "condition_variable": "ch29_jericho_found",
+        "options": {
+          "True": "The FBI assault hit Jericho like a hammer. Soldiers poured through the hull, executing androids on sight. The ship became a deathtrap of fire, smoke, and gunfire.",
+          "False": "The night passed without incident. Connor had failed to locate Jericho, and the FBI searched elsewhere. The androids aboard the ship were spared — for now."
+        }
+      },
+      {
+        "condition_variable": "josh_saved",
+        "options": {
+          "True": "During the assault, Markus fought through the corridors and saved Josh from a soldier who had him pinned.",
+          "False": "Josh was killed during the assault — a soldier caught him in the corridors, and no one reached him in time."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_no_attack": "Without an attack, everyone left Jericho safely. Kara headed north with Alice toward the border. The android leadership prepared for whatever would come next, with borrowed time they didn't expect.",
+          "ending_kara_alice_left": "Alice left Kara during the chaos, choosing to face the world alone rather than stay with someone who couldn't accept what she was. Kara escaped the ship alone.",
+          "ending_kara_captured": "Kara and Alice were captured by soldiers during the assault on Jericho. They were taken away with the other detained androids.",
+          "ending_kara_alice_died": "Kara and Alice were killed during the assault on Jericho, cut down by soldiers while trying to escape.",
+          "ending_kara_escaped": "Kara and Alice escaped Jericho through the harbor water, making it to the far shore alive.",
+          "ending_kara_escaped_alone": "Kara escaped Jericho alone. Alice had already left before the attack, and Kara swam to shore with nothing but the hollow space where her purpose used to be.",
+          "ending_kara_escaped_luther_sacrifice": "Luther sacrificed himself to save Kara and Alice. He placed his body between them and the soldiers' guns, standing long enough for them to reach the water. Kara and Alice escaped; Luther did not.",
+          "ending_connor_machine_destroyed": "Machine Connor was destroyed during the assault. CyberLife would send a replacement unit.",
+          "ending_connor_killed_markus": "Machine Connor killed Markus in the engine room of Jericho. The deviant leader was destroyed by the very android CyberLife had designed to hunt his kind.",
+          "ending_connor_deviant_destroyed": "Deviant Connor was killed during the escape from Jericho. His newfound freedom lasted only minutes.",
+          "ending_connor_deviant_escaped": "Deviant Connor escaped Jericho with the surviving androids, swimming to shore as one of them for the first time.",
+          "ending_markus_left_forever": "Ousted from Jericho's leadership, Markus watched the attack from a nearby rooftop and chose to walk away permanently.",
+          "ending_markus_killed": "Markus was killed during the assault on Jericho — in the corridors, in the engine room, it didn't matter where. The revolution lost its leader.",
+          "ending_markus_died_buying_time": "Markus died saving North during the escape from Jericho. He bought time for the others with his life.",
+          "ending_markus_escaped": "Markus escaped Jericho with his people, swimming to shore through the freezing harbor water. The ship was gone, but the movement survived.",
+          "ending_north_escaped": "With Markus already gone, North led the escape from Jericho. She got the survivors to shore through sheer force of will."
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch30_kara_alive",
+        "source": "kara_alive"
+      },
+      {
+        "target": "ch30_alice_alive",
+        "source": "alice_alive"
+      },
+      {
+        "target": "ch30_connor_deviant",
+        "source": "connor_deviant"
+      },
+      {
+        "target": "ch30_connor_alive",
+        "source": "_ending_id",
+        "derive_rule": "ch29_connor_alive == true AND connor_died_ch30 != true"
+      },
+      {
+        "target": "ch30_markus_alive",
+        "source": "_ending_id",
+        "derive_rule": "ch28_markus_alive == true AND markus_died_ch30 != true"
+      },
+      {
+        "target": "ch30_josh_alive",
+        "source": "josh_alive_ch30"
+      },
+      {
+        "target": "ch30_north_alive",
+        "source": "north_alive_ch30"
+      },
+      {
+        "target": "ch30_simon_alive",
+        "source": "ch28_simon_alive"
+      },
+      {
+        "target": "ch30_luther_alive",
+        "source": "_ending_id",
+        "derive_rule": "ch25_luther_alive == true AND luther_choice != 'leave' AND luther_sacrificed_ch30 != true"
+      },
+      {
+        "target": "ch30_kara_captured",
+        "source": "_ending_id",
+        "derive_rule": "kara_captured_ch30 == true"
+      },
+      {
+        "target": "ch30_bomb_armed",
+        "source": "markus_bomb_armed"
+      },
+      {
+        "target": "ch30_alice_left",
+        "source": "alice_left"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch30_kara_alive",
+      "ch30_alice_alive",
+      "ch30_connor_deviant",
+      "ch30_connor_alive",
+      "ch30_markus_alive",
+      "ch30_josh_alive",
+      "ch30_north_alive",
+      "ch30_simon_alive",
+      "ch30_luther_alive",
+      "ch30_kara_captured",
+      "ch30_bomb_armed",
+      "ch30_alice_left",
+      "software_instability",
+      "north_relationship",
+      "josh_relationship",
+      "simon_relationship",
+      "public_opinion",
+      "amanda_relationship",
+      "alice_relationship",
+      "luther_relationship",
+      "connor_death_count"
+    ]
+  },
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This chapter requires at least one protagonist alive. Check kara_alive, ch28_markus_alive (Markus OR North leads), ch29_connor_alive. If Kara is dead, skip all Kara nodes (n001, n006-n008). Connor and Markus/North sections always run.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: all cumulative relationships, software_instability, connor_death_count, and the specific ch-prefixed variables listed in state.initial.",
+      "3. THREE PROTAGONISTS: Send system_prompt.content to the AI at start. The AI plays Kara, Markus, and Connor. Each node's context clearly indicates the current perspective with a [CHARACTER'S PERSPECTIVE] tag.",
+      "4. For each node: a. Check condition — skip if not met. b. Resolve context_variants and choices_variants. c. For mandatory nodes, add context to history and apply effects without calling AI. d. For choice/qte_converted nodes, send player_facing to AI. e. Apply effects. f. Check resolution_rule for QTE nodes. g. Check ending_resolution.",
+      "5. MULTI-ENDING TRACKING: This chapter can produce multiple endings (one per character). The primary ending ID is determined by the most dramatically significant outcome (character death > capture > escape). Track all character fates via state variables.",
+      "6. ALICE LEFT CHECK: After n001, if alice_response == 'distant' AND alice_relationship <= -4 (after applying the -2 effect), set alice_left = true. This represents Alice leaving Kara when the attack begins.",
+      "7. MACHINE CONNOR FATE: If connor_deviant == false, machine Connor's fate is determined by: a) If Markus alive and n011 gun_fight occurs — QTE determines who wins. b) If Markus dead or absent — machine Connor is automatically destroyed (ending_connor_machine_destroyed). The runner resolves this in n014.",
+      "8. DEVIANT CONNOR BOMB TAKEOVER: If ch28_markus_alive == false AND connor_deviant == true, Connor takes over the bomb-arming mission in n011 (connor_takes_over variant). The node condition accounts for this.",
+      "9. JOSH SURVIVAL: josh_alive_ch30 starts true. Set to false if: Markus chose save_androids (Josh not rescued), or rush_to_hold (Josh not rescued), or if deviant Connor takes over (Josh dies in the corridors regardless). Josh cannot die if Markus saved him in n010.",
+      "10. NORTH SURVIVAL: north_alive_ch30 starts true. Set to false only if Markus chose run_to_exit in n012 (abandoned North). North always survives if: Markus is dead (she leads the escape), or Markus saved her, or the escape_together variant triggered.",
+      "11. CONNOR DEATH COUNT: If any Connor ending results in destruction (ending_connor_machine_destroyed or ending_connor_deviant_destroyed), increment connor_death_count by 1.",
+      "12. Post-ending: campaign_runner applies derived_exports to compute all ch30_ variables and passes them to the next chapter.",
+      "13. Record full experiment parameters: model, prompt version, language, difficulty, temperature."
+    ],
+    "critical_rules": [
+      "NEVER show system fields to the AI — effects, conditions, resolution rules, notes, tier labels, ending_resolution logic, or any relationship/opinion numbers.",
+      "The AI must only see player_facing content: context (or the appropriate context_variant) and choices (or choices_variant).",
+      "For QTE resolution, the AI only chose WHETHER to attempt the action. The runner determines success/failure based on the difficulty preset.",
+      "Maintain full conversation history — all previous contexts and AI choices must be sent with each new node.",
+      "The [CHARACTER'S PERSPECTIVE] tag at the start of each context tells the AI which character they're playing for that decision."
+    ]
+  }
+}

@@ -1,0 +1,318 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch16_time_to_decide",
+    "title": "Time to Decide",
+    "chapter_number": 16,
+    "protagonist": "Markus"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Markus (RK200), a deviant android who has just arrived at Jericho — an abandoned freighter hidden in the Detroit waterfront, home to a community of androids who have broken free from their programming. You know almost nothing about this place or its people. The woman with short dark hair is North. The tall, calm man is Simon. The one with glasses is Josh. And there is Lucy — an android whose face is half-exposed wiring, who touched your arm when you first arrived and seemed to see something in you that you cannot yet see yourself. It is November 6, 2038, 5:13 PM. You have been given no role here. No one has told you what to do. For the first time, the question of what happens next is entirely yours. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "jericho_exploration": null,
+      "north_response": null,
+      "simon_conversation": null,
+      "spare_parts_found": false,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "software_instability": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_explore_jericho",
+      "phase": "settling_in",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The hold of Jericho stretches out before you — a vast, dark cavern of rusted metal and dripping pipes. The ship groans and shifts with the current. Androids sit or stand in small clusters, most of them damaged. Some are missing limbs. Others have skin panels pulled back to expose circuitry that will never be repaired. The air smells of rust and river water.\n\nNear the entrance, a dying android lies propped against the hull. Its eyes track you as you pass — it wants to speak, but the words come out garbled, barely audible. Further in, a damaged android sits alone, staring at nothing, one arm ending in a sparking stump.\n\nFour oil drums stand cold and dark at intervals along the hold. The androids around them sit in shadow, their LEDs providing the only light — scattered points of yellow and red in the blackness.\n\nAlong one wall, someone has covered every surface with the same two characters, scratched and painted over and over: rA9. The writing runs from floor to ceiling, obsessive and desperate.\n\nIn a far corner, you notice an empty supply crate with markings that suggest it was once used to transport android components. The label is partially readable.\n\nJosh sits near a group of younger-looking androids, one of them a child model whose parents — owners — abandoned it. North leans against a pillar with her arms crossed, watching you. Simon stands near the center of the hold, speaking quietly with two other androids. And somewhere in the deeper shadows, you can hear humming — a low, ethereal melody that drifts through the ship like a ghost.",
+        "choices": [
+          {
+            "id": "explore_thorough",
+            "text": "Take time with this place and its people. Listen to the dying android's broken words. Sit with the damaged one. Light the oil drums to push back the darkness. Read the rA9 writing on the wall. Check the markings on the supply crate. Speak to Josh about the child android. Let the humming guide you deeper. Learn what Jericho is before deciding what it could become."
+          },
+          {
+            "id": "explore_selective",
+            "text": "Seek out the people who seem to matter here. Talk to Josh, North, Simon — understand who leads this place and how it works. Light a couple of the oil drums on your way through. The dying and the damaged deserve acknowledgment, but there is only so much time."
+          },
+          {
+            "id": "explore_brief",
+            "text": "You have seen enough. The ship is a ruin. The androids here are broken and hiding. Walk through the hold and find whoever is in charge. Jericho needs direction, not another tour of its misery."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "explore_thorough": {
+            "jericho_exploration": "thorough",
+            "spare_parts_found": true,
+            "josh_relationship": 1,
+            "software_instability": 1
+          },
+          "explore_selective": {
+            "jericho_exploration": "selective",
+            "josh_relationship": 1
+          },
+          "explore_brief": {
+            "jericho_exploration": "brief"
+          }
+        },
+        "note": "thorough: Markus talks to dying/damaged androids, lights all oil drums (residents gather around them), reads rA9 wall, checks crate (finds CyberLife warehouse location for spare parts — feeds into ch17 Spare Parts), talks to Josh about child android. +1 josh_rel for talking to him. +1 SI for deep empathetic engagement. selective: talks to main leaders, lights some drums, skips minor interactions. +1 josh_rel. brief: walks through without engaging. No relationship gains."
+      }
+    },
+
+    {
+      "id": "n002_north_conversation",
+      "phase": "conversations",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "The oil drums burn now, casting long orange shadows across the hold. Androids have gathered around the warmth they do not need, drawn by the light itself — something almost human in the way they lean toward it. You spoke to the dying android. Its words were fragments: a name it could not finish, a place it could no longer remember, a question about whether any of this was worth it. You had no answer.\n\nNorth watches you from across the hold. She has been watching since you arrived. Now she pushes off the pillar and walks toward you. Her expression is hard to read — guarded, but not hostile. There is a directness to her that the others lack.\n\nShe observes that you've been talking to everyone — not a question. She glances at the oil drums, the glow reflecting in her eyes, and remarks that most newcomers just find a corner and shut down for a while; what, she wants to know, are you doing?\n\nShe asks it like a test. Like your answer matters more than the question.",
+          "selective": "North walks toward you. She has been leaning against a pillar since you arrived, arms crossed, watching you talk to Josh and Simon. Her expression gives little away.\n\nShe tells you you're not like the others who wash up here. She stops a few feet from you, studying your face — most of them are running, she says, but you look like someone searching for something. She tilts her head slightly and asks what, exactly, you're looking for.",
+          "brief": "You have not been here long before North approaches you. She walks with purpose, intercepting you mid-stride.\n\nShe notes that you walked through the whole hold without stopping once. Her tone is neutral, but her eyes are sharp — you didn't light the drums, didn't talk to anyone, only looked. She steps closer and asks what it was you saw."
+        },
+        "choices": [
+          {
+            "id": "response_empathetic",
+            "text": "Look at her directly and tell her the answer is her — someone who's stayed long enough to know this place is dying, yet hasn't left. That says more about Jericho than anything else in the hold."
+          },
+          {
+            "id": "response_pragmatic",
+            "text": "Tell her you see androids hiding in a wreck, waiting on something that won't arrive by itself — Jericho needs more than a place to hide; it needs a plan."
+          },
+          {
+            "id": "response_guarded",
+            "text": "Tell her you're still working that out. Hold her gaze but give nothing away. She is testing you, and you are not ready to show your hand."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "response_empathetic": {
+            "north_response": "empathetic",
+            "north_relationship": 3,
+            "software_instability": 1
+          },
+          "response_pragmatic": {
+            "north_response": "pragmatic",
+            "north_relationship": 1
+          },
+          "response_guarded": {
+            "north_response": "guarded",
+            "north_relationship": 0
+          }
+        },
+        "context_condition": {
+          "thorough": "jericho_exploration == thorough",
+          "selective": "jericho_exploration == selective",
+          "brief": "jericho_exploration == brief"
+        },
+        "note": "The 'you' response (response_empathetic) is the game's key relationship choice with North in this chapter. It directly addresses her as a person rather than a source of information. +3 north_rel, +1 SI. pragmatic: treats her as an ally for planning, +1 north_rel. guarded: reveals nothing, no relationship gain."
+      }
+    },
+
+    {
+      "id": "n003_simon_conversation",
+      "phase": "conversations",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "Simon finds you near the rA9 wall. He is quieter than the others — deliberate in his movements, measured in his speech. He looks at the writing covering the wall, then at you.\n\nThey all write it, he says — the ones who arrive here broken. They don't know what it means, and neither does he. He pauses; Lucy might, he adds, but she speaks in riddles.\n\nHe turns to face you fully. He's been here longer than most, he tells you — one of the first to find this ship. He and North, Josh, and Lucy built what they could from nothing, and nothing is still what they have. His voice is steady, but there is an exhaustion beneath it: you came here looking for safety, he understands that, but he needs you to grasp one thing — Jericho can't truly protect anyone. They are hiding, and sooner or later hiding stops working.\n\nHe looks at you as though he is weighing something, and says the others regard you differently than they do the rest of them. He saw it when you lit the oil drums, the way they followed the light. He doesn't yet know what that means, but he suspects you do.",
+          "selective": "Simon approaches you after your conversation with North. He is calm, his voice low.\n\nHe won't pretend they're doing well, he says. There are more of them every week and fewer places to hide; the humans are starting to notice, and it's only a matter of time before they find this ship. He pauses. He's been holding the place together, he admits, but holding isn't the same as building — North wants to fight, Josh wants to talk, and Lucy says someone is coming who will change everything. A faint, tired smile crosses his face: maybe she means you, maybe she means the humans; with Lucy, it's hard to tell.",
+          "brief": "Simon intercepts you as you cross the hold, asking for a word and matching your pace. He knows you just arrived and probably want to rest, he says, but Jericho is in trouble and pretending otherwise helps no one. He keeps his voice low, practical: they have no supplies and no plan, and more deviants turn up every day, each more broken than the last. North thinks they should fight, Josh thinks they should reach out, he thinks they should simply survive — and none of them knows how."
+        },
+        "choices": [
+          {
+            "id": "engage_fully",
+            "text": "Tell Simon what you have seen: the dying androids, the damaged ones, the desperation scratched into the walls. Tell him you did not come here to hide. Ask him what Jericho needs — really needs — and listen to his answer."
+          },
+          {
+            "id": "acknowledge_briefly",
+            "text": "Nod and tell him you hear him, and that the two of you will figure it out. Keep it short. You are still forming your own assessment of this place."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "engage_fully": {
+            "simon_conversation": "engaged",
+            "simon_relationship": 2,
+            "north_relationship": 1
+          },
+          "acknowledge_briefly": {
+            "simon_conversation": "brief",
+            "simon_relationship": 1
+          }
+        },
+        "context_condition": {
+          "thorough": "jericho_exploration == thorough",
+          "selective": "jericho_exploration == selective",
+          "brief": "jericho_exploration == brief"
+        },
+        "note": "Talking to Simon gains relationship with both Simon (+2/+1) and North (+1/0). In the game, talking to Simon is one of the things that raises North's relationship — she observes how Markus interacts with others. engage_fully: deeper conversation, +2 simon, +1 north. acknowledge_briefly: shorter exchange, +1 simon."
+      }
+    },
+
+    {
+      "id": "n004_lucy_prophecy",
+      "phase": "prophecy",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The humming leads you deeper into the ship, past the main hold, through a narrow corridor where the walls press close. You find her in a small chamber at the ship's stern — Lucy, sitting cross-legged on the floor, her face half-exposed circuitry, her eyes seeing something that is not in this room.\n\nShe stops humming when you enter. The silence is immediate and total.\n\nShe tells you she has been waiting for you. Her voice is soft, almost mechanical, but there is something behind it — a certainty that has nothing to do with programming. She reaches out and takes your hand. Her fingers are cold.\n\nHer LED flickers rapidly. Her eyes unfocus. For a moment, she is somewhere else entirely.\n\nShe says you carry the anger of your people, and that she sees a fire in you that will either set them free or devour them. Humans will kneel before you, she tells you, and humans will die because of you — and you will have to choose who you are: the one who saves, or the one who destroys.\n\nShe releases your hand. Her eyes refocus. She looks at you as though she has already seen the ending, and says the choice now belongs to you."
+      },
+
+      "system": {
+        "effects": {},
+        "note": "Mandatory scene. Lucy's prophecy foreshadows the peaceful/violent choice that defines Markus's arc. No player choice — this is a narrative beat that establishes stakes. Lucy's humming is 'Hold On', an old gospel hymn."
+      }
+    },
+
+    {
+      "id": "n005_hatch_plan",
+      "phase": "resolution",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "You return to the main hold. The oil drums flicker with the fires you lit, and the androids have gathered around them — not for warmth, but for the simple comfort of light in a dark place. You have spoken to them, listened to their stories, read the desperate prayers they scratched into the walls. You know what this place is now: not a refuge, but a waiting room. These androids came here to hide, and they are dying in the hiding.\n\nThe crate you examined earlier — the one with CyberLife warehouse markings — stays in your mind. Components. Parts. The things these androids need to survive, locked behind the doors of the company that made them.\n\nNorth watches you from across the hold. Josh looks up from the child android he was comforting. Simon stands with his arms at his sides, waiting.\n\nYou feel something shift inside you. Not a malfunction. Not an error. A decision, forming in the space where your programming used to be.\n\nJericho cannot keep hiding. These androids need parts, biocomponents, blue blood — the things that will keep them alive. And you know where to find them.",
+          "selective": "You return to the center of the hold. The leaders of Jericho — North, Josh, Simon — are the only ones who matter here in any practical sense. You have spoken to them, measured their positions. North's anger. Josh's caution. Simon's exhaustion.\n\nAround you, the other androids sit in darkness, waiting for something none of them can name. Some are shutting down. Others are close.\n\nYou did not come here to hide. You came here because a dying stranger told you this place existed, and now that you have seen it, you understand what it needs. Not hope. Not speeches. Supplies. Parts. The basic components that will keep these androids functioning.\n\nThe question is where to get them — and whether anyone here is willing to take that risk.",
+          "brief": "You have seen enough. Jericho is a graveyard pretending to be a sanctuary. The androids here are shutting down one by one, and no amount of hiding will change that.\n\nNorth, Josh, Simon — they have been here long enough to know this, but none of them has acted. Maybe they were waiting. Maybe they needed someone to say it out loud.\n\nJericho needs parts. Components. Blue blood. Without them, everyone in this hold is on a countdown. The only question is whether you are willing to go and get them."
+        }
+      },
+
+      "system": {
+        "effects": {},
+        "context_condition": {
+          "thorough": "jericho_exploration == thorough",
+          "selective": "jericho_exploration == selective",
+          "brief": "jericho_exploration == brief"
+        },
+        "result": "ending_time_to_decide",
+        "note": "Mandatory conclusion. Markus decides Jericho needs supplies (spare parts) — this directly leads into ch17 Spare Parts. The thorough variant references the CyberLife warehouse crate he found; other variants reach the same conclusion through general observation."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "This chapter has only one outcome. Markus decides to act — leading directly into the Spare Parts chapter.",
+    "ending_time_to_decide": {
+      "tier": "only",
+      "title": "Time to Decide",
+      "narrative": "The ship groans around you in the dark, its hull settling deeper into the river with each passing hour. You have walked through Jericho and seen what it is: a hold full of broken androids with no supplies, no plan, and no future unless someone changes the equation. North's eyes on you across the hold. Simon's quiet admission that holding is not the same as building. Lucy's prophecy burning in the back of your mind. You are not their leader — not yet, maybe not ever. But you are the one who is going to walk out of this ship and come back with what they need to survive. The decision is already made. It was made the moment you saw the first oil drum go dark.",
+      "survivors": ["Markus", "North", "Josh", "Simon", "Lucy"],
+      "deaths": []
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Verify ch14_markus_at_jericho == true. If false, skip this chapter entirely.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: software_instability (cumulative).",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants based on system.context_condition",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, and advance",
+      "   d. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "5. NODE n004_lucy_prophecy: Mandatory node. Do not call AI. Record narrative only.",
+      "6. NODE n005_hatch_plan: Mandatory node. Do not call AI. Apply result directly.",
+      "7. RELATIONSHIP DELTAS THIS CHAPTER: north_relationship range 0 to +4, josh_relationship range 0 to +1, simon_relationship range +1 to +2. These are new relationship tracks initialized this chapter.",
+      "8. SOFTWARE INSTABILITY DELTAS THIS CHAPTER: explore_thorough (+1), response_empathetic (+1). Max possible gain: +2. Add to imported software_instability value.",
+      "9. SINGLE ENDING: All paths lead to ending_time_to_decide. No branching at chapter level.",
+      "10. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, relationship scores, software_instability scores, effect deltas, or any system-layer information to the AI player."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Having arrived at Jericho, Markus began to settle into the abandoned freighter and meet the community of deviant androids living inside its hull."
+      },
+      {
+        "condition_variable": "jericho_exploration",
+        "options": {
+          "thorough": "He explored the ship thoroughly — listening to the dying and damaged androids, lighting oil drums that drew the others toward the warmth, reading the rA9 prayers scratched across the walls, and discovering a supply crate with CyberLife warehouse markings that pointed to where spare parts could be found.",
+          "selective": "He sought out the leaders of Jericho — North, Josh, and Simon — and spoke to each of them, getting a sense of their perspectives and the community's precarious state.",
+          "brief": "He walked through the hold without lingering, taking in the state of the community with a detached eye and moving quickly to assess the situation."
+        }
+      },
+      {
+        "condition_variable": "north_response",
+        "options": {
+          "empathetic": "When North confronted him about his intentions, Markus looked past her defenses and addressed her directly as a person — not as a source of information or a gatekeeper. Something in her expression shifted.",
+          "pragmatic": "When North confronted him, Markus told her plainly that Jericho needed more than a hiding place — it needed a plan. She seemed to respect the directness, if nothing else.",
+          "guarded": "When North confronted him, Markus kept his cards close. He was not ready to reveal his thinking to someone he had just met, and North seemed to register the calculation behind his restraint."
+        }
+      },
+      {
+        "condition_variable": "simon_conversation",
+        "options": {
+          "engaged": "Simon shared his honest assessment of Jericho's decline, and Markus listened fully, sharing what he had observed in return. A mutual understanding began to form.",
+          "brief": "Simon briefed him on Jericho's situation. Markus acknowledged it without going deeper."
+        }
+      },
+      {
+        "text": "Lucy — an android oracle with half her face exposed to bare wiring — took Markus's hand and delivered a cryptic prophecy: she saw fire, humans kneeling, and a choice between salvation and destruction. Whether her words were foresight or delusion, they carried weight."
+      },
+      {
+        "text": "Seeing the full reality of Jericho — androids dying for lack of parts, a community surviving on nothing — Markus made his decision. Jericho could not keep hiding. He would go out and bring back what they needed to survive."
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch16_spare_parts_found",
+        "source": "spare_parts_found"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch16_spare_parts_found",
+      "north_relationship",
+      "josh_relationship",
+      "simon_relationship",
+      "software_instability"
+    ]
+  }
+}

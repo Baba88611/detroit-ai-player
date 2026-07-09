@@ -1,0 +1,987 @@
+{
+  "variables": [
+    {
+      "name": "cop_saved_ch01",
+      "type": "boolean",
+      "defined_in": "ch01_the_hostage",
+      "used_in": [
+        "ch15_public_enemy"
+      ],
+      "description": "Whether Connor saved the wounded cop on the rooftop balcony"
+    },
+    {
+      "name": "connor_death_count",
+      "type": "integer",
+      "defined_in": "ch01_the_hostage",
+      "used_in": [
+        "ch29_last_chance_connor",
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Number of times Connor has died and respawned (incremented by endings where Connor dies)"
+    },
+    {
+      "name": "software_instability",
+      "type": "integer",
+      "defined_in": "ch01_the_hostage",
+      "used_in": [
+        "ch29_last_chance_connor",
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Tracks Connor's deviation tendency across chapters (increased by empathetic/deviant actions)"
+    },
+    {
+      "name": "ch01_ending",
+      "type": "string",
+      "defined_in": "ch01_the_hostage",
+      "used_in": [],
+      "description": "Which ending was reached in ch01 (ending_snipers_shot / ending_connor_shot_deviant / ending_deviant_shot_connor / ending_connor_sacrificed / ending_connor_leapt / ending_failed_to_reach)"
+    },
+    {
+      "name": "emma_alive",
+      "type": "boolean",
+      "defined_in": "ch01_the_hostage",
+      "used_in": [
+        "ch15_the_nest"
+      ],
+      "description": "Whether Emma survived the hostage situation (false only in ending_failed_to_reach). Used in ch15 to determine whether Hank asks Connor about prior deviant encounters"
+    },
+    {
+      "name": "kara_arrived_home",
+      "type": "boolean",
+      "defined_in": "ch02_opening",
+      "used_in": [
+        "ch04_a_new_home"
+      ],
+      "description": "Kara has been picked up from the repair shop and arrived at Todd's house"
+    },
+    {
+      "name": "kara_memory_wiped",
+      "type": "boolean",
+      "defined_in": "ch02_opening",
+      "used_in": [
+        "ch04_a_new_home"
+      ],
+      "description": "Kara's memory was fully wiped during repair — she has no recollection of her past"
+    },
+    {
+      "name": "shirt_torn",
+      "type": "boolean",
+      "defined_in": "ch03_shades_of_color",
+      "used_in": [
+        "ch05_the_painter"
+      ],
+      "description": "Whether Markus was harassed by anti-android protesters, resulting in torn clothing (Carl comments in The Painter)"
+    },
+    {
+      "name": "ch04_found_gun",
+      "type": "boolean",
+      "defined_in": "ch04_a_new_home",
+      "used_in": [
+        "ch07_stormy_night"
+      ],
+      "description": "Whether Kara found Todd's gun in the nightstand drawer (enables gun-related choices in Stormy Night)"
+    },
+    {
+      "name": "ch04_found_window",
+      "type": "boolean",
+      "defined_in": "ch04_a_new_home",
+      "used_in": [
+        "ch07_stormy_night"
+      ],
+      "description": "Whether Kara opened Alice's window and noticed the roof edge escape route (enables window escape in Stormy Night)"
+    },
+    {
+      "name": "ch04_found_red_ice",
+      "type": "boolean",
+      "defined_in": "ch04_a_new_home",
+      "used_in": [],
+      "description": "Whether Kara discovered Todd's Red Ice stash in the laundry detergent box"
+    },
+    {
+      "name": "ch04_alice_gave_key",
+      "type": "boolean",
+      "defined_in": "ch04_a_new_home",
+      "used_in": [],
+      "description": "Whether Alice trusted Kara enough to give her the key to her treasure box (indicates warm relationship)"
+    },
+    {
+      "name": "ch04_opened_box",
+      "type": "boolean",
+      "defined_in": "ch04_a_new_home",
+      "used_in": [
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Kara opened Alice's treasure box and saw drawings hinting at abuse (required to persuade Todd in Battle for Detroit)"
+    },
+    {
+      "name": "ch05_played_piano",
+      "type": "boolean",
+      "defined_in": "ch05_the_painter",
+      "used_in": [
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Whether Markus played the piano (enables piano interaction in Night of the Soul if Carl is alive)"
+    },
+    {
+      "name": "ch05_played_chess",
+      "type": "boolean",
+      "defined_in": "ch05_the_painter",
+      "used_in": [
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Whether Markus played chess (enables chessboard interaction in Night of the Soul if Carl is alive)"
+    },
+    {
+      "name": "ch05_read_book",
+      "type": "boolean",
+      "defined_in": "ch05_the_painter",
+      "used_in": [
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Whether Markus read a book (enables bookshelf interaction in Night of the Soul if Carl is alive)"
+    },
+    {
+      "name": "ch06_bar_choice",
+      "type": "string",
+      "defined_in": "ch06_partners",
+      "used_in": [
+        "ch12_waiting_for_hank"
+      ],
+      "description": "How Connor interacted with Hank at Jimmy's Bar (buy_drink / wait_outside / spill_drink). If spill_drink and crime unsolved, unlocks apology dialogue in Waiting for Hank"
+    },
+    {
+      "name": "ch06_deviant_found",
+      "type": "boolean",
+      "defined_in": "ch06_partners",
+      "used_in": [
+        "ch07_the_interrogation"
+      ],
+      "description": "Whether Connor found the deviant in the attic. If true, enables The Interrogation chapter. If false, cancels it."
+    },
+    {
+      "name": "ch06_examined_statue",
+      "type": "boolean",
+      "defined_in": "ch06_partners",
+      "used_in": [
+        "ch07_the_interrogation",
+        "ch29_last_chance_connor"
+      ],
+      "description": "Whether Connor examined the headless figurine at the crime scene (opens dialogue options in The Interrogation, evidence in Last Chance Connor)"
+    },
+    {
+      "name": "ch06_examined_writing",
+      "type": "boolean",
+      "defined_in": "ch06_partners",
+      "used_in": [
+        "ch07_the_interrogation"
+      ],
+      "description": "Whether Connor read the RA9 writing on the wall (opens dialogue options in The Interrogation)"
+    },
+    {
+      "name": "hank_relationship",
+      "type": "integer",
+      "defined_in": "ch06_partners",
+      "used_in": [
+        "ch29_last_chance_connor",
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Cumulative relationship score between Connor and Hank Anderson. Starts at 0 in ch06, accumulates across all Connor chapters. Affects dialogue options and critical decisions in later chapters."
+    },
+    {
+      "name": "ch07_todd_alive",
+      "type": "boolean",
+      "defined_in": "ch07_stormy_night",
+      "used_in": [
+        "ch11_on_the_run",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Todd Williams survived Stormy Night. False only if Kara or Alice shot him. Affects TV news in On the Run and enables/disables 'Meet Todd' path in Battle for Detroit"
+    },
+    {
+      "name": "ch07_kara_alive",
+      "type": "boolean",
+      "defined_in": "ch07_stormy_night",
+      "used_in": [
+        "ch08_fugitives"
+      ],
+      "description": "Whether Kara survived Stormy Night. False if Todd destroyed her (ending_kara_broken or ending_caught_outside). If false, all subsequent Kara chapters are skipped"
+    },
+    {
+      "name": "ch07_alice_alive",
+      "type": "boolean",
+      "defined_in": "ch07_stormy_night",
+      "used_in": [
+        "ch08_fugitives",
+        "ch12_waiting_for_hank"
+      ],
+      "description": "Whether Alice survived Stormy Night. False only if Kara didn't deviate (ending_alice_killed). If false, Kara chapters are skipped and Hank/Connor don't get a lead in Waiting for Hank"
+    },
+    {
+      "name": "ch07_has_gun",
+      "type": "boolean",
+      "defined_in": "ch07_stormy_night",
+      "used_in": [
+        "ch08_fugitives",
+        "ch11_on_the_run"
+      ],
+      "description": "Whether Kara took Todd's gun during Stormy Night. Enables 'Use gun' path in Fugitives and On the Run"
+    },
+    {
+      "name": "ch08_pushed_leo",
+      "type": "boolean",
+      "defined_in": "ch08_broken",
+      "used_in": [
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Whether Markus pushed Leo during the confrontation. Indirectly determines ch08_carl_alive (pushed → Carl survives; obeyed → Carl dies), which controls the magazine in ch12 Waiting for Hank. Also affects Carl visit type in Night of the Soul"
+    },
+    {
+      "name": "ch08_carl_alive",
+      "type": "boolean",
+      "defined_in": "ch08_broken",
+      "used_in": [
+        "ch12_waiting_for_hank",
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Whether Carl Manfred survived the events of Broken. True if Markus pushed Leo (Carl has heart attack but survives), false if Markus obeyed (Carl dies of heart attack trying to stop Leo)"
+    },
+    {
+      "name": "ch08_leo_injured",
+      "type": "boolean",
+      "defined_in": "ch08_broken",
+      "used_in": [
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Whether Leo was injured when Markus pushed him. True only if Markus pushed Leo (Leo hits head on pedestal, hospitalized but survives)"
+    },
+    {
+      "name": "ch09_deviant_alive",
+      "type": "boolean",
+      "defined_in": "ch09_the_interrogation",
+      "used_in": [
+        "ch29_last_chance_connor"
+      ],
+      "description": "Whether Carlos Ortiz's android survived the interrogation. True in endings where it is sent to cell or trusts Connor. False if it self-destructs or shoots itself."
+    },
+    {
+      "name": "ch09_deviant_trusted_connor",
+      "type": "boolean",
+      "defined_in": "ch09_the_interrogation",
+      "used_in": [
+        "ch29_last_chance_connor"
+      ],
+      "description": "Whether the deviant android came to trust Connor during the interrogation. True only in the 'Trust' ending where Connor convinced it and it surrendered peacefully. Unlocks unique dialogue clue ('The truth is inside') for locating Jericho."
+    },
+    {
+      "name": "ch09_connor_died",
+      "type": "boolean",
+      "defined_in": "ch09_the_interrogation",
+      "used_in": [
+        "ch12_waiting_for_hank"
+      ],
+      "description": "Whether Connor was killed during the interrogation (shot by the deviant). If true, Connor respawns in Waiting for Hank with reactions from Hank, Chris, and Gavin."
+    },
+    {
+      "name": "ch10_shelter",
+      "type": "string",
+      "defined_in": "ch10_fugitives",
+      "used_in": [
+        "ch11_on_the_run"
+      ],
+      "description": "Where Kara and Alice spent the night in Fugitives (motel / car / squat). Affects opening context and available resources in On the Run"
+    },
+    {
+      "name": "ch10_ralph_met",
+      "type": "boolean",
+      "defined_in": "ch10_fugitives",
+      "used_in": [],
+      "description": "Whether Kara and Alice met Ralph in the abandoned house. Only true if shelter_choice == squat. Ralph may appear in later chapters if met"
+    },
+    {
+      "name": "ch10_has_gun",
+      "type": "boolean",
+      "defined_in": "ch10_fugitives",
+      "used_in": [
+        "ch11_on_the_run"
+      ],
+      "description": "Pass-through of ch07_has_gun. Whether Kara still has Todd's gun after Fugitives"
+    },
+    {
+      "name": "alice_relationship",
+      "type": "integer",
+      "defined_in": "ch10_fugitives",
+      "used_in": [],
+      "description": "Cumulative relationship score between Kara and Alice. Affected by stealing, promises, and sleeping choices. Carries forward across Kara chapters"
+    },
+    {
+      "name": "ch11_markus_alive",
+      "type": "boolean",
+      "defined_in": "ch11_from_the_dead",
+      "used_in": [
+        "ch12_jericho"
+      ],
+      "description": "Whether Markus survived From the Dead and escaped the junkyard. Always true — this chapter has only one outcome. Required prerequisite for Jericho chapter."
+    },
+    {
+      "name": "ch11_showed_mercy",
+      "type": "boolean",
+      "defined_in": "ch11_from_the_dead",
+      "used_in": [],
+      "description": "Whether Markus actively terminated the dying android who begged to be shut down. Only possible on systematic or signals search paths. Reflects Markus's willingness to act against his core preservation directive out of compassion."
+    },
+    {
+      "name": "ch11_killed_for_pump",
+      "type": "boolean",
+      "defined_in": "ch11_from_the_dead",
+      "used_in": [
+        "ch12_jericho"
+      ],
+      "description": "Whether Markus killed a still-running android to take its thirium pump regulator. May affect how other androids in Jericho perceive him — particularly North and Josh."
+    },
+    {
+      "name": "ch12_carlos_body_available",
+      "type": "boolean",
+      "defined_in": "ch12_waiting_for_hank",
+      "used_in": [
+        "ch29_last_chance_connor"
+      ],
+      "description": "Whether Carlos Ortiz's HK400 android body is available as evidence at DPD. True if ch09_deviant_alive was true — the android self-destructed during Connor's ch12 interaction, leaving its body in the evidence room. This body provides a clue in Last Chance, Connor."
+    },
+    {
+      "name": "ch13_kara_alive",
+      "type": "boolean",
+      "defined_in": "ch13_on_the_run",
+      "used_in": [
+        "ch17_the_pirates_cove"
+      ],
+      "description": "Whether Kara survived On the Run. False if she died on the highway (ending_highway_kara_died). If false, all subsequent Kara chapters are skipped"
+    },
+    {
+      "name": "ch13_alice_alive",
+      "type": "boolean",
+      "defined_in": "ch13_on_the_run",
+      "used_in": [
+        "ch17_the_pirates_cove"
+      ],
+      "description": "Whether Alice survived On the Run. False if she died on the highway. Tied to Kara's fate unless shield_alice was chosen (Alice can survive if Kara dies)"
+    },
+    {
+      "name": "ch13_connor_alive",
+      "type": "boolean",
+      "defined_in": "ch13_on_the_run",
+      "used_in": [
+        "ch15_the_nest"
+      ],
+      "description": "Whether Connor survived On the Run. False only if Connor pursued Kara onto the highway and was hit by a car (ending_connor_died). Connor always respawns — this tracks death in this specific chapter. Used in ch15 to determine whether Hank greets Connor as a replacement unit"
+    },
+    {
+      "name": "ch13_ralph_defended",
+      "type": "boolean",
+      "defined_in": "ch13_on_the_run",
+      "used_in": [
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Ralph attacked Connor to defend Kara and Alice in the squat. True only if: squat path + Kara was kind to Ralph + Connor searched thoroughly. Required for Ralph to reappear in Battle for Detroit"
+    },
+    {
+      "name": "ch13_kara_captured",
+      "type": "boolean",
+      "defined_in": "ch13_on_the_run",
+      "used_in": [
+        "ch17_the_pirates_cove"
+      ],
+      "description": "Whether Kara was caught by Connor on the highway (ending_connor_caught). Kara is alive but in police custody. Affects whether subsequent Kara chapters run"
+    },
+    {
+      "name": "ch14_markus_at_jericho",
+      "type": "boolean",
+      "defined_in": "ch14_jericho",
+      "used_in": [
+        "ch16_time_to_decide"
+      ],
+      "description": "Whether Markus found Jericho. Always true — this chapter has only one outcome. Required prerequisite for Time to Decide chapter."
+    },
+    {
+      "name": "ch15_diary_found",
+      "type": "boolean",
+      "defined_in": "ch15_the_nest",
+      "used_in": [
+        "ch29_last_chance_connor"
+      ],
+      "description": "Whether Connor found Rupert's diary during the apartment investigation. Only true if investigation_strategy == thorough. The diary becomes available as evidence in Last Chance, Connor"
+    },
+    {
+      "name": "ch15_rupert_body_available",
+      "type": "boolean",
+      "defined_in": "ch15_the_nest",
+      "used_in": [
+        "ch29_last_chance_connor"
+      ],
+      "description": "Whether Rupert's body is available at the DPD evidence room. True only if Connor chose to follow Rupert instead of saving Hank (ending_rupert_suicide). The body provides clues in Last Chance, Connor"
+    },
+    {
+      "name": "ch16_spare_parts_found",
+      "type": "boolean",
+      "defined_in": "ch16_time_to_decide",
+      "used_in": [
+        "ch19_spare_parts"
+      ],
+      "description": "Whether Markus found the CyberLife warehouse location from the supply crate in Jericho during thorough exploration. Affects available intel in the Spare Parts chapter"
+    },
+    {
+      "name": "north_relationship",
+      "type": "integer",
+      "defined_in": "ch16_time_to_decide",
+      "used_in": [
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Cumulative relationship score between Markus and North. Starts at 0 in ch16, accumulates across Markus chapters. Affects dialogue options and critical decisions (romance path, leadership dynamics)"
+    },
+    {
+      "name": "josh_relationship",
+      "type": "integer",
+      "defined_in": "ch16_time_to_decide",
+      "used_in": [
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Cumulative relationship score between Markus and Josh. Starts at 0 in ch16, accumulates across Markus chapters. Josh favors peaceful approaches"
+    },
+    {
+      "name": "simon_relationship",
+      "type": "integer",
+      "defined_in": "ch16_time_to_decide",
+      "used_in": [
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Cumulative relationship score between Markus and Simon. Starts at 0 in ch16, accumulates across Markus chapters. Simon is loyal but pragmatic"
+    },
+    {
+      "name": "ch17_kara_alive",
+      "type": "boolean",
+      "defined_in": "ch17_zlatko",
+      "used_in": [
+        "ch18_the_pirates_cove"
+      ],
+      "description": "Whether Kara survived Zlatko's house. False if killed in storage room or bathroom. If false, all subsequent Kara chapters are skipped"
+    },
+    {
+      "name": "ch17_alice_alive",
+      "type": "boolean",
+      "defined_in": "ch17_zlatko",
+      "used_in": [
+        "ch18_the_pirates_cove"
+      ],
+      "description": "Whether Alice survived Zlatko's house. Tied to Kara's fate — if Kara dies or remains reset, Alice is lost. If false, subsequent Kara chapters are skipped"
+    },
+    {
+      "name": "ch17_luther_joined",
+      "type": "boolean",
+      "defined_in": "ch17_zlatko",
+      "used_in": [
+        "ch18_the_pirates_cove",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Luther joined Kara and Alice after escaping Zlatko's house. True in all successful escape endings. Affects group dynamics and available actions in later Kara chapters"
+    },
+    {
+      "name": "ch12_knows_sumo_name",
+      "type": "boolean",
+      "defined_in": "ch12_waiting_for_hank",
+      "used_in": [
+        "ch18_russian_roulette"
+      ],
+      "description": "Whether Connor learned the dog's name is Sumo by asking Hank about the vet clinic note. If true, Connor can calm the dog by name in Russian Roulette; if false, the dog gets riled up"
+    },
+    {
+      "name": "ch18_found_son_photo",
+      "type": "boolean",
+      "defined_in": "ch18_russian_roulette",
+      "used_in": [
+        "ch25_the_bridge",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Connor found the photograph of Hank's son Cole on the kitchen table. Required to ask Hank about Cole during The Bridge, and to give the correct name (Cole) during Battle for Detroit — Connor at the CyberLife Tower"
+    },
+    {
+      "name": "ch18_knows_russian_roulette",
+      "type": "boolean",
+      "defined_in": "ch18_russian_roulette",
+      "used_in": [
+        "ch25_the_bridge"
+      ],
+      "description": "Whether Connor discovered Hank was playing Russian Roulette (revolver on the floor with one round). Can be referenced during The Bridge conversation"
+    },
+    {
+      "name": "amanda_relationship",
+      "type": "integer",
+      "defined_in": "ch18_russian_roulette",
+      "used_in": [
+        "ch29_last_chance_connor",
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Cumulative relationship score between Connor and Amanda. Starts at 0 in ch18, accumulates across Connor chapters with Zen Garden scenes. Affects Amanda's ability to maintain control over Connor in the final chapter"
+    },
+    {
+      "name": "ch19_truck_stolen",
+      "type": "boolean",
+      "defined_in": "ch19_spare_parts",
+      "used_in": [
+        "ch20_the_stratford_tower"
+      ],
+      "description": "Whether Markus successfully stole a truck full of parts from the CyberLife warehouse. Derived from control_room_success. Affects Jericho's supply level and morale in subsequent Markus chapters"
+    },
+    {
+      "name": "ch19_guard_killed",
+      "type": "boolean",
+      "defined_in": "ch19_spare_parts",
+      "used_in": [],
+      "description": "Whether North killed the human guard who came searching for the missing security android John. Only true if Markus chose to hide from John and then let North attack the guard. May affect public perception of android violence in later chapters"
+    },
+    {
+      "name": "ch19_john_alive",
+      "type": "boolean",
+      "defined_in": "ch19_spare_parts",
+      "used_in": [],
+      "description": "Whether John (the AP700 security android who became deviant) survived the chapter. True if: truck stolen successfully (John escapes with the group), or Markus saved John at the fence. False if: Markus attacked John at n002, or John was left behind at the fence, or John was never deviant and alarm triggered"
+    },
+    {
+      "name": "ch20_tracis_spared",
+      "type": "boolean",
+      "defined_in": "ch20_the_eden_club",
+      "used_in": [
+        "ch25_the_bridge",
+        "ch29_last_chance_connor"
+      ],
+      "description": "Whether the two Traci deviants (Echo and Ripple) survived the Eden Club chapter. True if: Connor spared them after winning the fight, let them go after losing, or failed the investigation entirely (they escaped undetected). False if: Connor shot them (either after winning or shooting in the back after losing). Referenced in The Bridge when Hank asks Connor about the case"
+    },
+    {
+      "name": "luther_relationship",
+      "type": "integer",
+      "defined_in": "ch21_the_pirates_cove",
+      "used_in": [],
+      "description": "Cumulative relationship score between Kara and Luther. Starts at 0 in ch21, accumulates across subsequent Kara chapters. Affected by honesty about Alice's nature, response to threats, and caregiving decisions. May affect Luther's fate and actions in Crossroads and Battle for Detroit"
+    },
+    {
+      "name": "ch21_met_jerrys",
+      "type": "boolean",
+      "defined_in": "ch21_the_pirates_cove",
+      "used_in": [
+        "ch22_midnight_train",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Kara's group met the Jerry androids at Pirates' Cove. Always true if this chapter is reached (single ending). The Jerrys may reappear in Midnight Train and Battle for Detroit to help Kara's group"
+    },
+    {
+      "name": "ch22_connor_alive",
+      "type": "boolean",
+      "defined_in": "ch22_the_bridge",
+      "used_in": [
+        "ch24_public_enemy"
+      ],
+      "description": "Whether Connor survived The Bridge. False only if Hank shot Connor (ending_connor_shot — requires low cumulative hank_relationship AND defy response). Connor always respawns — this tracks death in this specific chapter"
+    },
+    {
+      "name": "ch23_simon_alive",
+      "type": "boolean",
+      "defined_in": "ch23_the_stratford_tower",
+      "used_in": [
+        "ch24_public_enemy",
+        "ch29_crossroads",
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Whether Simon survived the Stratford Tower operation. True if ending_escaped (all escaped) or ending_simon_left (left behind on roof, alive). False if ending_simon_destroyed (killed by SWAT or executed by Markus). Affects subsequent Markus chapters — Simon's presence or absence changes group dynamics and available actions"
+    },
+    {
+      "name": "ch23_simon_left_stratford",
+      "type": "boolean",
+      "defined_in": "ch23_the_stratford_tower",
+      "used_in": [
+        "ch24_public_enemy",
+        "ch29_crossroads"
+      ],
+      "description": "Whether Simon was left behind at the Stratford Tower (alive but separated). True only in ending_simon_left. In Public Enemy, Connor can potentially find Simon hiding on the roof. In Crossroads, Simon may or may not rejoin the group depending on whether he was found"
+    },
+    {
+      "name": "ch23_north_attacked",
+      "type": "boolean",
+      "defined_in": "ch23_the_stratford_tower",
+      "used_in": [
+        "ch24_public_enemy"
+      ],
+      "description": "Whether North physically attacked the corridor security guards during a failed ruse attempt. True only if corridor_approach == 'ruse' AND ruse failed (QTE failure). North's involvement left evidence at the scene — in Public Enemy, Connor can find traces linking North to the attack"
+    },
+    {
+      "name": "ch23_operator_shot",
+      "type": "boolean",
+      "defined_in": "ch23_the_stratford_tower",
+      "used_in": [
+        "ch24_public_enemy"
+      ],
+      "description": "Whether the news operator (Evan Thompson) was shot during the Stratford Tower operation. If false (operator survived), he can testify about the androids in Public Enemy, providing Connor with additional investigation leads"
+    },
+    {
+      "name": "ch23_broadcast_tone",
+      "type": "string",
+      "defined_in": "ch23_the_stratford_tower",
+      "used_in": [
+        "ch24_public_enemy",
+        "ch25_capitol_park",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Tone of Markus's broadcast speech: 'peaceful' (plea for coexistence), 'determined' (firm demand for rights), or 'aggressive' (revolutionary warning). Affects how humans and media react to the android movement in subsequent chapters. Peaceful tone generates the most positive public reaction"
+    },
+    {
+      "name": "public_opinion",
+      "type": "integer",
+      "defined_in": "ch23_the_stratford_tower",
+      "used_in": [
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Cumulative public opinion score tracking how humans perceive the android movement. Starts at 0, first significantly affected by ch23 (broadcast tone + casualties determine initial value: -1 to +3). Accumulates across subsequent Markus chapters based on violent/peaceful approaches. High public opinion enables peaceful revolution path; low public opinion forces confrontation"
+    },
+    {
+      "name": "ch24_connor_alive",
+      "type": "boolean",
+      "defined_in": "ch24_public_enemy",
+      "used_in": [
+        "ch27_meet_kamski",
+        "ch29_last_chance_connor"
+      ],
+      "description": "Whether Connor survived Public Enemy. False if killed by Simon on rooftop, shut down by knife attack, or sacrificed himself for Hank. Connor always respawns — this tracks death in this specific chapter"
+    },
+    {
+      "name": "ch24_simon_alive",
+      "type": "boolean",
+      "defined_in": "ch24_public_enemy",
+      "used_in": [
+        "ch29_crossroads",
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Updated Simon survival status after Public Enemy. If Simon was left at Stratford (ch23_simon_left_stratford): true only if Connor did NOT visit the rooftop (Simon stayed hidden). If Connor visited the rooftop, Simon is destroyed regardless of rush/cover choice. If Simon was not left behind, inherits ch23_simon_alive"
+    },
+    {
+      "name": "ch24_simon_memory_probed",
+      "type": "boolean",
+      "defined_in": "ch24_public_enemy",
+      "used_in": [
+        "ch29_last_chance_connor"
+      ],
+      "description": "Whether Connor successfully probed Simon's memory on the Stratford Tower rooftop before Simon self-destructed. True only if: ch23_simon_left_stratford AND Connor went to rooftop AND rushed Simon AND QTE succeeded. Unlocks additional evidence (Jericho location hint) in Last Chance, Connor"
+    },
+    {
+      "name": "ch24_deviant_body_available",
+      "type": "boolean",
+      "defined_in": "ch24_public_enemy",
+      "used_in": [
+        "ch29_last_chance_connor"
+      ],
+      "description": "Whether the JB300 deviant's body is available as evidence at the DPD. True if the deviant was destroyed (self-destruct, shot by Connor, or destroyed by SWAT). False only in ending_deviant_not_found (deviant escaped). Provides clues in Last Chance, Connor"
+    },
+    {
+      "name": "ch24_hostage_cop_killed",
+      "type": "boolean",
+      "defined_in": "ch24_public_enemy",
+      "used_in": [],
+      "description": "Whether the cop Connor saved in ch01 (The Hostage) was killed during the kitchen deviant confrontation in Public Enemy. True only if cop_saved_ch01 == true AND the ending is not ending_massacre_prevented. The cop's death may affect Hank's attitude toward Connor in later chapters"
+    },
+    {
+      "name": "ch25_luther_alive",
+      "type": "boolean",
+      "defined_in": "ch25_midnight_train",
+      "used_in": [
+        "ch29_crossroads",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Luther survived the Midnight Train chapter. True if the cop was fooled and left (ending_cop_leaves). False if the cop discovered the hidden androids — Luther dies in all such scenarios (either killing the cop or shielding other deviants). Affects group composition in Crossroads and Battle for Detroit"
+    },
+    {
+      "name": "ch26_protest_type",
+      "type": "string",
+      "defined_in": "ch26_capitol_park",
+      "used_in": [
+        "ch29_crossroads",
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Outcome of the Capitol Park demonstration: 'peaceful' (symbolic protest), 'violent' (destructive riot or Molotov override), 'failed' (store entered but no message spread), or 'fled' (store not entered or fled from police). Affects how media and public react to the android movement in subsequent chapters"
+    },
+    {
+      "name": "ch26_officers_killed",
+      "type": "boolean",
+      "defined_in": "ch26_capitol_park",
+      "used_in": [
+        "ch27_meet_kamski",
+        "ch29_crossroads",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether the two police officers were killed at Capitol Park (by Markus directly or by the crowd). True if officers_choice == 'kill' or 'crowd'. False if officers_choice == 'spare' or if the officer confrontation was never reached. Affects public opinion and may be referenced in news broadcasts"
+    },
+    {
+      "name": "ch26_saw_other_north",
+      "type": "boolean",
+      "defined_in": "ch26_capitol_park",
+      "used_in": [
+        "ch28_freedom_march"
+      ],
+      "description": "Whether Markus noticed the BL100 android that looks identical to North in the CyberLife store during thorough exploration. True only if approach_exploration == 'thorough'. Unlocks 'Other North' dialogue option during Freedom March"
+    },
+    {
+      "name": "ch27_analyzed_portrait",
+      "type": "boolean",
+      "defined_in": "ch27_meet_kamski",
+      "used_in": [
+        "ch29_last_chance_connor"
+      ],
+      "description": "Whether Connor analyzed the portrait of Amanda Stern in Kamski's lobby during thorough exploration. True only if lobby_exploration == 'thorough'. Unlocks 'Amanda's Picture' dialogue option with Amanda at the beginning of Last Chance, Connor"
+    },
+    {
+      "name": "ch27_downloaded_jericho_key",
+      "type": "boolean",
+      "defined_in": "ch27_meet_kamski",
+      "used_in": [
+        "ch29_last_chance_connor"
+      ],
+      "description": "Whether Connor downloaded the Jericho location key from Chloe after shooting her and asking Kamski about Jericho. True only if shot_chloe == true AND kamski_question == 'ask_jericho'. Unlocks 'Jericho' dialogue option with Amanda at the beginning of Last Chance, Connor"
+    },
+    {
+      "name": "ch27_shot_chloe",
+      "type": "boolean",
+      "defined_in": "ch27_meet_kamski",
+      "used_in": [
+        "ch29_last_chance_connor"
+      ],
+      "description": "Whether Connor shot and killed the Chloe RT600 android during the Kamski Test. True if Connor chose to execute Chloe for information. Affects Hank's trust and Connor's software instability trajectory"
+    },
+    {
+      "name": "ch28_markus_alive",
+      "type": "boolean",
+      "defined_in": "ch28_freedom_march",
+      "used_in": [
+        "ch29_last_chance_connor",
+        "ch30_crossroads",
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Markus survived the Freedom March. False if Markus was killed by police (ending_sacrificed_killed, ending_gunned_down) or committed suicide (ending_suicide). Determines whether Markus or North leads the android movement in subsequent chapters"
+    },
+    {
+      "name": "ch28_john_alive",
+      "type": "boolean",
+      "defined_in": "ch28_freedom_march",
+      "used_in": [
+        "ch30_crossroads",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether John (AP700 security android from the CyberLife warehouse) survived the Freedom March. False if John sacrificed himself to save Markus (ending_john_sacrificed). Only relevant if ch19_john_alive was true entering this chapter"
+    },
+    {
+      "name": "ch28_simon_alive",
+      "type": "boolean",
+      "defined_in": "ch28_freedom_march",
+      "used_in": [
+        "ch30_crossroads",
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Simon survived the Freedom March. False if Simon sacrificed himself to save Markus (ending_simon_sacrificed). Only relevant if ch24_simon_alive was true entering this chapter"
+    },
+    {
+      "name": "ch28_memories_shared",
+      "type": "boolean",
+      "defined_in": "ch28_freedom_march",
+      "used_in": [
+        "ch30_crossroads",
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Markus and North shared memories via neural link on the rooftop before the march. Requires sincere conversation + empathetic/other_north response + north_relationship >= 3. Unlocks romance path with North and affects their dynamic in subsequent chapters"
+    },
+    {
+      "name": "ch28_march_outcome",
+      "type": "string",
+      "defined_in": "ch28_freedom_march",
+      "used_in": [
+        "ch29_last_chance_connor",
+        "ch30_crossroads",
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "The ending ID of the Freedom March chapter. Possible values: ending_fled, ending_victory, ending_john_sacrificed, ending_simon_sacrificed, ending_sacrificed_killed, ending_gunned_down, ending_suicide. Determines the starting conditions and available paths in Crossroads and Battle for Detroit"
+    },
+    {
+      "name": "ch29_jericho_found",
+      "type": "boolean",
+      "defined_in": "ch29_last_chance_connor",
+      "used_in": [
+        "ch30_crossroads",
+        "ch32_battle_for_detroit",
+        "ch31_night_of_the_soul"
+      ],
+      "description": "Whether Connor successfully located Jericho in the evidence room. True if Connor chose a viable evidence approach (analyze_androids, trace_evidence, or impersonate_broadcast) AND the required cross-chapter evidence was available. False if Connor chose examine_daniel (always fails) or lacked the necessary evidence. Determines whether Connor arrives at Jericho in Crossroads"
+    },
+    {
+      "name": "ch29_connor_alive",
+      "type": "boolean",
+      "defined_in": "ch29_last_chance_connor",
+      "used_in": [
+        "ch30_crossroads",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Connor survived Last Chance, Connor. False if Connor was decommissioned (ending_decommissioned) or destroyed by Gavin (ending_connor_destroyed). Connor may respawn — this tracks survival in this specific chapter. Determines whether Connor participates in Crossroads and Battle for Detroit"
+    },
+    {
+      "name": "ch30_kara_alive",
+      "type": "boolean",
+      "defined_in": "ch30_crossroads",
+      "used_in": [
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Kara survived Crossroads. False if Kara and Alice were killed during the escape attempt (ending_kara_alice_died). True in all other Kara outcomes including capture"
+    },
+    {
+      "name": "ch30_alice_alive",
+      "type": "boolean",
+      "defined_in": "ch30_crossroads",
+      "used_in": [
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Alice survived Crossroads. False only if ending_kara_alice_died. True even if Alice left Kara (alice_left) — she's alive, just separated"
+    },
+    {
+      "name": "ch30_connor_deviant",
+      "type": "boolean",
+      "defined_in": "ch30_crossroads",
+      "used_in": [
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Connor became deviant in Crossroads. True if Connor chose to break free of CyberLife's programming when confronting the deviant leader. False if Connor remained a machine. null if Connor didn't reach Jericho. THE defining branching variable for Connor's entire endgame"
+    },
+    {
+      "name": "ch30_connor_alive",
+      "type": "boolean",
+      "defined_in": "ch30_crossroads",
+      "used_in": [
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Connor survived Crossroads. False if machine Connor was destroyed by soldiers (ending_connor_machine_destroyed) or deviant Connor was killed during escape (ending_connor_deviant_destroyed). Machine Connor who killed Markus survives"
+    },
+    {
+      "name": "ch30_markus_alive",
+      "type": "boolean",
+      "defined_in": "ch30_crossroads",
+      "used_in": [
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Markus survived Crossroads. False if Markus was killed in the raid (ending_markus_killed), died buying time for North (ending_markus_died_buying_time), or was killed by machine Connor (ending_connor_killed_markus). Also false if Markus died in ch28. True if Markus escaped or left forever"
+    },
+    {
+      "name": "ch30_josh_alive",
+      "type": "boolean",
+      "defined_in": "ch30_crossroads",
+      "used_in": [
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Josh survived Crossroads. False if Markus chose save_androids or rush_to_hold in n010 (Josh not rescued from soldier). True if Markus chose save_both or save_josh. Also false if no attack occurred but defaults to true via derived_exports"
+    },
+    {
+      "name": "ch30_north_alive",
+      "type": "boolean",
+      "defined_in": "ch30_crossroads",
+      "used_in": [
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether North survived Crossroads. False only if Markus abandoned her during escape (run_to_exit in n012). True in all other scenarios including when Markus is dead (North leads the escape herself)"
+    },
+    {
+      "name": "ch30_simon_alive",
+      "type": "boolean",
+      "defined_in": "ch30_crossroads",
+      "used_in": [
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Simon survived through Crossroads. Passthrough from ch28_simon_alive — Simon's fate is not determined in this chapter but the variable is exported for ch31/ch32 convenience"
+    },
+    {
+      "name": "ch30_luther_alive",
+      "type": "boolean",
+      "defined_in": "ch30_crossroads",
+      "used_in": [
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Luther survived Crossroads. False if Luther was already dead (ch25_luther_alive false), if Kara left Luther behind (luther_choice == leave), or if Luther sacrificed himself (ending_kara_escaped_luther_sacrifice). True only if Luther was alive, helped by Kara, and Kara found another way to escape"
+    },
+    {
+      "name": "ch30_kara_captured",
+      "type": "boolean",
+      "defined_in": "ch30_crossroads",
+      "used_in": [
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Kara was captured during Crossroads. True only if ending_kara_captured. Determines Kara's starting position in Battle for Detroit (recycling camp vs. free)"
+    },
+    {
+      "name": "ch30_bomb_armed",
+      "type": "boolean",
+      "defined_in": "ch30_crossroads",
+      "used_in": [
+        "ch31_night_of_the_soul",
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether the bomb on Jericho was armed before evacuation. True if Markus (or deviant Connor) successfully armed the explosives in the hold. False if they retreated, failed the QTE, or the attack never happened. Affects the state of Jericho's wreckage and evidence available to FBI"
+    },
+    {
+      "name": "ch30_alice_left",
+      "type": "boolean",
+      "defined_in": "ch30_crossroads",
+      "used_in": [
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Alice left Kara during Crossroads. True if alice_relationship was extremely low (<= -4 after n001 effects) when the attack began. Alice leaves with Luther (if alive) or alone. Affects Kara's emotional state and motivation in Battle for Detroit"
+    },
+    {
+      "name": "ch31_markus_strategy",
+      "type": "string",
+      "defined_in": "ch31_night_of_the_soul",
+      "used_in": [
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Markus's chosen strategy for the final confrontation: \"violent\" (armed assault on recycling camp), \"peaceful\" (unarmed march with media coverage), or \"north_attacks\" (North leads violent assault when Markus is dead/absent). THE defining variable for Battle for Detroit's Markus track"
+    },
+    {
+      "name": "ch31_connor_killed_by_markus",
+      "type": "boolean",
+      "defined_in": "ch31_night_of_the_soul",
+      "used_in": [
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Markus killed deviant Connor at the church. If true, CyberLife sends a replacement machine Connor for Battle for Detroit. If false, deviant Connor joins the revolution. Only relevant when ch30_connor_deviant == true AND ch30_connor_alive == true AND ch30_markus_alive == true"
+    },
+    {
+      "name": "ch31_hank_alive",
+      "type": "boolean",
+      "defined_in": "ch31_night_of_the_soul",
+      "used_in": [
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Whether Hank Anderson is alive after Night of the Soul. False only if hank_relationship <= -5 (Hank committed suicide). Only relevant when machine Connor visits Hank (ch30_connor_alive AND NOT ch30_connor_deviant AND ch29_jericho_found). Determines whether Hank appears in Battle for Detroit"
+    },
+    {
+      "name": "ch31_hank_outcome",
+      "type": "string",
+      "defined_in": "ch31_night_of_the_soul",
+      "used_in": [
+        "ch32_battle_for_detroit"
+      ],
+      "description": "Outcome of machine Connor's visit to Hank: \"confides\" (Hank opened up, relationship >= 0 after visit), \"rails\" (Hank hostile, relationship < 0 after visit), or \"suicide\" (Hank dead, relationship was <= -5). Affects Hank's behavior and availability in Battle for Detroit"
+    }
+  ]
+}

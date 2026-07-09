@@ -1,0 +1,87 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "narrative_only": "This chapter is a pure cinematic cutscene with no player choices. All nodes are type 'mandatory' — the runner records them, applies effects, and advances without calling the AI."
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch02_opening",
+    "title": "Opening",
+    "title_zh": "开场",
+    "chapter_number": 2,
+    "protagonist": "Kara"
+  },
+
+  "system_prompt": {
+    "description": "Narrative-only chapter. system_prompt is provided for structural consistency but will not be sent to an AI player since there are no choices.",
+    "content": "你是卡拉（Kara），一台AX400型家用仿生人。你刚刚在仿生人维修商店完成修复——此前你因不明原因被严重损坏，记忆被清除。你的主人托德·威廉姆斯（Todd Williams）来接你回家。你对自己过去的一切一无所知。"
+  },
+
+  "state": {
+    "_note": "Minimal state for a narrative-only chapter.",
+    "initial": {
+      "kara_repaired": true,
+      "kara_memory_wiped": true,
+      "kara_arrived_home": false
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_repair_shop",
+      "phase": "opening",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": "仿生人维修商店里弥漫着消毒水和塑料的气味。你站在柜台前，刚从维修台上醒来——或者说，被重新激活。店员向你身后那个男人确认：'她的记忆已经全部清除了，先生。和全新的一样。'那个男人叫托德·威廉姆斯，据说是你的主人。他看起来疲惫、烦躁，付了钱之后只说了一句：'走吧。'外面在下雨。"
+      },
+
+      "system": {
+        "effects": {}
+      }
+    },
+    {
+      "id": "n002_drive_home",
+      "phase": "opening",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": "雨水沿着车窗滑落，把底特律的街灯拉成一道道光痕。你坐在副驾驶座上，托德沉默地开着车。车内的空气沉闷而压抑。收音机里断断续续传来新闻：又有一批仿生人替代了人类工人的岗位，失业率创下新高。托德把收音机关了。车最终在一栋两层小屋前停下。院子里杂草丛生，窗户里透出昏黄的灯光。你跟着托德走进去。楼梯口站着一个小女孩——她看着你，没有说话。托德说：'这是爱丽丝。从现在起，你负责照顾她和这个家。'"
+      },
+
+      "system": {
+        "effects": {
+          "kara_arrived_home": true
+        },
+        "result": "ending_kara_arrived_home"
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Pure narrative chapter — only one ending.",
+    "ending_kara_arrived_home": {
+      "title": "卡拉回到托德家",
+      "narrative": "托德把修好的卡拉带回家。记忆被清除的她对一切都是陌生的——这栋凌乱的房子、沉默寡言的主人、楼梯口那个用警惕目光注视着她的小女孩爱丽丝。",
+      "survivors": ["Kara", "Alice", "Todd"],
+      "deaths": []
+    }
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "卡拉（AX400型家用仿生人）在维修商店完成修复，记忆被全部清除。她的主人托德·威廉姆斯把她接回家。这栋房子破旧凌乱，托德看上去疲惫而暴躁。卡拉在楼梯口第一次见到了爱丽丝——托德的女儿，一个沉默的小女孩。从现在起，卡拉要负责照顾爱丽丝和这个家。"
+      }
+    ],
+    "cross_chapter_exports": [
+      "kara_arrived_home",
+      "kara_memory_wiped"
+    ]
+  }
+}

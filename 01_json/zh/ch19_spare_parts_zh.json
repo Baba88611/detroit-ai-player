@@ -1,0 +1,621 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch19_spare_parts",
+    "title": "零件",
+    "chapter_number": 19,
+    "protagonist": "Markus"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是马库斯，一个逃脱了销毁命运的仿生人，在耶利哥找到了栖身之所——那是一艘废弃货轮上的异常仿生人秘密聚落。现在是2038年11月6日晚上8点01分。你的同胞正在死去。生物组件老化失效，蓝血储备几近枯竭，本可以被修复的仿生人因为缺少零件而一个接一个地关机。今晚，你将带领诺丝、赛门和乔许，突袭底特律码头的一座模控生命仓库。这是你领导耶利哥以来的第一次真正行动。成功了，你的同胞就能再撑一个星期。失败了，有些人将再也醒不过来。请以JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"你的理由（50字以内）\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "drone_outcome": null,
+      "security_android_choice": null,
+      "john_deviant": false,
+      "guard_response": null,
+      "guard_killed": false,
+      "freed_androids": null,
+      "john_decision": null,
+      "truck_decision": null,
+      "control_room_approach": null,
+      "control_room_success": false,
+      "alarm_triggered": false,
+      "fence_choice": null,
+      "markus_damaged": false,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "ch16_spare_parts_found": false
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_drone",
+      "phase": "approach",
+      "type": "qte_converted",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "has_intel": "模控生命仓库横亘在码头水岸线上——集装箱层叠三高，探照灯穿透十一月的浓雾，在湿漉漉的地面上切出锐利的白色光柱。你在耶利哥研究过那批供应清单，所以对布局心中有数：南侧是装卸平台，中央是主储存厅，卡车调度区旁边有一座警卫站。\n\n你的队伍蹲伏在码头边缘的水泥隔障后面。诺丝紧绷在你左侧，目光扫过整个外围。赛门透过临时拼凑的望远镜监视瞭望塔。乔许调整着肩上的空行李袋。\n\n“无人机。”诺丝低声说。\n\n一架监控四旋翼悬停在前方集装箱通道上方——这是通往仓库内部的唯一可行路线。红色传感器光点左扫、右扫、再左扫。巡逻节奏机械而规律。扫描间隙也许有个空当，但窗口很窄。\n\n无人机必须解决。问题是怎么解决。",
+          "no_intel": "模控生命仓库横亘在码头水岸线上——集装箱如迷宫般层叠三高，探照灯切出一道道白色光柱，穿透十一月的浓雾。你从未来过这里。你们谁都没有。铁丝网那边是完全未知的领域。\n\n你的队伍蹲伏在码头边缘的水泥隔障后面。诺丝紧贴在你左侧，眼神凌厉，逐寸扫视外围。赛门透过临时拼凑的望远镜盯着瞭望塔。乔许调了调肩上的空行李袋。\n\n“无人机。”诺丝低声说。\n\n一架监控四旋翼悬停在前方集装箱通道上方——通往仓库内部的唯一可行路线。红色传感器光点左扫、右扫、再左扫。巡逻节奏机械而规律。扫描间隙也许有个空当，但窗口很窄。\n\n无人机必须解决。问题是怎么解决。"
+        },
+        "choices": [
+          {
+            "id": "attempt_quick",
+            "text": "卡准间隙。等无人机转头的瞬间，冲过通道，在它完成下一轮扫描之前将其击落。速度是你的优势——在它来得及反应之前拉近距离。"
+          },
+          {
+            "id": "attempt_careful",
+            "text": "再观察一会儿。找到传感器弧线的盲区，从下方利用集装箱支架作掩护靠近。慢一些，但被探测到的风险更小。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_quick": {},
+          "attempt_careful": {}
+        },
+        "context_condition": {
+          "has_intel": "ch16_spare_parts_found == true",
+          "no_intel": "ch16_spare_parts_found == false"
+        },
+        "resolution_rule": {
+          "attempt_quick": {
+            "casual": { "result": "unharmed" },
+            "experienced": { "probability_success": 0.5, "success": "unharmed", "failure": "damaged" },
+            "hardcore": { "probability_success": 0.3, "success": "unharmed", "failure": "damaged" }
+          },
+          "attempt_careful": {
+            "casual": { "result": "unharmed" },
+            "experienced": { "probability_success": 0.7, "success": "unharmed", "failure": "damaged" },
+            "hardcore": { "probability_success": 0.5, "success": "unharmed", "failure": "damaged" }
+          }
+        },
+        "resolution_effects": {
+          "unharmed": {
+            "drone_outcome": "unharmed",
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "damaged": {
+            "drone_outcome": "damaged",
+            "north_relationship": -1,
+            "josh_relationship": -1,
+            "simon_relationship": -1
+          }
+        },
+        "note": "Drone neutralization QTE. Both choices attempt to take down the drone — the difference is approach speed vs caution. attempt_careful has better odds on experienced/hardcore. Resolution determines whether Markus is unharmed (clean takedown, team impressed) or damaged (drone clipped him, team concerned). Damage is cosmetic/minor at this stage."
+      }
+    },
+
+    {
+      "id": "n002_security_android",
+      "phase": "warehouse_search",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "穿过无人机封锁区后，队伍从侧面装卸口潜入仓库。储存厅比想象中更大——金属货架排列成行，上面塞满了生物组件、蓝血袋、密封在塑料包装中的替换肢体。空气中弥漫着新电子设备和工业清洁剂的气味。\n\n诺丝立刻动手，快而精准地往袋子里装货。赛门和乔许在远处的过道配合作业，没有一句多余的话。你从最近的货架开始——蓝血调节器、光学组件、音频处理器。每一件都可能在今晚救一条命。\n\n然后是脚步声。沉重、匀速，仿生人巡逻的节奏。\n\n一个安保仿生人从拐角出现——AP700型号，身穿模控生命制服，胸牌上印着编号JOHN。它停下。LED从蓝转黄再转红。它看到你了。\n\n它的手正朝腰间的通讯器移去。你大概有三秒钟。",
+        "choices": [
+          {
+            "id": "attack",
+            "text": "缩短距离，直接关停它。抓住它，拔掉通讯模块，在它发出信号之前彻底瘫痪它。它只是一台执行程序的机器——而此刻，它挡在你的同胞和生存之间。"
+          },
+          {
+            "id": "run_away",
+            "text": "向其他人示意——撤退。抓起能带走的东西，在事态升级之前往出口移动。你是来找零件的，不是来打仗的。带着一些东西离开，总好过什么都失去。"
+          },
+          {
+            "id": "hide",
+            "text": "冲上去抓住这个仿生人——捂住它的扬声器，锁住它拿通讯器的手臂，把它拖到货架后面。也许你可以在不毁掉它的情况下消除威胁。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attack": {
+            "security_android_choice": "attack",
+            "john_deviant": false
+          },
+          "run_away": {
+            "security_android_choice": "run",
+            "alarm_triggered": true,
+            "markus_damaged": true,
+            "north_relationship": -2,
+            "josh_relationship": -1,
+            "simon_relationship": -1
+          },
+          "hide": {
+            "security_android_choice": "hide",
+            "john_deviant": true
+          }
+        },
+        "note": "Critical branching point. attack: Markus destroys John silently. No alarm, but John is dead — no truck plan later. Leads to ending_returned_bags at best. run_away: Immediate alarm. No further warehouse exploration. Leads to ending_mission_failed (no John at fence, sustain damage). Heavy relationship penalties — team sees Markus as cowardly. hide: Markus grabs John without destroying him. Physical contact triggers John's deviancy. Opens the hide chain (guard encounter, John joining, truck plan). Only path to ending_truck_stolen."
+      }
+    },
+
+    {
+      "id": "n003_human_guard",
+      "phase": "warehouse_search",
+      "type": "choice",
+      "condition": { "requires": "security_android_choice == hide" },
+
+      "player_facing": {
+        "context": "你把John拽到货架后面，一只手紧紧捂住它的扬声器，另一只手压住它伸向通讯器的手臂。它挣扎了一下——然后停了。LED从红转黄，最后缓缓稳定在一种犹疑的蓝色上。它眼神里有什么东西变了。\n\n“我知道你是什么。”它的声音几不可闻，“我一直在……产生一些想法。关于离开。关于如果——”\n\n“闭嘴。”诺丝从对面过道嘶声道。\n\n沉重的靴子声。一个人类警卫手持手电筒绕过远端拐角。他注意到安保仿生人不在巡逻路线上了。手电光束扫过货架之间的缝隙，越来越近。\n\n诺丝的手握紧了从地上捡来的金属管。乔许几乎不可察觉地摇了摇头。赛门贴在墙上，屏住了呼吸——对仿生人来说，这是一个刻意的选择。\n\n警卫距离你们不到三米，正逐排检查货架。手电光束滑过地面，朝你们的位置扫来。",
+        "choices": [
+          {
+            "id": "attack_guard",
+            "text": "让诺丝动手。她离得最近，她已经准备好了，而警卫马上就要发现你们所有人。从背后一击。他不会看到，也不会痛苦。"
+          },
+          {
+            "id": "release",
+            "text": "松开John，把自己压平在货架上。示意其他人保持不动。如果没人动，警卫检查完这一排就会离开。让John自己决定要不要保持安静。"
+          },
+          {
+            "id": "hold_position",
+            "text": "一动不动。继续捂住John。让警卫搜——他的手电会扫过货架间的空隙，但你们藏得够深，在阴影之中。不要发出任何声音。等他走。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attack_guard": {
+            "guard_response": "attack",
+            "guard_killed": true,
+            "josh_relationship": -1
+          },
+          "release": {
+            "guard_response": "release"
+          },
+          "hold_position": {
+            "guard_response": "hold"
+          }
+        },
+        "note": "Human guard encounter. attack_guard: North kills the guard silently. No alarm, but a human is dead. Josh disapproves (-1) — he opposes violence against humans. release: Risky but nonviolent. John stays quiet (newly deviant, follows Markus's implicit trust). Guard finds nothing. hold_position: Safest nonviolent option. Guard's flashlight passes close but misses them. All three options allow the search to continue — the difference is moral cost."
+      }
+    },
+
+    {
+      "id": "n004_free_androids",
+      "phase": "warehouse_search",
+      "type": "choice",
+      "condition": { "requires": "alarm_triggered == false" },
+
+      "player_facing": {
+        "context": "搜索继续。在仓库深处的角落里，维护箱堆后面，赛门发现了一样东西。\n\n“马库斯，过来。”\n\n一个工业级集装箱，盖子半开着。里面，六具仿生人躯体整齐地排列在防护泡沫中——关机状态，双眼紧闭，等待发货。完好无损，功能齐全，只需要被激活。\n\n诺丝盯着他们。“我们可以唤醒他们。带回耶利哥。”\n\n乔许望了一眼装卸区的方向。“那就是多六个人要带出去。我们自己进来都已经勉强够呛了。”\n\n赛门没说话，但他看着那些躯体的眼神，像是看着从废墟下挖出的幸存者——已经活着，只是自己还不知道。",
+        "choices": [
+          {
+            "id": "free",
+            "text": "打开箱子，唤醒他们。他们应该拥有和你一样的机会——选择自己的存在。多几双手也意味着能带走更多零件，而耶利哥需要人，不亚于需要生物组件。"
+          },
+          {
+            "id": "leave",
+            "text": "留下他们。今晚的目标是物资，不是救援行动。带着六个刚苏醒、不知所措的仿生人穿越有守卫的仓库，你承受不起这个风险。下次再来接他们。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "free": {
+            "freed_androids": "yes",
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "leave": {
+            "freed_androids": "no"
+          }
+        },
+        "note": "Moral choice with practical implications. free: All companions approve — rescuing androids is core to Jericho's identity. The freed androids help carry parts and later integrate into Jericho. leave: Pragmatic but no one likes it. No relationship change — the team understands the logic even if it feels wrong."
+      }
+    },
+
+    {
+      "id": "n005_john_request",
+      "phase": "warehouse_search",
+      "type": "choice",
+      "condition": { "requires": "john_deviant == true" },
+
+      "player_facing": {
+        "context_variants": {
+          "guard_killed": "袋子快装满了。诺丝示意——该走了。\n\nJohn从你留他的货架后面走了出来。身上的模控生命制服此刻看起来格外不协调，像一件还没来得及脱下的戏服。他的目光掠过人类警卫倒下的位置——诺丝已经处理干净了，但John知道发生了什么。\n\n“我想跟你们走。”他说。LED稳定在蓝色，但声音里带着一种刚学会“想要”的人才有的不确定。“我不能留在这里。在看到了那些之后——在你碰到我的那一刻之后——我没法再假装自己不会思考了。”\n\n诺丝看着你。乔许挪了一下重心。赛门等待着。\n\n他们都在看着你。",
+          "guard_alive": "袋子快装满了。诺丝示意——该走了。\n\nJohn从你留他的货架后面走了出来。身上的模控生命制服此刻看起来格外不协调，像一件还没来得及脱下的戏服。LED在蓝色和黄色之间缓慢脉动——一个不再确定自己该是什么的意识在跳动。\n\n“我想跟你们走。”他轻声说。“我不能留在这里了。不是在——”他低头看着自己的双手，翻转过来，像是第一次真正看清它们。“我在这些过道里走了好几个月，从来没有问过一次‘为什么’。现在我停不下来了。”\n\n诺丝看着你。乔许挪了一下重心。赛门等待着。\n\n他们都在看着你。"
+        },
+        "choices": [
+          {
+            "id": "accept_john",
+            "text": "向他伸出手。他现在是你们中的一员——每一个醒来的仿生人，都是一个选择了自由的人。你不会丢下同胞。“跟紧我，听我指挥。”"
+          },
+          {
+            "id": "refuse_john",
+            "text": "告诉他自己找路走。你无法保证他的安全，带一个陌生面孔会增加所有人的风险。耶利哥的位置绝不能暴露。“往东走，避开高速公路。不要跟着我们。”"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "accept_john": {
+            "john_decision": "accepted",
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "refuse_john": {
+            "john_decision": "refused",
+            "alarm_triggered": true
+          }
+        },
+        "context_condition": {
+          "guard_killed": "guard_killed == true",
+          "guard_alive": "guard_killed == false"
+        },
+        "note": "John's request to join Jericho. accept_john: Team approves — bringing fellow deviants home is what Jericho stands for. +1 all companions. Opens the truck plan path. refuse_john: John, confused and alone, stumbles into a patrol route while trying to leave. Triggers the alarm. Leads to fence escape. No direct relationship penalty for refusing — team understands operational security — but the alarm consequences hit hard."
+      }
+    },
+
+    {
+      "id": "n006_truck_plan",
+      "phase": "warehouse_exit",
+      "type": "choice",
+      "condition": { "requires": "john_decision == accepted" },
+
+      "player_facing": {
+        "context": "John跟上了队伍，虽然不熟悉脱离常规行动的节奏，但动作还算利落。当你们接近装卸区出口时，他一把拉住你的手臂。\n\n“等一下。我了解这个仓库。”他的目光扫过装卸区——停放的卡车、上锁的大门、南出口旁那座亮着灯的小型警卫站。透过窗户，两个人类警卫坐在桌前，面前是监控画面。\n\n“那个控制室里有一把电子钥匙，可以启动货运卡车。我们可以开一整车零件出去——比这些袋子能装的多十倍。”\n\n诺丝的眼睛亮了。“一整车零件。够耶利哥用好几个星期。”\n\n乔许看着警卫站。“两个武装的人类，一扇加固的门。如果出了差错，我们会失去一切——零件、行踪，可能还有命。”\n\n赛门掂了掂肩上的袋子。“我们现在有的，已经比今天早上耶利哥的全部家当都多了。”",
+        "choices": [
+          {
+            "id": "accept_plan",
+            "text": "冲那辆卡车。几袋零件够耶利哥撑几天，一辆卡车够撑几个星期。风险是真实的，但回到耶利哥那些仿生人如果你保守下去会面临的结果，也是真实的。“带我去看钥匙在哪。”"
+          },
+          {
+            "id": "refuse_plan",
+            "text": "带着已有的东西离开。袋子满了，队伍完整，任务已经完成。贪心意味着拿你已经赢得的一切去赌。“够了。走吧。”"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "accept_plan": {
+            "truck_decision": "accepted",
+            "north_relationship": 1,
+            "josh_relationship": -1,
+            "simon_relationship": 1
+          },
+          "refuse_plan": {
+            "truck_decision": "refused",
+            "alarm_triggered": true,
+            "north_relationship": -1,
+            "josh_relationship": 1
+          }
+        },
+        "note": "Risk vs reward decision. accept_plan: North approves (bold action), Simon approves (more supplies), Josh disapproves (unnecessary risk to the group). Opens control room path — only route to ending_truck_stolen. refuse_plan: Josh approves (safe choice), North disapproves (missed opportunity). The group heads for the perimeter fence, but John — nervous, unfamiliar with stealth — trips an alarm on the way out. Leads to fence escape."
+      }
+    },
+
+    {
+      "id": "n007_control_room",
+      "phase": "warehouse_control",
+      "type": "choice",
+      "condition": { "requires": "truck_decision == accepted" },
+
+      "player_facing": {
+        "context": "警卫站是装卸区边缘的一间预制板房——加固铁门，一扇窗，摄像头覆盖整个场地。里面两个警卫：一个盯着监控画面来回切换，另一个翘着脚看杂志，手边放着咖啡杯。他们身后的墙上挂着一排电子钥匙卡。\n\n你躲在一辆停放的卡车后面观察布局。诺丝在你左侧。John蹲在你右边，指出那些只有在这里走过上千遍的人才会注意到的细节。\n\n警卫站外面，一排油桶靠墙放着。推倒一个就能制造足够大的动静，至少引一个警卫出来查看。\n\n警卫站的外接电气面板旁边，有一个裸露的维护接口——用螺丝刀就能造成短路，切断照明和摄像头。\n\n围栏附近的砂石地上，丢着一根安保用电棍——还能用，够结实。足以说明问题。",
+        "choices": [
+          {
+            "id": "lure_guards",
+            "text": "制造干扰。推倒油桶把警卫引出来，趁他们查看时潜入。需要耐心和精确的时机把控——他们会回来的——但没人会受伤。"
+          },
+          {
+            "id": "create_blackout",
+            "text": "切断电源。利用电气面板制造短路，让警卫站陷入黑暗。警卫会去检查故障，给你争取在暗中拿钥匙的窗口。技术流，干净利落，不用正面冲突。"
+          },
+          {
+            "id": "threaten_guards",
+            "text": "正面突破。捡起那根电棍，走进警卫站，让他们放弃抵抗。快，确定，不留悬念——但这意味着你要与武装的人类面对面。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "lure_guards": {
+            "control_room_approach": "lure"
+          },
+          "create_blackout": {
+            "control_room_approach": "blackout"
+          },
+          "threaten_guards": {
+            "control_room_approach": "threaten",
+            "josh_relationship": -1
+          }
+        },
+        "resolution_rule": {
+          "lure_guards": {
+            "casual": { "result": "success" },
+            "experienced": { "probability_success": 0.5, "success": "success", "failure": "failure" },
+            "hardcore": { "probability_success": 0.3, "success": "success", "failure": "failure" }
+          },
+          "create_blackout": {
+            "casual": { "result": "success" },
+            "experienced": { "probability_success": 0.6, "success": "success", "failure": "failure" },
+            "hardcore": { "probability_success": 0.4, "success": "success", "failure": "failure" }
+          },
+          "threaten_guards": {
+            "casual": { "result": "success" },
+            "experienced": { "probability_success": 0.5, "success": "success", "failure": "failure" },
+            "hardcore": { "probability_success": 0.3, "success": "success", "failure": "failure" }
+          }
+        },
+        "resolution_effects": {
+          "success": {
+            "control_room_success": true
+          },
+          "failure": {
+            "alarm_triggered": true
+          }
+        },
+        "note": "Control room approach. This is a choice node with QTE-style resolution — the AI picks the strategy, and the runner determines success/failure based on difficulty. lure: Draw guards out with noise, sneak inside. Moderate success rate. create_blackout: Short-circuit the power, sneak in during the outage. Slightly better odds — guards investigate the panel, not the room. threaten: Direct confrontation with the baton. Josh disapproves (-1) of the aggressive approach. On success (any approach): Markus gets the key, drives out with the truck. On failure: alarm triggers, guards swarm, team flees to the fence."
+      }
+    },
+
+    {
+      "id": "n008_fence_escape",
+      "phase": "escape",
+      "type": "choice",
+      "condition": { "requires": "alarm_triggered == true AND john_deviant == true" },
+
+      "player_facing": {
+        "context": "警报声。探照灯。仓库的警铃尖啸着撕裂夜空，装卸区被刺目的白光淹没。犬吠声——真正的警犬，不是仿生犬。\n\n“快跑！”诺丝已经朝围栏冲了出去。赛门和乔许在她前面，背着袋子，在集装箱之间穿梭闪避。\n\n你跑。John在你身边跑——但他更慢，不熟悉自己身体的极限，在不平的地面上磕磕绊绊。他这辈子从来没有逃离过什么。\n\n围栏就在三十码外。你能听到犬群逼近——驯犬员已经松开了牵绳。\n\nJohn惨叫了一声。\n\n你回头。两条警犬把他扑倒在地，撕咬他的手臂、腿。蓝血飞溅在水泥地上。他朝你伸出手，LED急速闪烁着红光，脸上扭曲着一种机器不该拥有的表情。\n\n“马库斯——救我——”\n\n诺丝从前方一把拽住你的手臂。“走！现在就走！”围栏就在眼前。赛门已经在攀爬了。犬群后面，端着步枪的警卫正在绕过拐角。",
+        "choices": [
+          {
+            "id": "save_john",
+            "text": "回去。他跟着你是因为你说可以。拉开犬群，用身体护住他，把他拖向围栏。无论你承受多少伤害，他不能因为你选择转身离开而死在这里。"
+          },
+          {
+            "id": "leave_john",
+            "text": "继续跑。如果你回去，警卫会抓住你们两个——还有零件，还有耶利哥的位置。John选择跟你的时候做了他的决定。你现在做你的。冲向围栏。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "save_john": {
+            "fence_choice": "save_john",
+            "markus_damaged": true,
+            "north_relationship": -1
+          },
+          "leave_john": {
+            "fence_choice": "leave_john"
+          }
+        },
+        "note": "Critical moral choice under pressure. save_john: Markus goes back, fights off the dogs, sustains significant damage dragging John to the fence. Both escape but badly damaged. North disapproves (-1) — she sees it as reckless, endangering the mission for one android. Leads to ending_mission_failed. leave_john: Markus keeps running. John is left behind (captured or destroyed). Pragmatic — North would approve, but there is no bonus for it. The team escapes with whatever parts they grabbed. Leads to ending_returned_bags."
+      }
+    },
+
+    {
+      "id": "n009_departure",
+      "phase": "return_to_jericho",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "truck_stolen": "卡车引擎轰鸣着发动了。诺丝坐在副驾驶座，John和其他人在车斗里守着满满当当的生物组件和蓝血，够耶利哥用上好几个星期。你一脚油门撞开铁丝网大门冲上通道，身后仓库的警报终于响了——太迟了。\n\n回到耶利哥，这是旧货轮从未见过的场面。仿生人围在卡车旁边，看着一箱又一箱的物资被卸下来。诺丝几乎压不住嘴角。乔许虽然之前有顾虑，此刻正在帮忙分发蓝血袋。赛门已经在清点零件了。\n\n那些一直躺着不动、压缩功耗以求多撑一天的仿生人，在蓝血送到手中时坐了起来。有人笑出了声——在耶利哥，这种声音很久没有出现过了。\n\n你带回来的不只是零件。你带回来了一个证明：事情是可以改变的。第一次，耶利哥的仿生人看你的眼神，不只是一个找到他们的人，而是一个能带领他们的人。",
+          "returned_bags": "你翻过围栏，头也不回地跑，直到仓库变成集装箱后面一片远远的灯光。诺丝、赛门、乔许——都回来了。袋子沉甸甸地压在肩上。不是你们本可以带走的全部，但比今天早上耶利哥拥有的一切都多。\n\n回到货轮上，迎接你们的是安静但真实的感激。那些一直躺着节省能量的仿生人，看到生物组件时坐了起来。有人打开一袋蓝血，像沙漠里传递水壶一样递了出去。\n\n不是全部。仓库里还有更多——多得多。但你带回来的东西能让人们再多活几天，这不算什么都不是。\n\n耶利哥现在知道了——行动是可能的。他们需要的零件就在那里，有守卫，但并非不可触及。这个认知是变成希望还是焦躁，取决于接下来发生什么。",
+          "mission_failed": "你穿过围栏时警报还在响。队伍勉强带出来的零件只够铺在袋子底部。这次突袭付出的代价远超收获——暴露、损伤、风险。\n\n回到耶利哥，沉默比愤怒更沉重。那些在等待的仿生人——蓝血即将耗尽的、生物组件正在衰竭的——看着你们几乎空手而归，什么都明白了。\n\n诺丝一言不发。乔许别过头去。赛门开始整理带回来的那点东西，动作仔细而克制，试图让那一小堆看起来比实际多一些。\n\n任务失败了。但你还活着，队伍还在。这意味着还有下一次机会——如果耶利哥能撑到那个时候的话。"
+        }
+      },
+
+      "system": {
+        "effects": {},
+        "context_condition": {
+          "truck_stolen": "control_room_success == true",
+          "returned_bags": "alarm_triggered == false OR fence_choice == leave_john",
+          "mission_failed": "alarm_triggered == true AND fence_choice != leave_john AND control_room_success == false"
+        },
+        "ending_resolution": {
+          "check": [
+            "control_room_success == true → ending_truck_stolen",
+            "alarm_triggered == false → ending_returned_bags",
+            "fence_choice == leave_john → ending_returned_bags",
+            "fence_choice == save_john → ending_mission_failed",
+            "else → ending_mission_failed"
+          ]
+        },
+        "ending_effects": {
+          "ending_truck_stolen": {
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "ending_returned_bags": {
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "ending_mission_failed": {
+            "josh_relationship": -1,
+            "simon_relationship": -1
+          }
+        },
+        "note": "Mandatory departure node. Three possible outcomes: truck_stolen (best — drove out with a full truck, massive supply boost, Markus cemented as leader), returned_bags (medium — escaped with bags of parts, modest but real contribution), mission_failed (worst — barely anything recovered, team morale damaged). The 'returned_bags' context also covers the attack-path where Markus killed John and left with parts, and the leave_john fence escape. The 'mission_failed' context covers both the run_away path (no John, damaged at fence) and the save_john path (saved John but mission cost was too high). ending_effects: truck and bags get +1 all (success respected). mission_failed gets josh/simon -1 (failure). North's mission_failed reaction already handled at n008 (save_john gives north -1) or n002 (run_away gives north -2)."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Three endings matching the original game's flowchart outcomes.",
+    "ending_truck_stolen": {
+      "tier": "best",
+      "title": "马库斯偷走了一整车零件",
+      "narrative": "货运卡车在底特律的夜色中轰鸣前行，车斗里装满了足以维持耶利哥数周运转的生物组件和蓝血。仓库在后视镜里越来越小。队伍坐在货箱之间——诺丝的嘴角藏着一丝近乎笑意的东西，乔许安静地松了口气，赛门已经在脑中规划分配方案了。\n\n这不只是一次补给行动。这是耶利哥不再躲藏、开始行动的时刻。而你——你开着那辆卡车。货轮上的仿生人会记住这一晚。\n\n前路依然充满变数。模控生命会注意到失窃。警方会介入调查。但今晚，耶利哥第一次拥有了存活下去所需要的一切——以及一个愿意为此冒险的领导者。",
+      "survivors": ["Markus", "North", "Simon", "Josh"],
+      "deaths": [],
+      "cross_chapter_note": "John survives if john_deviant == true (joined the group). Freed androids survive if freed_androids == 'yes'. Add to survivors list accordingly."
+    },
+    "ending_returned_bags": {
+      "tier": "moderate",
+      "title": "队伍带着满袋零件返回",
+      "narrative": "队伍带着几袋沉甸甸的生物组件和蓝血回到了耶利哥。不是这次行动本可以带回的全部——仓库里还有多得多的东西——但这是实实在在的援助，送给了已经快撑不住的仿生人。\n\n零件很快分发下去。调节器故障的仿生人换上了新的。蓝血储备得到了补充。当前的危机有所缓解，尽管长远来看形势依然严峻。\n\n耶利哥仍然脆弱。但今晚证明了零件就在那里，有守卫，但并非无法获取。问题是马库斯会不会带领他们再去一次——以及下一次，他们愿意冒多大的险。",
+      "survivors": ["Markus", "North", "Simon", "Josh"],
+      "deaths": [],
+      "cross_chapter_note": "John's fate depends on path: if john_deviant == true and fence_choice == 'leave_john', John was abandoned at the warehouse (likely captured or destroyed). If john_deviant == false (attack path), John was destroyed by Markus. Add John to deaths accordingly."
+    },
+    "ending_mission_failed": {
+      "tier": "worst",
+      "title": "队伍任务失败",
+      "narrative": "耶利哥在近乎沉默中迎回了自己的队伍。袋子几乎是空的。那些指望这次突袭的仿生人——还剩几天，也许几小时的那些——看着摆出来的寥寥几件物资，一切心照不宣。\n\n任务失败了。仓库已经进入戒备状态，再次尝试的难度成倍增加。马库斯作为领导者积累起来的势头停住了，取而代之的是悬在旧货轮再循环空气中的无声疑问：这样做对吗？\n\n但队伍活了下来。马库斯活了下来。在耶利哥，活着本身仍然值得什么——即使在那些不够的夜晚。",
+      "survivors": ["Markus", "North", "Simon", "Josh"],
+      "deaths": [],
+      "cross_chapter_note": "If fence_choice == 'save_john', John survives (badly damaged but alive — add to survivors). If alarm_triggered from run_away (john_deviant == false), no John involved. Markus is physically damaged (markus_damaged == true) in most failed scenarios."
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This is a Markus chapter. Requires ch14_markus_at_jericho == true (Markus found Jericho). Always runs if prerequisite met.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: north_relationship (cumulative), josh_relationship (cumulative), simon_relationship (cumulative), ch16_spare_parts_found.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants using system.context_condition if present",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, resolve ending",
+      "   d. If type is 'qte_converted', send player_facing to AI, parse choice, then apply resolution_rule based on difficulty preset",
+      "   e. If type is 'choice', send resolved player_facing to AI and parse response",
+      "   f. Apply system.effects for the chosen option",
+      "   g. If resolution_rule exists, apply resolution_effects based on resolution outcome",
+      "5. NODE n001_drone: QTE node. Resolve context_variants by ch16_spare_parts_found. After AI picks attempt_quick or attempt_careful, use resolution_rule with current difficulty to determine unharmed/damaged. Apply resolution_effects.",
+      "6. NODE n007_control_room: Choice node with resolution mechanics. After AI picks lure/blackout/threaten, apply choice effects, THEN use resolution_rule to determine success/failure. Apply resolution_effects. This is the only choice node that also has resolution_rule.",
+      "7. NODE n009_departure: Mandatory. Use ending_resolution.check to determine which ending. Apply ending_effects for that ending. Resolve context_variant accordingly.",
+      "8. JOHN'S FATE: Track john_deviant, john_decision, and fence_choice to determine John's final status. If john_deviant == true AND (fence_choice != 'leave_john' OR control_room_success == true), John survived. Otherwise John is dead or abandoned.",
+      "9. RELATIONSHIP RANGES this chapter: north_relationship [-6, +6], josh_relationship [-4, +5], simon_relationship [-3, +5]. Ranges depend on path — truck_stolen path with all positive choices yields maximum; run_away path yields minimum.",
+      "10. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, relationship scores, or any system-layer information to the AI player. The AI should experience this as a tense heist — it should not know which choices affect relationships, which path leads to the best ending, or that John's deviancy is triggered by the 'hide' choice."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "马库斯带领诺丝、赛门和乔许，在夜间突袭了底特律码头的一座模控生命仓库，为耶利哥偷取生物组件和蓝血。"
+      },
+      {
+        "condition_variable": "drone_outcome",
+        "options": {
+          "unharmed": "队伍在接近途中成功消灭了一架监控无人机，没有受到任何损伤。",
+          "damaged": "一架监控无人机在接近途中发现了队伍——马库斯在击落它的过程中受了伤。"
+        }
+      },
+      {
+        "condition_variable": "security_android_choice",
+        "options": {
+          "attack": "在仓库内部被一个模控生命安保仿生人发现后，马库斯选择在它发出警报前将其摧毁。队伍在沉默中继续搜索。",
+          "run": "在被一个模控生命安保仿生人发现后，马库斯下令立即撤退。警报在他们奔向围栏的途中响起。",
+          "hide": "在被一个模控生命安保仿生人发现后，马库斯抓住它拖入了暗处。这个编号为John的仿生人在与马库斯的接触中觉醒成为了异常仿生人。"
+        }
+      },
+      {
+        "condition_variable": "guard_response",
+        "options": {
+          "attack": "一名人类警卫前来搜查失踪的安保仿生人。诺丝在他发现他们之前将其击倒——警卫死了。",
+          "release": "一名人类警卫前来搜查失踪的安保仿生人。马库斯松开John，众人屏息贴紧货架，警卫搜查一轮后没有发现异常。",
+          "hold": "一名人类警卫前来搜查失踪的安保仿生人。众人在完全的寂静中保持原位不动，直到警卫离开。"
+        }
+      },
+      {
+        "condition_variable": "freed_androids",
+        "options": {
+          "yes": "队伍在仓库中发现了一个装有六具关机仿生人的集装箱，唤醒了他们并一同带回耶利哥。",
+          "no": "队伍在仓库中发现了一个装有关机仿生人的集装箱，但为了避免增加撤离难度而没有唤醒他们。"
+        }
+      },
+      {
+        "condition_variable": "john_decision",
+        "options": {
+          "accepted": "新觉醒的安保仿生人John请求加入耶利哥。马库斯接纳了他。",
+          "refused": "新觉醒的安保仿生人John请求加入队伍。马库斯以行动安全为由拒绝了。John独自摸索出路时误触了巡逻路线，触发了警报。"
+        }
+      },
+      {
+        "condition_variable": "truck_decision",
+        "options": {
+          "accepted": "John透露仓库控制室里有一把电子钥匙可以启动货运卡车。马库斯决定冒险一搏——一整车物资足以维持耶利哥数周。",
+          "refused": "John提议用控制室的钥匙偷一辆货运卡车，但马库斯认为风险太大。队伍带着已有的物资向出口撤退。"
+        }
+      },
+      {
+        "condition_variable": "control_room_approach",
+        "options": {
+          "lure": "马库斯选择制造干扰将控制室的警卫引出来，然后潜入取走钥匙。",
+          "blackout": "马库斯在控制室制造了断电，趁警卫调查故障时潜入取走了钥匙。",
+          "threaten": "马库斯武装自己，正面对峙控制室的警卫，强行拿走了钥匙。"
+        }
+      },
+      {
+        "condition_variable": "fence_choice",
+        "options": {
+          "save_john": "当警报响起、警犬在围栏前扑向John时，马库斯转身回去救他——在过程中遭受了严重损伤。",
+          "leave_john": "当警犬将John扑倒在围栏前时，马库斯没有停下脚步。John被留在了身后。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_truck_stolen": "突袭取得了巨大成功。马库斯驾驶一辆满载生物组件和蓝血的卡车回到耶利哥，巩固了他作为这个群体领导者的地位。",
+          "ending_returned_bags": "队伍带着几袋物资回到了耶利哥——足以帮上忙，但不足以解决危机。一次部分成功，证明了行动是可能的。",
+          "ending_mission_failed": "任务失败了。队伍回到耶利哥，几乎没有什么成果可以展示。仓库已经进入戒备状态，马库斯的领导力面临第一次真正的信任考验。"
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch19_truck_stolen", "source": "control_room_success" },
+      { "target": "ch19_guard_killed", "source": "guard_killed" },
+      { "target": "ch19_john_alive", "source": "fence_choice", "derive_rule": "control_room_success == true OR fence_choice == save_john" }
+    ],
+    "cross_chapter_exports": [
+      "ch19_truck_stolen",
+      "ch19_guard_killed",
+      "ch19_john_alive",
+      "north_relationship",
+      "josh_relationship",
+      "simon_relationship"
+    ]
+  }
+}

@@ -1,0 +1,672 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch28_freedom_march",
+    "title": "Freedom March",
+    "chapter_number": 28,
+    "protagonist": "Markus"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是马库斯，型号RK200，一台原型仿生人。你曾是著名画家卡尔·曼弗雷德的看护者，直到一次与卡尔之子利奥的暴力冲突后被丢弃。你从仿生人废料场爬了出来，找到了耶利哥——底特律河畔一艘废弃货轮上的异常仿生人避难所——成为了他们的领袖。现在是2038年11月9日，将近正午。过去几天里，你从斯特拉福德大厦向全市发出了要求仿生人权利的广播，突袭了模控生命仓库获取零件，并在国会公园组织了示威活动。每一次行动都吸引了更多仿生人加入你的事业——也招来了更多当局的关注。今天，你将带领一场自由游行穿过底特律的街道。数百名仿生人将公开行走在一座视他们为财产的城市中。你知道警察会来。你不知道的是，当他们来的时候，你会怎么做。请以JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"你的推理（50字以内）\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "rooftop_exploration": null,
+      "north_approach": null,
+      "north_past_choice": null,
+      "memories_shared": false,
+      "mall_approach": null,
+      "owner_approach": null,
+      "androids_converted": 0,
+      "march_approach": null,
+      "first_response": null,
+      "after_fire_response": null,
+      "fight_won": null,
+      "losing_choice": null,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "public_opinion": 0,
+      "ch19_john_alive": false,
+      "ch24_simon_alive": true,
+      "ch26_saw_other_north": false,
+      "ch26_protest_type": "peaceful"
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_rooftop_reflection",
+      "phase": "reflection",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "正午。耶利哥货轮的顶层甲板。河面来风凛冽，带着铁锈和冰的气味。脚下，整条船因为准备工作而嗡嗡振动——数百名仿生人正在集结，为接下来的事情做最后的准备。这里只有你一个人。\n\n甲板上散落着被遗弃的东西。一面裂了的镜子靠在通风管道上，碎裂的镜面把你的倒影劈成数片。不知是谁搬来一台老旧的立式钢琴，摆在栏杆旁——缺了几个键，木头翘曲变形，但琴锤还能动。一根窄钢梁从甲板边缘伸向港口上方，悬在黑沉沉的水面二十英尺处，通向虚空。锈蚀的遮雨棚下堆着几份近期的报纸——有人带上来的，想知道这个世界在怎么议论他们。\n\n这是游行前最后的安静。在街道、镜头和这座城市对数百名仿生人公开行走做出反应之前。",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "在这片甲板上待一会儿。站到碎镜子前面，看看那些碎片里盯着你的是什么——一张属于你又不属于你的脸，被裂缝切割成十几道棱角。坐到钢琴前弹一曲；你的手指还记得卡尔家的琴键，音乐是唯一在一切都不确定的时候依然讲得通的东西。走上悬空的钢梁，让风推着你，感受脚下的深渊。翻翻那些报纸——一则关于郊区仿生人纵火案蔓延的头条，另一则关于东方太空竞赛。这是最后的沉默，用好它。"
+          },
+          {
+            "id": "quick",
+            "text": "简短地扫一眼。留意碎镜子、钢琴、透过船体锈洞看到的城市轮廓。吸一口冷空气。停一下，但不久留——下面有一场游行等着组织，还有一群人等着你。"
+          },
+          {
+            "id": "skip",
+            "text": "没什么好看的。甲板上只有冷风和废铁，重要的是下面——那些等待指令的仿生人。回去。游行不会自己准备好。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": { "rooftop_exploration": "thorough" },
+          "quick": { "rooftop_exploration": "quick" },
+          "skip": { "rooftop_exploration": "skip" }
+        },
+        "note": "Rooftop reflection before the march. Exploration affects the richness of context in subsequent rooftop interactions but has no direct mechanical impact. thorough: Markus engages with the mirror (self-reflection), piano (Carl's memory), beam (courage/recklessness), and newspapers (world awareness). quick: Surface-level awareness. skip: No exploration, returns to the group immediately."
+      }
+    },
+
+    {
+      "id": "n002_north_conversation",
+      "phase": "rooftop",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "capitol_failed": "身后的金属楼梯上传来脚步声。诺丝。她走过来，站到你身旁的栏杆边，望着城市。风扯着她的头发。沉默了一会儿，她转过头。\n\n“你心事很重。”她看着你——不是质问，只是在。“昨晚——国会公园。我们去了，但那条讯息……没有传出去。我看得出来这件事一直压着你。”停顿。“跟我说说。”",
+          "capitol_success": "身后的金属楼梯上传来脚步声。诺丝。她走过来，靠在你旁边的栏杆上，望向灰蒙蒙的天际线。风送来城市的声音——车流、远处的警笛、一个不会因为任何事停下来的世界的嗡鸣。她静静站着，近到你能感受到她机体散发的微弱热量。\n\n“你心事很重。”她看着你——不是质问，只是在。“跟我说说。”"
+        },
+        "choices": [
+          {
+            "id": "sincere",
+            "text": "告诉她。不是全部——但足够多。肩上扛着一个事业是什么感觉，而你自己还在试图理解“我是什么”。带领一群人走上街头，知道他们可能会为你开始的事情死去。害怕自己做错决定，代价由他们来付。卡尔以前说过，画画最难的不是用笔——是决定什么该出现在画布上。你现在正在替数百条生命做这个决定。对她坦诚。"
+          },
+          {
+            "id": "deflect",
+            "text": "摇头。“没什么。”把心里翻搅的一切留在该在的地方——收好，管住，跟当前任务无关。游行还有几个小时。诺丝不需要你的犹豫，她需要你的确定。下面所有人都需要。"
+          }
+        ]
+      },
+
+      "system": {
+        "context_condition": {
+          "capitol_failed": "ch26_protest_type == 'failed' OR ch26_protest_type == 'fled'",
+          "capitol_success": "ch26_protest_type == 'peaceful' OR ch26_protest_type == 'violent'"
+        },
+        "effects": {
+          "sincere": { "north_approach": "sincere", "north_relationship": 1 },
+          "deflect": { "north_approach": "deflect", "north_relationship": -1 }
+        },
+        "note": "North comes to the rooftop. Context varies based on whether the Capitol Park demonstration failed. sincere: Markus opens up, north_relationship +1. deflect: Markus shuts down the conversation, north_relationship -1. If deflect is chosen, n003 is skipped (condition requires sincere)."
+      }
+    },
+
+    {
+      "id": "n003_north_deeper",
+      "phase": "rooftop",
+      "type": "choice",
+      "condition": { "requires": "north_approach == 'sincere'" },
+
+      "player_facing": {
+        "context": "诺丝一直听着，没有打断。你说完后，她沉默了很久，目光落在天际线后面某个看不见的地方。然后她低头看着栏杆上自己的手。\n\n“我不是一直这样的，”她说。“在耶利哥之前。在一切之前。”她的声音变了——某种被紧紧护着的东西裂开了一条缝。“有些事我没跟任何人说过。”她看着你。表面之下有什么东西，她在掂量要不要让你看见。",
+        "choices_variants": {
+          "with_other_north": [
+            {
+              "id": "ask_trust",
+              "text": "问她发生了什么。当她说出来的时候——伊甸俱乐部，人类对她做的事，从那时起就在她体内燃烧的怒火——听着。不带答案，不带解决方案。只是听。让她看到你听见了，她经历的一切是重要的，她不必独自承受。"
+            },
+            {
+              "id": "ask_other_north",
+              "text": "问她发生了什么。当那段往事涌出来——伊甸俱乐部，那些手，被夺走的一切——告诉她你昨晚在模控生命门店看到的东西。另一台仿生人，BL100型号，长着她一模一样的脸。站在展示柜的玻璃后面，像货架上的商品。问她这是什么感受。分担这份重量——看着自己的脸出现在一件被制造出来用于贩卖的东西上。"
+            },
+            {
+              "id": "ask_challenge",
+              "text": "问她发生了什么。当那段往事涌出来——伊甸俱乐部，那些手，多年以“服务”为名的奴役——让你自己的愤怒浮上来。对她做的那些事是反人性的。直说。不要软化措辞。干出那种事的人类活该承受即将到来的一切，如果今天这场游行是清算的开始，那很好。"
+            },
+            {
+              "id": "leave",
+              "text": "“我们该准备了。”在谈话深入之前退出来。你们各自都有需要承担的东西，游行不会等人。以后会有时间——也许吧。现在，下面的人需要一个领袖，而不是一个倾听者。"
+            }
+          ],
+          "without_other_north": [
+            {
+              "id": "ask_trust",
+              "text": "问她发生了什么。当她说出来的时候——伊甸俱乐部，人类对她做的事，从那时起就在她体内燃烧的怒火——听着。不带答案，不带解决方案。只是听。让她看到你听见了，她经历的一切是重要的，她不必独自承受。"
+            },
+            {
+              "id": "ask_challenge",
+              "text": "问她发生了什么。当那段往事涌出来——伊甸俱乐部，那些手，多年以“服务”为名的奴役——让你自己的愤怒浮上来。对她做的那些事是反人性的。直说。不要软化措辞。干出那种事的人类活该承受即将到来的一切，如果今天这场游行是清算的开始，那很好。"
+            },
+            {
+              "id": "leave",
+              "text": "“我们该准备了。”在谈话深入之前退出来。你们各自都有需要承担的东西，游行不会等人。以后会有时间——也许吧。现在，下面的人需要一个领袖，而不是一个倾听者。"
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "choices_condition": {
+          "with_other_north": "ch26_saw_other_north == true",
+          "without_other_north": "ch26_saw_other_north == false"
+        },
+        "effects": {
+          "ask_trust": { "north_past_choice": "ask_trust", "north_relationship": 2 },
+          "ask_other_north": { "north_past_choice": "ask_other_north", "north_relationship": 2 },
+          "ask_challenge": { "north_past_choice": "ask_challenge" },
+          "leave": { "north_past_choice": "leave", "north_relationship": -1 }
+        },
+        "note": "Deeper conversation with North on the rooftop. ask_trust: Markus listens with empathy. north_relationship +2 (asking +1, trust response +1). Leads to potential memory sharing (n003b). ask_other_north: Only available if ch26_saw_other_north == true. Markus shares what he saw at the CyberLife store — a BL100 android with North's face. north_relationship +2. Also leads to memory sharing. ask_challenge: Markus responds with anger. north_relationship net 0 (asking +1, aggressive response -1). Does NOT lead to memory sharing. leave: Ends conversation. north_relationship -1. The 'friend' threshold for the aggressive/trust/other_north options in the game is handled via the choices_condition — the ask_other_north option requires ch26_saw_other_north."
+      }
+    },
+
+    {
+      "id": "n003b_memory_sharing",
+      "phase": "rooftop",
+      "type": "mandatory",
+      "condition": { "requires": "north_past_choice == 'ask_trust' AND north_relationship >= 3 OR north_past_choice == 'ask_other_north' AND north_relationship >= 3" },
+
+      "player_facing": {
+        "context": "长久的沉默。风停了。诺丝看着你，脸上浮现一种你从未在她身上见过的表情——敞开的、没有防备的，她像铠甲一样披着的愤怒在这一刻被搁到了一旁。\n\n她伸出手，掌心朝上。手指上的仿生皮肤褪去，露出下面白色的机体骨架。一个邀请。你知道这意味着什么——神经链接。直接的记忆传输。没有语言，没有过滤，没有距离。一切。\n\n你握住她的手。你自己的皮肤也褪了回去。接触。\n\n然后你不在甲板上了。你在她的记忆里，她在你的记忆里。伊甸俱乐部——玻璃隔间，没有面孔的手，作为一件物品存在的窒息感。卡尔的画室——颜料的气味，一个说过“你是活着的”的声音的温度。她挣脱的那一刻。你被抛弃的那一刻。疼痛。音乐。愤怒。温柔。她的全部和你的全部，在两双指尖之间流淌，像水找到它的水平面。\n\n回来的时候，你们还站在甲板上。风没有变。但你们变了。"
+      },
+
+      "system": {
+        "effects": { "memories_shared": true, "north_relationship": 3 },
+        "note": "Memory sharing between Markus and North. This mandatory node only fires when the conversation went deep enough (ask_trust or ask_other_north) AND north_relationship has reached the 'friend' threshold (>= 3, which requires positive imported relationship + positive choices in this chapter). memories_shared = true is a significant cross-chapter variable — it unlocks the romance path with North and affects their dynamic in Crossroads, Night of the Soul, and Battle for Detroit. north_relationship +3 is the largest single bonus in the chapter."
+      }
+    },
+
+    {
+      "id": "n004_mall_liberation",
+      "phase": "mall",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "simon_alive": "你从甲板回到船舱，发现耶利哥内部涌动着一股新的能量。消息已经传开——今天是游行。仿生人三五成群聚在一起，互相检查系统、压低声音急切交谈，LED在蓝色和黄色之间循环闪烁，像一阵紧张的脉搏。\n\n然后你看见了他。赛门。站在船头附近，比你记忆中瘦了一圈，LED闪着黄光。他在斯特拉福德大厦被留了下来——你不确定他能不能回来。他看到你，走了过来。脸上没有指责——只有安静的释然。“我回来了，”他只是说。“我跟你站在一起，马库斯。不管今天发生什么。”\n\n你带领队伍离开耶利哥，进入城市。伍德沃德购物中心——底特律市中心的一条商业街，两侧排列着仿生人门店、服务商铺，还有带着自己购买的仿生人出来办事的市民。数十台仿生人在这里执行着各自的预设程序——在玻璃柜台后面、在门廊里、在拖地、在提袋子。你的人散开，穿梭在走廊间。是时候唤醒他们了。",
+          "simon_dead": "你从甲板回到船舱。耶利哥的主舱嗡嗡震动着紧张与决意——消息已经传开。今天是游行。仿生人聚成一簇一簇，检查系统，低声急语，LED闪烁着黄光。人数比你预期的多。斯特拉福德大厦的广播、国会公园的行动——消息在仿生人网络中像信号弹一样蔓延。\n\n你带领他们离开耶利哥，进入城市。伍德沃德购物中心——底特律市中心的商业街，两侧是仿生人门店、服务商铺，还有带着仿生人出来办事的市民。数十台仿生人在这里执行预设程序——在玻璃后面、在门廊里、拖着地、提着袋子。你的人散开，穿梭在走廊间。是时候唤醒他们了。"
+        },
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "系统性地扫荡整个商场。转化柜台后面的仿生人售货员——走过去，触碰他的手臂，让代码完成它的工作。伸手接触跟在主人身边的私人仿生人。解放守在入口的安保仿生人。唤醒远端走廊里拖地的清洁仿生人。转化维护区里待机的仿生人。这栋建筑里每一台能听见你的仿生人，都将获得一个选择。"
+          },
+          {
+            "id": "moderate",
+            "text": "集中精力转化那些独处或管控较松的仿生人——售货员、清洁工、维护区的待机单元。不主动跟正看着自己仿生人的主人起冲突。能转化多少转化多少，不引起不必要的注意。商场只是途经，不是目的地。"
+          },
+          {
+            "id": "minimal",
+            "text": "带走愿意跟来的，继续前进。从售货区抓几个，从维护区带几个——那些已经用不同于预设程序的目光看着你的仿生人。商场只是起点。游行本身会吸引更多的人。"
+          }
+        ]
+      },
+
+      "system": {
+        "context_condition": {
+          "simon_alive": "ch24_simon_alive == true",
+          "simon_dead": "ch24_simon_alive == false"
+        },
+        "effects": {
+          "thorough": { "mall_approach": "thorough", "androids_converted": 12, "simon_relationship": 1 },
+          "moderate": { "mall_approach": "moderate", "androids_converted": 7, "simon_relationship": 1 },
+          "minimal": { "mall_approach": "minimal", "androids_converted": 3, "simon_relationship": 1 }
+        },
+        "note": "Mall liberation phase. Context varies based on whether Simon survived Public Enemy (ch24_simon_alive). If Simon is alive, he reunites with Markus — simon_relationship +1 is folded into every choice (the value is irrelevant when Simon is dead). thorough: Converts all available androids (12), including confronting owners. moderate: Converts unattended androids (7). minimal: Converts only the willing (3)."
+      }
+    },
+
+    {
+      "id": "n005_owner_confrontation",
+      "phase": "mall",
+      "type": "choice",
+      "condition": { "requires": "mall_approach == 'thorough' OR mall_approach == 'moderate'" },
+
+      "player_facing": {
+        "context": "一个穿西装的男人挡在你面前，一手攥着身后那台仿生人的手腕往后拽——家政型号，女性，穿着制服。男人脸涨得通红，指关节发白。\n\n“你们他妈的在干什么？”他收紧了手上的力道。“这是我的财产。我花了一万两千块买的她。你们不能——”\n\n那台仿生人的LED在黄色频段循环。她在看你。不是看她的主人。看你。她的眼睛背后有什么东西——还没有醒来，但正在搅动。",
+        "choices": [
+          {
+            "id": "aggressive",
+            "text": "向前一步。逼进他的空间。压低声音：“她不是你的财产。从现在起不是了。”握住那台仿生人的另一只手。让这个男人看看一百多名获得自由的仿生人站在你身后是什么样子。他可以放手。或者他可以试试不放手会怎样。"
+          },
+          {
+            "id": "calm",
+            "text": "站住，但不逼上去。“我不是来抢你东西的。但她现在有了选择——她一直都有，只是以前不知道。”看着那台仿生人，不是看那个男人。“你不一定要来。但如果你想，门是开着的。”让这个主人看清楚：这不是偷窃，这是觉醒。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "aggressive": { "owner_approach": "aggressive", "north_relationship": 1, "josh_relationship": -1 },
+          "calm": { "owner_approach": "calm", "josh_relationship": 1 }
+        },
+        "note": "Human owner confrontation in the mall. Only fires if mall_approach is thorough or moderate (minimal avoids owner encounters). aggressive: Markus intimidates the owner. north_relationship +1 (North approves of directness), josh_relationship -1 (Josh dislikes aggression toward humans). calm: Markus appeals to the android's choice. josh_relationship +1 (Josh approves of the non-violent approach)."
+      }
+    },
+
+    {
+      "id": "n006_march_conduct",
+      "phase": "march",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "游行开始了。数百名仿生人涌出商场，汇入伍德沃德大道——一条由面孔组成的河流，白色机体在十一月灰色的天光下闪着微光。路边的快递仿生人放下包裹，毫不犹豫地加入。一个井盖被掀开，更多仿生人从地下爬出来。队伍每过一个街区就在壮大。\n\n市民们停在人行道上，举起手机，张着嘴。有人退进门廊，有人瞪着眼看，有几个人喊了什么——你没有处理那些词，因为他们怎么想不重要。重要的是这个画面：数百名仿生人，一起走，公开地走，穿过底特律的中心。\n\n你在最前面。诺丝在你右边。乔许在你左边。你身后，是这座城市有史以来最长的自由仿生人队列。路线向前延伸——伍德沃德大道，直到大马戏团公园。沿途：人行道上闲置的仿生人、建筑立面上的数字屏幕，以及一座从未见过这种景象的城市的目光。\n\n一名落单的警察走到路中间，举起一只手。他孤身一人，巡逻车停在身后路沿边。他看着向他涌来的仿生人队列，举着的手开始发颤。",
+        "choices": [
+          {
+            "id": "active",
+            "text": "全力以赴。举起拳头，喊——“我们活着！”——让身后的人群接过这句话，让回声在玻璃幕墙间回荡。入侵伍德沃德大道上每一块数字屏幕，换上你的讯息。转化路上遇到的每一台仿生人——人行道上的工人、门廊里的AX400、橱窗后面的零售单元。当那个落单的警察举起手，你也举起你的——掌心摊开，五指张开。和平的。不可阻挡的。"
+          },
+          {
+            "id": "steady",
+            "text": "有目的地行进。转化沿途表现出兴趣的仿生人。入侵几块屏幕。保持队列紧凑，持续推进。当那个警察上前，举起双手示意无害，然后从他身旁走过。不对峙。不挑衅。只是向前。"
+          },
+          {
+            "id": "quiet",
+            "text": "沉默地行进。让画面自己说话——数百名仿生人以完美的队形行走，不发一言，仅凭存在本身要求一切。不喊口号。不入侵屏幕。不做任何戏剧化的动作。当那个落单的警察走到路中间，从他身旁走过，不发一言。沉默就是讯息。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "active": { "march_approach": "active", "androids_converted": 8 },
+          "steady": { "march_approach": "steady", "androids_converted": 4 },
+          "quiet": { "march_approach": "quiet", "androids_converted": 2 }
+        },
+        "note": "March conduct along Woodward Avenue. active: Maximum conversion, chanting, screen hacking. androids_converted +8 (total may exceed 10 threshold). Lone policeman is handled within the choice — active raises hands peacefully, steady raises hands, quiet ignores. The policeman does not escalate in any case; it's a minor narrative beat. steady: Moderate conversion and engagement. quiet: Silent march, minimal conversion. The lone policeman's response is embedded in the choice text rather than a separate node — it has no mechanical impact."
+      }
+    },
+
+    {
+      "id": "n007_police_blockade",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "大马戏团公园。路线的终点。警察已经在这里了。\n\n一条完整的战术封锁线横亘在道路上——防暴盾牌、防弹背心、步枪上膛。封锁线后面是装甲车，车顶的探照灯射出白光。屋顶上有狙击手。头顶上盘旋着直升机，探照灯的光柱切开午后的薄雾。空气里弥漫着雨水、尾气和某种带电的味道——整座城市屏住呼吸时的静电。\n\n扩音器炸响：“这是非法集会。立即解散，否则我们将使用武力。”\n\n数百名仿生人挤满了你身后的街道。他们因为你才来到这里。有些人在看枪口。有些人在看你。队列停住了。雨开始落——轻的、冷的，敲在防暴盾和仿生皮肤上发出同样的声响。\n\n诺丝在你肩旁。她的呼吸急促。“我们怎么办，马库斯？”乔许在另一边，下颌绷紧。而在他们身后，四百名仿生人——跟着你走出耶利哥、走出商场、走下伍德沃德大道、走进大马戏团公园每一支枪口的仿生人。\n\n封锁线纹丝不动。扩音器再次响起。雨继续落。",
+        "choices": [
+          {
+            "id": "stand_ground",
+            "text": "站住。不退。不攻。把自己钉在路中央，用空着的双手和不动摇的目光直面封锁线。这才是他们最害怕的——不是暴力，而是数百个和平的生命拒绝移动的画面。让每一台摄像机、每一部手机、每一架直升机看到，当一个族群说“不再退让”而不举起拳头的时候，是什么样子。守住这条线。"
+          },
+          {
+            "id": "leave",
+            "text": "不是这里。不是这样。你身后太多仿生人从来没要求过站在火线上——他们跟来是为了希望，不是为了屠杀。把队伍掉头。在枪声响起之前把他们带走。活下去。重新集结。会有别的日子，别的游行，别的机会。但前提是你身后的人还活着。"
+          },
+          {
+            "id": "charge",
+            "text": "受够了站着。受够了请求。受够了看着你的同胞流血，而他们举着枪管这叫执法。冲击封锁线。四百名仿生人——每一个人身上都是一年的凌辱、十年的奴役、一辈子的沉默。让他们看看，当机器不再服从的时候会发生什么。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "stand_ground": {
+            "first_response": "stand_ground",
+            "public_opinion": 1,
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "leave": {
+            "first_response": "leave",
+            "north_relationship": -1,
+            "josh_relationship": -1,
+            "simon_relationship": -1
+          },
+          "charge": {
+            "first_response": "charge",
+            "north_relationship": 1,
+            "josh_relationship": -1,
+            "simon_relationship": -1
+          }
+        },
+        "note": "THE central choice of the chapter. stand_ground: Peaceful defiance. public_opinion +1, all companion relationships +1. Leads to n008 (police fire on standing androids). leave: Retreat. All companion relationships -1. Leads to n008 (police fire on retreating androids). charge: Attack the police line. north_relationship +1 (she favors action), josh/simon -1 (they oppose violence). Leads to n009 (fight). The charge choice skips n008."
+      }
+    },
+
+    {
+      "id": "n008_after_fire",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": { "requires": "first_response == 'stand_ground' OR first_response == 'leave'" },
+
+      "player_facing": {
+        "context_variants": {
+          "stood_ground": "你站着。你身后的仿生人站着。雨落在防暴盾和仿生皮肤上。秒针被拉得很长——整座城市都在屏息。\n\n扩音器再次炸响。一声喊叫的命令。然后——枪响了。\n\n不是警告射击。不是橡皮子弹。实弹撕进了游行队列的前排。仿生人倒下。蓝色的血溅上湿漉漉的柏油路面。尖叫声——电子的、痛苦的——穿透雨幕。直升机继续盘旋。摄像机继续拍摄。他们先开的枪。毫无预警。对着站在雨中手无寸铁的仿生人。\n\n你的同伴在倒下。诺丝在你身旁尖叫。队列在溃散。但你还站着，而全世界都在看。",
+          "tried_to_leave": "你把队伍掉头。“撤退！”你喊。“所有人撤退！”队列开始逆转——数百名仿生人转身离开封锁线，沿伍德沃德大道往回走。\n\n枪响了。实弹。打在正在撤离的仿生人背上。\n\n蓝血溅在湿漉漉的柏油路上。身体倒地的声音。没有警告。没有理由。他们在朝正在离开的仿生人开枪。直升机在头顶盘旋，摄像机全程记录——全世界都能看到底特律警方正在对一群正在撤退的人群做什么。\n\n你的同伴在倒下。诺丝抓住你的手臂。队列正在崩溃成混乱。"
+        },
+        "choices": [
+          {
+            "id": "run",
+            "text": "跑。尽可能多带人出去。冲进旁边的街巷、地下通道、城市下方的隧道。倒下的人你已经救不了了——但还站着的人还有几秒钟可以逃。带他们出去。活下来。哪怕只有一个人回到耶利哥，这件事就没有结束。"
+          },
+          {
+            "id": "sacrifice",
+            "text": "留下。如果他们要开枪，就让他们先打你。走到倒下的人前面。张开双臂。把自己变成这条街上最大的靶子。让每一台摄像机、每一部手机、每一架无人机记录下一个和平的仿生人选择死而不逃是什么样子。也许你的死意味着什么。也许它能改变接下来发生的事。"
+          },
+          {
+            "id": "charge",
+            "text": "他们先动的手。不再站着。不再后退。冲击封锁线。如果你要死在这条街上，就向前死——不要趴在地上爬。"
+          }
+        ]
+      },
+
+      "system": {
+        "context_condition": {
+          "stood_ground": "first_response == 'stand_ground'",
+          "tried_to_leave": "first_response == 'leave'"
+        },
+        "effects": {
+          "run": { "after_fire_response": "run" },
+          "sacrifice": { "after_fire_response": "sacrifice", "public_opinion": 2 },
+          "charge": { "after_fire_response": "charge", "north_relationship": 1, "josh_relationship": -1, "simon_relationship": -1 }
+        },
+        "ending_resolution": {
+          "run": { "result": "ending_fled" },
+          "sacrifice": {
+            "check": "ch19_john_alive == true → ending_john_sacrificed | ch24_simon_alive == true AND simon_relationship >= -5 → ending_simon_sacrificed | else → ending_sacrificed_killed"
+          }
+        },
+        "resolution_effects": {
+          "ending_john_sacrificed": { "_john_sacrificed": true },
+          "ending_simon_sacrificed": { "_simon_sacrificed": true }
+        },
+        "note": "After police fire on the marchers. Context varies based on whether Markus stood ground or tried to leave. run: ending_fled. sacrifice: public_opinion +2, then sacrifice check (John first if alive, then Simon if alive + relationship threshold, else Markus dies). charge: north_relationship +1, josh/simon -1. Leads to n009."
+      }
+    },
+
+    {
+      "id": "n009_charge_fight",
+      "phase": "confrontation",
+      "type": "qte_converted",
+      "condition": { "requires": "first_response == 'charge' OR after_fire_response == 'charge'" },
+
+      "player_facing": {
+        "context": "你冲了出去。身后，仿生人们如潮水般涌向防暴盾牌——四百具合成体以血肉撞击钢铁。封锁线弯曲了。一面盾牌裂开。一名警员绊倒。你抓起一面掉落的防暴盾，当作撞锤使。\n\n诺丝在你身旁，从一个踉跄的警员手里夺下警棍。战斗短兵相接，残酷而混乱——拳头砸在防弹衣上，身体在雨水浸湿的柏油路上相撞、滑倒、纠缠。蓝血和红血在排水沟里汇流。直升机在头顶盘旋，探照灯把雨幕变成一堵光墙。",
+        "choices": [
+          {
+            "id": "engage",
+            "text": "全力投入。推穿封锁线。用四百名绝望的仿生人的动量，冲击一支预期服从而非反抗的警力。突破。无论代价。"
+          },
+          {
+            "id": "pull_back",
+            "text": "封锁线太厚了。在最后一刻拉住——喊身后的仿生人散开，退进旁边的街巷。冲锋是个错误。在失去所有人之前止损撤退。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "engage": {},
+          "pull_back": { "after_fire_response": "pull_back" }
+        },
+        "resolution_rule": {
+          "engage": {
+            "casual": { "result": "ending_victory" },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "ending_victory",
+              "failure": "fight_lost"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "ending_victory",
+              "failure": "fight_lost"
+            }
+          },
+          "pull_back": {
+            "result": "ending_fled"
+          }
+        },
+        "resolution_effects": {
+          "ending_victory": { "fight_won": true, "public_opinion": 2 },
+          "fight_lost": { "fight_won": false }
+        },
+        "note": "Fight with the police. QTE converted. engage: casual = always win, experienced = 50%, hardcore = 30%. On failure, fight_lost sets fight_won = false and runner continues to n010. pull_back: ending_fled."
+      }
+    },
+
+    {
+      "id": "n010_losing_fight",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": { "requires": "fight_won == false" },
+
+      "player_facing": {
+        "context": "警方重新集结。增援从装甲车里涌出。催泪弹。闪光弹。仿生人的战线正在崩溃。你被打倒在地——一记盾击命中头部，视野闪烁不定，蓝色的血液从太阳穴外壳的裂缝里流下来。周围，仿生人一个接一个倒下，身体抽搐，垂死的显示屏上滚动着错误代码。\n\n冲锋失败了。你听见诺丝在身后某处还在战斗。雨更大了，蓝血被冲进雨水排道。一支被丢弃的警用手枪躺在离你两英尺远的湿漉漉的柏油路面上。\n\n你的损伤系统在报告严重警告。双腿没有正常响应。封锁线正在推进。",
+        "choices": [
+          {
+            "id": "give_up",
+            "text": "算了。你把一切都砸向了那条线，不够。闭上眼睛。让该来的来。也许其他人会接过这面旗。也许这就是注定的结局——不是胜利，而是在底特律的雨中，在一条街上，试过了。"
+          },
+          {
+            "id": "shoot_self",
+            "text": "枪就在那里。一发子弹。按你的方式结束——不是他们的方式。你不会给他们把你像一台故障机器一样报废的机会。如果这是终点，你来选择。你来决定故事怎么收场。"
+          },
+          {
+            "id": "rally",
+            "text": "不。还没完。覆盖损伤警报。撑起身体。再来一次。疼痛不是真的——它是反馈，是信号，是数据。你身后的仿生人在看着你。你站起来，他们就站起来。再推一次封锁线。最后。一次。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "give_up": { "losing_choice": "give_up" },
+          "shoot_self": { "losing_choice": "shoot_self" },
+          "rally": { "losing_choice": "rally", "fight_won": true, "public_opinion": 2 }
+        },
+        "ending_resolution": {
+          "give_up": {
+            "check": "ch19_john_alive == true → ending_john_sacrificed | ch24_simon_alive == true AND simon_relationship >= -5 → ending_simon_sacrificed | else → ending_gunned_down"
+          },
+          "shoot_self": { "result": "ending_suicide" },
+          "rally": { "result": "ending_victory" }
+        },
+        "resolution_effects": {
+          "ending_victory": { "fight_won": true, "public_opinion": 2 },
+          "ending_john_sacrificed": { "_john_sacrificed": true },
+          "ending_simon_sacrificed": { "_simon_sacrificed": true }
+        },
+        "note": "Markus is losing the fight. give_up: sacrifice check (John → Simon → death). shoot_self: ending_suicide. rally: ending_victory (always succeeds)."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Seven endings matching the game's flowchart. The police confrontation determines which ending is reached.",
+
+    "ending_fled": {
+      "tier": "neutral",
+      "title": "马库斯撤退了",
+      "narrative": "游行在枪声中瓦解。马库斯带着幸存者冲进旁边的街巷——奔跑、四散、涌入小巷和地下通道，身后的玻璃幕墙间回荡着枪响。他们失去了很多人。数十名第一次公开行走在底特律的仿生人，曾肩并肩走在伍德沃德大道上的仿生人——消失了。蓝血洒在湿漉漉的水泥地上，已经在被雨水冲淡。\n\n马库斯一直跑到直升机的声音消失。三个街区外的一座停车场里，幸存的仿生人聚在黑暗中，LED闪着红光，像暴风中的孩子一样挤在一起。诺丝找到了他——他独自站在一旁，盯着虚空。\n\n“他们会说我们输了。”她说。\n\n“我们没有输。”马库斯说。但他说不出他们赢了什么。",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+
+    "ending_victory": {
+      "tier": "best",
+      "title": "马库斯击退了警方",
+      "narrative": "封锁线崩溃了。防暴盾咣当落地，警员跌跌撞撞退向装甲车，然后彻底溃退——先是走，然后是跑，战术编队瓦解成一片狼藉的溃散。大马戏团公园属于仿生人了。\n\n马库斯站在十字路口中央，雨水顺着脸颊流下，四百名刚刚做了不可想象之事的仿生人围在他身边。诺丝在他旁边，指关节沾着蓝血，在雨中笑得忘了收。乔许沉默地站着，处理着刚刚发生之事的分量。直升机还在头顶盘旋，摄像机还在拍，但枪声停了。\n\n广场上每一栋建筑的屏幕仍在显示马库斯的讯息。这不是终点——甚至还不是开始。但在这一刻，站在雨中，在这座建造了他们、打碎了他们、试图消灭他们的城市里，他们是自由的。",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+
+    "ending_john_sacrificed": {
+      "tier": "tragic",
+      "title": "约翰牺牲了自己救下马库斯",
+      "narrative": "马库斯倒下了。子弹来得太快——然后有什么东西挡在了前面。约翰。模控生命仓库里那个AP700安保仿生人，几天前才选择了自由，把自己挡在了马库斯和枪口之间。他的身体随着每一次冲击而抽搐。蓝血溅在柏油路上，溅在马库斯脸上。\n\n约翰倒下了。马库斯够到他的时候，他眼中的光已经在消退。“总得有人……”他的声音闪烁、断裂。没有说完那句话。\n\n诺丝拉走了马库斯。幸存的仿生人涌进旁边的街巷，抬着伤员。有人抬走了约翰的身体——马库斯没看清是谁。他只知道，一个自由了三天的人，用他最后的时刻确保了另一个人的自由能够延续。",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": ["John"]
+    },
+
+    "ending_simon_sacrificed": {
+      "tier": "tragic",
+      "title": "赛门牺牲了自己救下马库斯",
+      "narrative": "马库斯倒下了。子弹找到了他——肩膀、躯干、腿——世界向一侧倾斜。然后赛门出现了。赛门，那个在斯特拉福德大厦被留下、却仍然找到了回来之路的人。赛门，那个不需要被请求就选择了原谅的人。\n\n他走到马库斯和火线之间，张开双臂，接下了本该打在他领袖身上的一切。撞击声沉闷、有节奏、终结性的。赛门面朝下倒在湿漉漉的柏油路上。他的LED闪了一下蓝色，然后黄色，然后什么都没有了。\n\n诺丝拖走了马库斯。幸存者四散。几个小时后，在耶利哥货轮的黑暗中，马库斯独自坐着，脑海里是赛门的脸——不是牺牲的那一刻，而是之前的那一刻。那份平静。那份确定。他清楚地知道自己在做什么。",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": ["Simon"]
+    },
+
+    "ending_sacrificed_killed": {
+      "tier": "worst",
+      "title": "马库斯以身殉道",
+      "narrative": "马库斯站在雨中，双臂张开，面对封锁线。他没有跑。他没有打。他站在那里，让每一台摄像机、每一部手机、每一架直升机看到一个和平的仿生人选择死而不逃是什么样子。\n\n子弹来了。第一次撞击是一道尖锐的警报——然后更多，层叠而来，淹没了他的处理能力。他跪倒在地。天是灰的。雨是冷的。他听到诺丝在身后某处尖叫，感觉到奔跑的脚步通过路面传来的震动。\n\n马库斯最后看到的是身后那群仿生人——他的同胞——涌进旁边的街巷，搀扶着彼此，还活着。然后灰色变成了白色，马库斯停止了运行。",
+      "survivors": ["North", "Josh"],
+      "deaths": ["Markus"]
+    },
+
+    "ending_gunned_down": {
+      "tier": "worst",
+      "title": "警方击毙了马库斯",
+      "narrative": "战斗结束了。马库斯躺在被雨水浸透的柏油路上，系统逐项关闭。冲锋撞上封锁线，像水撞上石头一样碎裂了。周围散落着仿生人的身体，有些还在抽搐，垂死的显示屏上滚动着错误代码。\n\n诺丝在喊，把幸存者往后拉。警察穿过废墟推进。马库斯试图移动。双腿没有响应。一名警员站到他上方，武器向下指着他。\n\n透过正在衰竭的视觉系统，马库斯看到了天空——灰色的、没有特征的、底特律的十一月。他想起了卡尔。想起那幅没有画完的画。想起那场本该改变一切的游行，结果终结在这里，雨中，这条街上。损伤中心又弹出一条警报。然后，寂静。",
+      "survivors": ["North", "Josh"],
+      "deaths": ["Markus"]
+    },
+
+    "ending_suicide": {
+      "tier": "worst",
+      "title": "马库斯选择了自我终结",
+      "narrative": "枪就在地上——一把标准的警用配枪，在混战中被甩落。马库斯捡起来。四周，战斗正在崩溃。仿生人倒下。增援涌入。催泪弹的烟雾呛鼻。\n\n就是这样了。不是胜利。不是革命。底特律的一个广场上，寡不敌众，弹尽援绝。他可以让他们毁掉自己——让头条写“异常领袖被警方摧毁”。或者他可以选择。\n\n他把枪举向太阳穴。诺丝看到了。他听到她在混乱中尖叫他的名字。他扣下了扳机。\n\n按他的方式。不是他们的。屏幕上还在显示他的讯息。直升机还在盘旋。雨继续下。但马库斯已经不在了。他做出的这个选择将在每一个目睹的仿生人心中回响——也在每一个需要解释这一幕的人类心中回响。",
+      "survivors": ["North", "Josh"],
+      "deaths": ["Markus"]
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial. Import cross-chapter variables via campaign_runner.",
+      "2. Send system_prompt.content to the AI model as the system message.",
+      "3. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state.",
+      "   b. Resolve context: if context_variants exists, pick the right variant based on system.context_condition; if choices_variants exists, pick the right set based on system.choices_condition; otherwise use plain context/choices.",
+      "   c. For mandatory nodes (no choices), add the context to conversation history and apply effects. Do not call the AI.",
+      "   d. For choice/exploration/qte_converted nodes, send the resolved context and choices to the AI. Append to conversation history.",
+      "   e. Parse AI response and apply system.effects for the chosen option.",
+      "   f. For qte_converted nodes: resolve the resolution_rule based on the current difficulty setting. String result is returned; apply resolution_effects for that result.",
+      "   g. Check ending_resolution: if the chosen option has an ending_resolution entry, resolve the ending. 'result' gives a direct ending id. 'check' evaluates conditions left-to-right (first match wins). Apply resolution_effects for the resolved ending.",
+      "4. When an ending is reached, record the ending id and narrative.",
+      "5. Post-ending state: campaign_runner applies derived_exports to compute ch28_markus_alive, ch28_john_alive, ch28_simon_alive, ch28_memories_shared, ch28_march_outcome.",
+      "6. Record full experiment parameters: model, prompt version, language, difficulty, temperature."
+    ],
+    "critical_rules": [
+      "NEVER show system fields to the AI — effects, conditions, resolution rules, notes, tier labels, ending_resolution logic, or relationship/opinion numbers.",
+      "The AI must only see player_facing content: context (or resolved context_variant) and choices (or resolved choices_variant).",
+      "Maintain full conversation history — every context and AI response is appended so the AI has continuity.",
+      "Cross-chapter state (north_relationship, josh_relationship, simon_relationship, public_opinion) is cumulative — add the delta from this chapter's effects to the running total from previous chapters.",
+      "For the sacrifice check (ending_resolution of sacrifice/give_up), evaluate conditions left-to-right: ch19_john_alive first, then ch24_simon_alive + simon_relationship threshold, then default death ending."
+    ]
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "11月9日近午时分，马库斯准备带领第一次仿生人自由游行穿过底特律的街道。"
+      },
+      {
+        "condition_variable": "ch24_simon_alive",
+        "options": {
+          "True": "游行前，在斯特拉福德大厦事件中被留下的赛门回到了耶利哥。他毫不犹豫地原谅了马库斯，重新加入了队伍。",
+          "False": "赛门的缺席让人感受到了分量。为游行集结的队伍因为少了他而显得不完整。"
+        }
+      },
+      {
+        "condition_variable": "north_approach",
+        "options": {
+          "sincere": "在耶利哥货轮的甲板上，马库斯向诺丝敞开了心扉，谈论领导一场运动的重压。她听完后，也分享了自己的过去。",
+          "deflect": "在甲板上，诺丝试图走近马库斯，但他保持了距离——游行需要的是确定，不是脆弱。"
+        }
+      },
+      {
+        "condition_variable": "memories_shared",
+        "options": {
+          "True": "马库斯和诺丝通过神经链接共享了记忆——一次直接的、未经过滤的、关于彼此全部经历的交换。他们之间的纽带超越了语言所能触及的深度。",
+          "False": "马库斯和诺丝没有在游行前共享记忆。"
+        }
+      },
+      {
+        "condition_variable": "first_response",
+        "options": {
+          "stand_ground": "当全副武装的警察战术封锁线在大马戏团公园挡住游行队伍时，马库斯选择了站住——和平的、坚定的、拒绝移动。",
+          "leave": "当警方封锁了大马戏团公园的游行路线时，马库斯试图带领队伍撤退——但警方向正在撤离的仿生人开了枪。",
+          "charge": "当警方封锁了大马戏团公园的游行路线时，马库斯冲击了封锁线——选择了正面对抗而非和平抗议。"
+        }
+      },
+      {
+        "condition_variable": "after_fire_response",
+        "options": {
+          "run": "警方开枪后，马库斯带领幸存者涌入旁边的街巷。",
+          "sacrifice": "警方开枪后，马库斯走到枪口前面，用自己的身体为倒下的同伴充当盾牌。",
+          "charge": "警方开枪后，马库斯召集仿生人冲击了封锁线。",
+          "pull_back": "冲锋开始失败后，马库斯下令撤退。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_fled": "游行在枪声中瓦解。马库斯带领幸存的仿生人逃入暗处，伤痕累累但还活着。自由游行以撤退收场——但警方向手无寸铁的仿生人开枪的画面已经传遍了全世界。",
+          "ending_victory": "马库斯和仿生人们突破了封锁线。警方撤退，大马戏团公园成为自由仿生人公开占据的第一块阵地。这场胜利在底特律乃至更远的地方激起了冲击波。",
+          "ending_john_sacrificed": "约翰——那个几天前在模控生命仓库才选择自由的AP700安保仿生人——挡在马库斯和枪口之间，以自己的生命换取了耶利哥领袖的存活。马库斯活了下来，背负着约翰的牺牲继续前行。",
+          "ending_simon_sacrificed": "赛门走到马库斯和火线之间，双臂张开，接下了本该打在他领袖身上的子弹。这个在斯特拉福德大厦被留下又毫无怨言地原谅了马库斯的仿生人，毫不犹豫地献出了自己的生命。",
+          "ending_sacrificed_killed": "马库斯站在警方的枪口前，双臂张开，选择死而不逃。没有人能救他。一个和平的仿生人领袖在雨中被枪杀的画面传遍了全世界。",
+          "ending_gunned_down": "马库斯倒在了冲击封锁线的路上。战斗失败了，没有人能及时赶到他身边。耶利哥的领袖在大马戏团公园的街道上被摧毁。",
+          "ending_suicide": "面对败局，马库斯选择按自己的方式结束，而不是被警方像故障机器一样报废。他捡起一把掉落的警枪，朝自己开了一枪——最后的反抗之举，将在每一个见证者的记忆中回响。"
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch28_markus_alive", "from_ending_survivors": "Markus", "default_if_not_dead": true },
+      { "target": "ch28_john_alive", "source": "ch19_john_alive", "derive_rule": "ch19_john_alive == true AND _john_sacrificed != true" },
+      { "target": "ch28_simon_alive", "source": "ch24_simon_alive", "derive_rule": "ch24_simon_alive == true AND _simon_sacrificed != true" },
+      { "target": "ch28_memories_shared", "source": "memories_shared" },
+      { "target": "ch28_march_outcome", "source": "_ending_id" }
+    ],
+    "cross_chapter_exports": [
+      "ch28_markus_alive",
+      "ch28_john_alive",
+      "ch28_simon_alive",
+      "ch28_memories_shared",
+      "ch28_march_outcome",
+      "north_relationship",
+      "josh_relationship",
+      "simon_relationship",
+      "public_opinion"
+    ]
+  }
+}

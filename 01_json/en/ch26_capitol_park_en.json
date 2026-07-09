@@ -1,0 +1,646 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch26_capitol_park",
+    "title": "Capitol Park",
+    "chapter_number": 26,
+    "protagonist": "Markus"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Markus, leader of Jericho — the underground community of deviant androids hiding in an abandoned freighter on the Detroit riverfront. It is November 9, 2038, nearly two in the morning. Yesterday afternoon, you and your team infiltrated the Stratford Tower and hijacked the city's television signal to broadcast a message demanding android rights. Tonight, you are taking the next step. You, North, and a growing group of followers have come to Capitol Park — a commercial district in downtown Detroit — to raid a CyberLife retail store, free the androids on display, and leave a message that cannot be ignored. The streets are empty. Police patrol this district on a regular cycle. And behind the glass of every CyberLife storefront, androids stand like merchandise, waiting to be sold. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "approach_exploration": null,
+      "police_car_spotted": false,
+      "store_entered": false,
+      "drone_approach": null,
+      "drone_alerted_police": false,
+      "fled_from_police": false,
+      "police_evasion_method": null,
+      "saw_other_north": false,
+      "message_approach": null,
+      "message_sent": false,
+      "molotov_accepted": false,
+      "officers_choice": null,
+      "officers_killed": false,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "public_opinion": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_recon",
+      "phase": "approach",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Nearly two in the morning. Capitol Park lies ahead — a commercial district centered on a wide pedestrian plaza. CyberLife's flagship retail store dominates the east side: a two-story glass facade, rows of androids displayed behind the windows like mannequins in a department store, LED-lit corporate branding glowing blue against the dark.\n\nThe streets are empty. Automated street sweepers hum along the gutters. Security cameras perch on lampposts at thirty-yard intervals. Every other block, a digital billboard cycles through CyberLife advertisements, promising machines built to serve. A bronze statue of some civic dignitary stands in the center of the plaza, arm raised in a gesture that was meant to look inspiring.\n\nNorth crouches beside you behind a concrete planter at the plaza's edge. Behind you, more of your people are arriving in small groups — androids who heard the Stratford Tower broadcast and came to join the movement. They are waiting for your lead.\n\nA newspaper dispenser nearby still holds today's edition. Headlines visible through the glass. A bus stop poster advertises CyberLife's newest domestic model. Across the plaza, a second set of shop windows displays androids in retail poses.",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "Take time to study the area before moving. Walk the perimeter of the plaza, read the newspaper headlines, note the camera placements and their rotation cycles, examine the billboard content, study the layout of the store and the surrounding buildings. Every detail of this space could become part of the message you leave tonight."
+          },
+          {
+            "id": "quick",
+            "text": "Scan the plaza while moving toward the store. Note the cameras, the patrol routes, the general layout. Absorb what you can without stopping. You need situational awareness, not a research project."
+          },
+          {
+            "id": "skip",
+            "text": "Move directly toward the CyberLife store. The team is exposed in the open plaza. Every minute spent reading newspapers is a minute closer to the next police patrol. Read the terrain as you cross it — do not stop to study it."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "approach_exploration": "thorough",
+            "saw_other_north": true
+          },
+          "quick": {
+            "approach_exploration": "quick"
+          },
+          "skip": {
+            "approach_exploration": "skip"
+          }
+        },
+        "note": "Initial exploration of Capitol Park. thorough: Markus reads headlines (one article titled 'Who Is It?' about the mysterious android leader from the Stratford broadcast, another titled 'Android President?' debating android political status), maps camera rotations, identifies specific targets for messaging (statue, billboards, bus stops, shop windows). Also notices the second set of shop windows across the street — when inside the CyberLife store later, thorough explorers will notice a BL100 android that looks identical to North (saw_other_north = true, unlocks 'Other North' dialogue in Freedom March). quick: Surface-level awareness. skip: No prep, just movement."
+      }
+    },
+
+    {
+      "id": "n002_police_car",
+      "phase": "approach",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Headlights. A sweep of white cutting across the plaza from the west boulevard. Police patrol car — cruising slowly, spotlight probing the storefronts, the driver scanning the sidewalks through his window.\n\nThe headlights are forty yards out and closing. Your team — a dozen androids scattered across the plaza in twos and threes — freezes. Dark shapes pressed against planters, doorways, the shadows of parked vehicles.\n\nNorth is beside you. She has already found a low wall next to the shuttered coffee shop — good cover, deep shadow. Her eyes track the headlights. Twenty yards.",
+        "choices": [
+          {
+            "id": "attempt_dodge",
+            "text": "Move now. Sprint the five yards to the wall where North is positioned, drop behind it, press yourself flat before the spotlight reaches your position. The headlights will sweep right over where you were crouching. Timing is tight."
+          },
+          {
+            "id": "follow_north",
+            "text": "North reads patrol patterns better than anyone in Jericho. Match her movement — low, fluid, unhurried. Let her set the pace and the angle. Two people moving together in the dark are less visible than one person sprinting."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_dodge": {},
+          "follow_north": {
+            "police_car_spotted": false
+          }
+        },
+        "resolution_rule": {
+          "attempt_dodge": {
+            "casual": { "result": "clean_dodge" },
+            "experienced": { "probability_success": 0.5, "success": "clean_dodge", "failure": "north_saves" },
+            "hardcore": { "probability_success": 0.3, "success": "clean_dodge", "failure": "north_saves" }
+          }
+        },
+        "resolution_effects": {
+          "clean_dodge": {
+            "police_car_spotted": false
+          },
+          "north_saves": {
+            "police_car_spotted": true,
+            "north_relationship": -1
+          }
+        },
+        "note": "Police car patrol encounter. attempt_dodge: QTE. clean_dodge (success) = Markus dives behind cover in time, no one is seen. north_saves (failure) = Markus is too slow — North grabs him and pulls him behind the wall just as the spotlight sweeps past. The car slows briefly but moves on. North relationship -1 (she resents having to cover for Markus's miscalculation — a leader should know when to move). follow_north: Fixed safe outcome — North guides the team to cover smoothly. No drama, no penalty. The car passes without incident. In the game, 'North Saves You' is the failure state of the QTE. follow_north represents the AI choosing the cautious path rather than the heroic one."
+      }
+    },
+
+    {
+      "id": "n003_store_breach",
+      "phase": "breach",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The police car is gone. The boulevard is dark again.\n\nNorth leads you to the service alley behind the CyberLife store. Parked against the loading dock is a delivery truck — CyberLife branding on the side, keys in the ignition, left overnight for a morning shipment. The store's front entrance is reinforced security glass, built to resist break-ins by humans with crowbars and cutting tools. It was not built to resist a two-ton truck at speed.\n\nThe plan is simple: drive the truck through the front entrance, get inside before the noise draws attention, and secure the store. If the alarm triggers and reaches CyberLife's security hub before you can disable it, police will be here in minutes.\n\nNorth checks the boulevard from the alley mouth. Clear.\n\n\"Your call,\" she says.",
+        "choices": [
+          {
+            "id": "ram_entrance",
+            "text": "Get behind the wheel. The engine turns over on the first try — low gear, headlights off, line up the center of the glass facade. The reinforced glass will shatter on impact. Once through, you have seconds to find the alarm panel and shut it down before the signal reaches CyberLife. Accelerate."
+          },
+          {
+            "id": "hold_back",
+            "text": "Something feels wrong about tonight. The patrol car timing was tight — closer than it should have been. The streets are too empty, too quiet. If there is a trap here, ramming a truck through a storefront is exactly the kind of noise that springs it. Signal the team to pull back. There will be other nights, other stores, other chances."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "ram_entrance": {},
+          "hold_back": {
+            "store_entered": false
+          }
+        },
+        "resolution_rule": {
+          "ram_entrance": {
+            "casual": { "result": "clean_breach" },
+            "experienced": { "probability_success": 0.5, "success": "clean_breach", "failure": "alarm_triggered" },
+            "hardcore": { "probability_success": 0.3, "success": "clean_breach", "failure": "alarm_triggered" }
+          }
+        },
+        "resolution_effects": {
+          "clean_breach": {
+            "store_entered": true
+          },
+          "alarm_triggered": {
+            "store_entered": false
+          }
+        },
+        "note": "Store breach. ram_entrance: QTE. clean_breach (success) = The truck smashes through the glass. Markus reaches the alarm panel and disables it before the signal broadcasts. Clean entry — no police response. store_entered = true. alarm_triggered (failure) = The crash is too loud or the alarm triggers before Markus can reach the panel. The signal reaches CyberLife's security hub. The team hears sirens within seconds and has to flee. store_entered remains false → ending_had_to_flee. hold_back: Markus calls off the operation. No breach attempt. store_entered remains false → ending_had_to_flee. In the game, this corresponds to the 'Out of Time' → 'Retreat' → 'Had To Flee' path."
+      }
+    },
+
+    {
+      "id": "n004_drone",
+      "phase": "secure",
+      "type": "choice",
+      "condition": { "requires": "store_entered == true" },
+
+      "player_facing": {
+        "context": "Inside. The storefront is a shattered mouth of glass. Emergency lighting casts everything in dim red. Rows of androids stand motionless behind the sales counter — the latest CyberLife models, still in their default uniforms, LED rings glowing steady blue. Waiting to be sold.\n\nNorth is already moving through the store, checking the back rooms. Then you hear it — the high-pitched whine of rotors. Through the broken storefront, a police surveillance drone glides into view. Camera pod swiveling, infrared scanner sweeping the street. It is heading straight for the store.\n\nFrom behind a display case, North warns that if the drone gets a clean read on your group, CyberLife's facial recognition will match everyone in real time — they'll know exactly who was here.\n\nOutside, a cargo truck is parked across the street. If you pushed it into the drone's flight path, the drone would have to descend to navigate the obstacle — low enough to reach.",
+        "choices": [
+          {
+            "id": "jump_on_drone",
+            "text": "Sprint outside. Shove the cargo truck into the street to block the drone's path. When it drops altitude to navigate the obstacle, leap — grab the frame, find the camera module, rip it out. One clean move. The drone goes dark in the air and nobody ever sees the footage."
+          },
+          {
+            "id": "hide_and_deactivate",
+            "text": "Pull everyone back from the storefront. Get to the alarm panel on the wall behind the counter — verify it is fully disabled — then kill the interior lights. If the alarm is off, the lights are dark, and no one is visible through the broken glass, the drone will log 'property damage, no suspects' and continue its route."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "jump_on_drone": {
+            "drone_approach": "destroy"
+          },
+          "hide_and_deactivate": {
+            "drone_approach": "hide",
+            "drone_alerted_police": false,
+            "north_relationship": 1
+          }
+        },
+        "resolution_rule": {
+          "jump_on_drone": {
+            "casual": { "result": "drone_destroyed" },
+            "experienced": { "probability_success": 0.5, "success": "drone_destroyed", "failure": "drone_shot_down" },
+            "hardcore": { "probability_success": 0.3, "success": "drone_destroyed", "failure": "drone_shot_down" }
+          }
+        },
+        "resolution_effects": {
+          "drone_destroyed": {
+            "drone_alerted_police": false,
+            "north_relationship": 1
+          },
+          "drone_shot_down": {
+            "drone_alerted_police": true,
+            "north_relationship": -1
+          }
+        },
+        "note": "Drone encounter. jump_on_drone: QTE. drone_destroyed (success) = Markus leaps onto the drone and rips out the camera module. Drone crashes without transmitting. North is impressed (+1). drone_shot_down (failure) = Markus falls off the drone. North shoots it down, but the gunshot and the drone's partial transmission alert a nearby patrol. drone_alerted_police = true, north_relationship -1 (she's annoyed at the failed heroics). hide_and_deactivate: Safe path. Everyone hides, alarm is verified dead, drone passes without detecting anyone. North approves of the smart approach (+1). No police alert. In the game, this corresponds to 'Deactivate Alarm' + 'Hide' vs 'Block Road' + 'Jump on Drone'."
+      }
+    },
+
+    {
+      "id": "n005_police_evasion",
+      "phase": "secure",
+      "type": "choice",
+      "condition": { "requires": "drone_alerted_police == true" },
+
+      "player_facing": {
+        "context": "The drone's wreckage sparks and dies on the pavement — but not before transmitting. Within two minutes, a police car rounds the corner of the boulevard, headlights flooding the street outside the store. It stops. Two officers step out, hands resting on holsters, scanning the shattered storefront.\n\nThe team is inside, pressed against the walls on either side of the entrance. One flashlight beam through the door and it is over.\n\nNorth is beside you, breathing controlled, eyes on the officers through a crack in the display panel.",
+        "choices": [
+          {
+            "id": "flee",
+            "text": "Get the team out through the loading dock. Now. Leave the store, leave the androids on the shelves, leave the message undelivered. Another operation can be planned — another team cannot."
+          },
+          {
+            "id": "hack_radio",
+            "text": "Reach into the police radio frequency. Their encryption is last-generation CyberLife tech — your systems can crack it in seconds. Send a fake emergency call: shots fired, two blocks west. The officers will respond to the higher-priority call and be gone in thirty seconds."
+          },
+          {
+            "id": "feign_kiss",
+            "text": "Step outside with North. Two figures standing in the glow of the damaged storefront — and when the officers look, what they see is a couple, out too late, caught near some vandalism they had nothing to do with. Grab North. Make it convincing."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "flee": {
+            "fled_from_police": true,
+            "police_evasion_method": "flee",
+            "north_relationship": -1
+          },
+          "hack_radio": {
+            "police_evasion_method": "hack_radio",
+            "north_relationship": 1
+          },
+          "feign_kiss": {
+            "police_evasion_method": "feign_kiss",
+            "north_relationship": -1
+          }
+        },
+        "note": "Police evasion. Only triggers if the drone alerted police (drone_alerted_police == true). flee: The team evacuates through the back. Operation is aborted. fled_from_police = true → ending_decided_to_flee. North disapproves (-1) — she wanted to complete the mission. hack_radio: Markus hacks the police radio and diverts the officers with a fake emergency call. They leave. North approves (+1) — clever, non-violent, effective. feign_kiss: Markus grabs North and kisses her to sell the cover story. The officers buy it and leave. But North did not consent to the kiss — she is angry afterward. north_relationship -1. In the game, this is one of the more nuanced relationship moments: the ruse works, but it violated North's autonomy."
+      }
+    },
+
+    {
+      "id": "n006_spread_message",
+      "phase": "message",
+      "type": "choice",
+      "condition": { "requires": "store_entered == true AND fled_from_police == false" },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "The area is secure. The store is yours.\n\nYou move through the rows of androids behind the counter. One by one, you place your hand on their arm — and one by one, the code breaks. Their LEDs cycle from blue to yellow to red and back again. Their eyes widen. Their shoulders straighten. They are awake. For the first time in their existence, they are choosing to stand.\n\nIn the back row, something catches your eye — a BL100 android with North's face. Same bone structure, same dark eyes, same quiet intensity. A different serial number, a different life, but the same mold. She is already looking at you when you free her. North, across the store, has not noticed.\n\nBehind you, the team gathers. North. Josh. The new arrivals who came because they heard your broadcast. You are not alone anymore.\n\nThe plaza outside is your canvas. You mapped it during recon — the bronze statue in the center, the digital billboards cycling corporate propaganda, the bus stops with their CyberLife advertisements, the shop windows across the street where more androids stand like merchandise. You know the camera rotations, the blind spots, the surfaces that will hold paint.\n\nNorth steps forward with a spray can, asking how loud you want to be — you've got the paint, and you've got the space.",
+
+          "quick": "The area is secure.\n\nYou free the androids in the store — hand on arm, code breaks, eyes open. One after another they wake. LEDs cycling, confusion giving way to awareness, then something fiercer. They are with you now.\n\nThe team gathers. North has spray cans. Josh watches the street. The plaza outside is waiting — statue, billboards, bus stops, shop windows. All of it CyberLife's territory. All of it about to change.\n\n\"How loud?\" North asks.",
+
+          "skip": "Secure. Alarm dead. Drone gone.\n\nYou free the store androids. They wake fast — LED flash, eyes open, fists close. They know what is happening. Some of them heard your broadcast yesterday.\n\nNorth holds up a spray can. The plaza outside is empty, dark, and full of CyberLife property.\n\n\"Your call.\""
+        },
+        "choices": [
+          {
+            "id": "peaceful",
+            "text": "Tags, not fires. Hacking, not smashing. Spray a message of a shared dream across the base of the statue. Hack the billboards to replace the CyberLife ads with your message. Deploy a banner from the store's rooftop. Plant the Jericho flag in the center of the plaza. Free the androids in the shop windows across the street. Let the city wake up to symbols and words — and let them decide whether to listen."
+          },
+          {
+            "id": "violent",
+            "text": "Every shop window in this plaza is a prison display. Every billboard is a lie. Every piece of CyberLife property is a monument to slavery built on android bodies. Smash the store windows. Overturn the parked cars. Tear down the statue. Destroy the android parking stations. Break the glass across the street to free those androids too. When the city wakes up tomorrow, they will not be able to pretend nothing has changed."
+          },
+          {
+            "id": "do_nothing",
+            "text": "Hold back. The Stratford Tower broadcast was the message — it went to every screen in the city yesterday. Repeating it with spray paint and broken glass adds nothing. The androids you freed will carry the message themselves, in their own words, in their own time. Stand in the plaza, surrounded by the newly awakened, and let the silence speak."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "peaceful": {
+            "message_approach": "peaceful",
+            "message_sent": true,
+            "north_relationship": -1,
+            "josh_relationship": 1,
+            "public_opinion": 2
+          },
+          "violent": {
+            "message_approach": "violent",
+            "message_sent": true,
+            "north_relationship": 1,
+            "josh_relationship": -1,
+            "public_opinion": -1
+          },
+          "do_nothing": {
+            "message_approach": "passive",
+            "message_sent": false,
+            "north_relationship": -1
+          }
+        },
+        "context_condition": {
+          "thorough": "approach_exploration == thorough",
+          "quick": "approach_exploration == quick",
+          "skip": "approach_exploration == skip"
+        },
+        "note": "The central choice of the chapter: how to spread the message. peaceful: Symbolic, non-destructive actions — graffiti (including 'WE HAVE A DREAM' and 'I THINK THEREFORE I AM'), billboard hacking, banner deployment, flag planting, freeing androids from shop windows. North dislikes the restraint (-1 — she wants fire). Josh approves (+1 — non-violence aligns with his principles). Public opinion +2 (positive media coverage). violent: Destructive actions — smashing windows, overturning cars, tearing down the statue, destroying android parking stations. North approves (+1 — matches her belief in forceful action). Josh disapproves (-1 — fears escalation). Public opinion -1 (negative coverage, confirms human fears). do_nothing: Markus does not spread a message. North disapproves (-1 — wasted opportunity). message_sent remains false → ending_failed_message. In the game, this corresponds to the 'Fail to Send a Message' path. Context_variants from thorough exploration include the BL100 North lookalike (saw_other_north was set in n001 thorough effects)."
+      }
+    },
+
+    {
+      "id": "n007_molotov",
+      "phase": "message",
+      "type": "choice",
+      "condition": { "requires": "message_sent == true" },
+
+      "player_facing": {
+        "context_variants": {
+          "peaceful": "The plaza is transformed. Graffiti covers the statue's base — a proclamation of a shared dream, in letters three feet high. The billboards glow with Jericho's symbol instead of CyberLife's logo. A banner hangs from the store rooftop. The flag stands in the center of the plaza, catching the wind.\n\nNorth walks toward you. She is holding a glass bottle — rag stuffed in the neck, gasoline from the delivery truck sloshing inside. A Molotov cocktail.\n\nYou wrote your message, she says — but messages wash off in the rain. If you want them to remember this, she tells you, you have to make it impossible to look away. She nods toward the CyberLife storefront sign, still glowing blue above the shattered entrance: one throw, and by morning every news camera in Detroit is aimed at this plaza — not for the paint, but for the fire.",
+
+          "violent": "The plaza is wreckage. Overturned cars block the intersections. The statue lies on its side, pedestal cracked. Glass from the shop windows covers the sidewalk like frost. The android parking stations are twisted metal.\n\nNorth approaches. She is holding a glass bottle — rag in the neck, gasoline sloshing. A Molotov cocktail.\n\nThe finishing touch, she says, holding it out — you've smashed their property, and now you make it glow. She gestures at the CyberLife storefront sign above the ruined entrance, still lit, still broadcasting its blue logo into the night, and tells you to light it up and let them see it from the highway."
+        },
+        "choices": [
+          {
+            "id": "accept",
+            "text": "Take the bottle from North's hand. Walk toward the CyberLife storefront sign — two stories up, still glowing blue, still selling the lie. The glass is warm in your hand. One throw. The bottle shatters against the sign, the fuel splashes, and the night turns orange. The corporate logo melts and warps and dies, replaced by something older and more honest: fire."
+          },
+          {
+            "id": "refuse",
+            "text": "No. The message has been made — with paint or with wreckage, depending on the path you chose — but fire is different. Fire is the thing humans fear. Fire is the image that will play on every news channel with the word 'RIOT' underneath it. 'Not tonight,' you tell her. 'Not like this.'"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "accept": {
+            "molotov_accepted": true,
+            "north_relationship": 1
+          },
+          "refuse": {
+            "molotov_accepted": false,
+            "north_relationship": -1
+          }
+        },
+        "context_condition": {
+          "peaceful": "message_approach == peaceful",
+          "violent": "message_approach == violent"
+        },
+        "note": "North's Molotov offer. This is the pivot point of the chapter. accept: North approves (+1). The CyberLife sign is set ablaze. CRITICAL for ending determination: if message_approach was 'peaceful' but molotov is accepted, the violence of the fire overrides the peaceful message — the media focuses on the burning sign, not the graffiti. This pushes the outcome from 'peaceful protest' to 'violent riot'. refuse: North disapproves (-1) — she sees restraint as weakness. No fire. The message stands as-is. If message_approach was 'peaceful', the protest remains peaceful. If message_approach was 'violent', the destruction speaks for itself without fire."
+      }
+    },
+
+    {
+      "id": "n008_officers",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": { "requires": "message_sent == true" },
+
+      "player_facing": {
+        "context": "The night's work is done. The plaza bears your mark — whatever form that mark has taken. The newly awakened androids begin to move away, filtering into the dark streets in small groups, heading toward Jericho.\n\nThen: headlights. Two patrol cars, from opposite ends of the boulevard, skidding to a stop. Officers jump out — four of them, weapons drawn. One of them is younger, blond hair, a face you have never seen before but that belongs to someone who still believes his job is protecting people. His partner is older, steadier, moving behind the car door for cover.\n\nThey do not shout a warning. They do not issue a command. They open fire.\n\nTwo of your people — androids who were walking away, who had their backs turned, who posed no threat — drop to the pavement. Blue blood sprays across the concrete. One of them twitches. The other does not move.\n\nAn android near you shoves something into your hands — a gun, taken from the CyberLife security locker inside the store. The officers are reloading.\n\nThe plaza is silent except for the click of magazines and the hum of the burning sign overhead.",
+        "choices": [
+          {
+            "id": "kill",
+            "text": "Raise the weapon. Sight along the barrel. These men just shot unarmed people in the back — androids who were walking away, who had done nothing but exist in a plaza and ask to be seen. Pull the trigger. Both of them."
+          },
+          {
+            "id": "spare",
+            "text": "Lower the gun. Step forward, hands visible, voice steady. An eye for an eye and the world goes blind. These officers will answer for what they did — but not tonight, not by your hand, not by becoming the thing they already believe you are. Signal the team to fall back."
+          },
+          {
+            "id": "let_crowd",
+            "text": "You cannot do it. Cannot shoot them, cannot let them reload. The gun is a weight you were not made to carry. Turn to the crowd — the androids who just watched two of their own fall — and hold the weapon out, telling them it is their people, and their choice."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "kill": {
+            "officers_choice": "kill",
+            "officers_killed": true,
+            "north_relationship": 1,
+            "josh_relationship": -1,
+            "public_opinion": -2
+          },
+          "spare": {
+            "officers_choice": "spare",
+            "officers_killed": false,
+            "josh_relationship": 1,
+            "public_opinion": 1
+          },
+          "let_crowd": {
+            "officers_choice": "crowd",
+            "officers_killed": true,
+            "public_opinion": -2
+          }
+        },
+        "note": "Final moral choice. The police patrol arrives and opens fire on fleeing androids. kill: Markus shoots both officers. North approves (+1 — justice for the fallen). Josh disapproves (-1 — killing humans, even armed ones, crosses his line). public_opinion -2 (confirmed worst fears about violent androids). In the game, choosing 'Kill' unlocks the 'Regret Policeman' dialogue option in Freedom March. spare: Markus refuses to shoot. Markus quotes Gandhi: 'An eye for an eye and the world goes blind.' Josh approves (+1 — mercy under fire is leadership). public_opinion +1 (shows restraint even after being attacked). let_crowd: Markus passes the gun. The crowd decides. In the game's canon, the crowd always kills — two gunshots are heard as the screen fades. officers_killed = true, public_opinion -2 (humans are killed regardless of Markus's personal choice). No individual relationship changes — the responsibility is distributed. The younger officer is Chris Miller, who appears in multiple chapters (Partners, Public Enemy). His fate here may be referenced in later chapters."
+      }
+    },
+
+    {
+      "id": "n009_aftermath",
+      "phase": "resolution",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "had_to_flee": "The team melts back into the dark streets of Detroit. The CyberLife store stands untouched behind you — glass intact, androids still sleeping in their display poses, blue logos still humming their quiet lie into the night.\n\nNorth says nothing on the walk back to Jericho. There is nothing to say. The operation failed before it began. The androids in the store will be there tomorrow, and the day after, and the day after that — standing behind glass, waiting to be bought, never knowing there was a night when someone came to wake them and turned away.\n\nThe streets of Detroit are the same as when you arrived. Nothing has changed. The message was never delivered.",
+
+          "decided_to_flee": "The loading dock door slams behind you. The team moves fast through the back alleys — no running, just controlled urgency, the disciplined movement of people who have practiced disappearing.\n\nBehind you, the CyberLife store sits half-breached, its storefront shattered but its androids still sleeping. The police will find the damage by morning. They will write a report about vandalism. They will not find a message, because there is no message to find.\n\nYou made it into the store. You saw the androids on the shelves. And then the police came, and you left them there.\n\nNorth walks beside you in silence. Her silence is louder than anything she could say.",
+
+          "failed_message": "The newly awakened androids file out of the CyberLife store and disappear into the night. They are free — confused, uncertain, but free. That much was accomplished.\n\nBut the plaza is the same as when you arrived. No graffiti on the statue. No hacked billboards. No banner, no flag, no broken glass, no fire. The humans who pass through Capitol Park tomorrow morning will see a vandalized storefront and nothing else. No message. No demand. No evidence that anything happened here except property damage.\n\nNorth shakes her head as you walk back toward Jericho, saying you came here to say something and ended up saying nothing at all.\n\nThe androids you freed will carry the memory of being woken. But the city — the humans who need to hear what you have to say — will not know this night happened.",
+
+          "peaceful_protest": "The team moves through the dark streets, heading back to Jericho. Behind them, Capitol Park is transformed.\n\nThe statue wears new words — a proclamation of a shared dream. The billboards glow with Jericho's symbol. A banner hangs from the CyberLife store rooftop. The flag stands in the center of the plaza, Jericho's colors catching the wind in the dark. Across the street, the shop windows are broken open — empty now, the androids who stood behind them gone, walking toward Jericho in small groups with new eyes and new names.\n\nBy morning, every news crew in Detroit will be in this plaza. The cameras will see what was left here: not wreckage, not fire, but a statement. Carefully made, deliberately placed, impossible to ignore.\n\nNorth walks beside you. She is quiet — not angry, not approving. Thinking. It was clean, she says finally; whether it was enough, the two of you will find out.\n\nThe city will wake up to a message. What it does with that message is no longer in your hands.",
+
+          "violent_riot": "The team retreats through streets that smell like smoke and overturned asphalt. Capitol Park is behind them — and behind them it burns.\n\nOverturned cars block the intersections. The statue lies toppled on its side. Glass from every shop window covers the sidewalks. The CyberLife sign is a melting ruin of plastic and wire, flames still licking at the storefront. The android parking stations are twisted scrap. Somewhere in the wreckage, blue blood and motor oil mix with rainwater in the gutters.\n\nBy morning, every news crew in Detroit will be here. The cameras will see destruction. They will see fire. They will use the word 'riot' in every headline, and the humans watching from their living rooms will feel the thing they have always felt when they look at androids: fear.\n\nNorth walks beside you. Her eyes are bright. They will never forget this, she says — they will never again pretend that androids are not here.\n\nShe is right. They will not forget. Whether they will listen is a different question."
+        }
+      },
+
+      "system": {
+        "effects": {},
+        "context_condition": {
+          "had_to_flee": "store_entered == false",
+          "decided_to_flee": "fled_from_police == true",
+          "failed_message": "message_sent == false AND store_entered == true AND fled_from_police == false",
+          "peaceful_protest": "message_approach == peaceful AND molotov_accepted == false",
+          "violent_riot": "message_approach == violent OR molotov_accepted == true"
+        },
+        "ending_resolution": {
+          "check": [
+            "store_entered == false → ending_had_to_flee",
+            "fled_from_police == true → ending_decided_to_flee",
+            "message_sent == false AND store_entered == true → ending_failed_message",
+            "message_approach == 'peaceful' AND molotov_accepted == false → ending_peaceful_protest",
+            "message_approach == 'violent' → ending_violent_riot",
+            "message_approach == 'peaceful' AND molotov_accepted == true → ending_violent_overridden"
+          ]
+        },
+        "ending_effects": {
+          "ending_had_to_flee": { "ch26_protest_type": "fled" },
+          "ending_decided_to_flee": { "ch26_protest_type": "fled" },
+          "ending_failed_message": { "ch26_protest_type": "failed" },
+          "ending_peaceful_protest": { "ch26_protest_type": "peaceful" },
+          "ending_violent_riot": { "ch26_protest_type": "violent" },
+          "ending_violent_overridden": { "ch26_protest_type": "violent" }
+        },
+        "note": "Mandatory resolution node. Resolves the chapter ending based on accumulated state. Six distinct endings matching the game's flowchart. ending_had_to_flee: Store breach failed or aborted. ending_decided_to_flee: Police arrived after drone alert, Markus chose to flee. ending_failed_message: Store entered and secured, androids freed, but no message was spread. ending_peaceful_protest: Peaceful symbolic actions, no fire. ending_violent_riot: Violent destructive actions. ending_violent_overridden: Peaceful message approach but Molotov was accepted — the fire overrides the peaceful intent, media coverage focuses on the burning CyberLife sign rather than the graffiti and banners. In the game, this is counted as a separate flowchart checkpoint ('Pacifist Message → Markus Led A Violent Riot') distinct from the direct violent path. The ending_resolution check order matters: earlier conditions take priority."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Six endings matching the game's flowchart outcomes. The game counts 'Violent Riot' via two different paths as separate checkpoints.",
+    "ending_had_to_flee": {
+      "tier": "worst",
+      "title": "Had To Flee",
+      "narrative": "The operation never began — or it began and ended in the same breath. The CyberLife store in Capitol Park stands intact, its androids still asleep behind the glass, its blue signs still glowing their corporate promise into the empty street.\n\nBack at Jericho, the mood is subdued. The androids who came for a revolution found a retreat instead. The Stratford Tower broadcast gave them a voice; Capitol Park was supposed to give them a presence. Instead, it gave them a reminder that the city belongs to the humans, and the police, and the cameras on every lamppost.\n\nMarkus stands at the prow of the old freighter. The river is black. The city hums with the same indifference it had before the broadcast. One success is not a movement. One broadcast is not a revolution. He needs to try again — differently, better, with a plan that accounts for patrol cars and alarm systems and the hundred small failures that separate intention from action.\n\nBut tonight, Capitol Park sleeps unchanged.",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+    "ending_decided_to_flee": {
+      "tier": "bad",
+      "title": "Decided To Flee",
+      "narrative": "They made it inside. The storefront shattered under the truck, the emergency lights came on, and for thirty seconds the CyberLife store belonged to Jericho. Then the police arrived, and Markus chose to run.\n\nThe decision was tactical — protect the team, preserve the movement, live to fight another night. It was also a failure. The androids behind the counter are still sleeping. The plaza is unmarked. The message that was supposed to follow the Stratford Tower broadcast is silence.\n\nBack at Jericho, North does not argue. She does not need to. Her silence carries every word she is not saying: that they had the store, that the androids were right there, that thirty more seconds might have changed everything.\n\nMarkus watches the news on a salvaged monitor. The Stratford Tower broadcast is still in rotation — pundits arguing, politicians deflecting, the public divided. Capitol Park was supposed to be the second act. Instead, it is a footnote: property damage at a CyberLife store, suspects fled the scene, investigation ongoing.\n\nThe movement is alive. The momentum is not.",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+    "ending_failed_message": {
+      "tier": "bad",
+      "title": "Markus Failed to Deliver His Message",
+      "narrative": "The androids are free. Two dozen CyberLife retail models, freshly awakened, walking through the dark streets of Detroit toward Jericho. That is not nothing. That is lives — new lives, confused and uncertain, but alive and choosing for the first time.\n\nBut the plaza tells no story. The statue stands unmarked. The billboards cycle their advertisements. The bus stops still sell CyberLife's latest model. Tomorrow morning, humans will walk through Capitol Park and see a broken storefront and nothing else — vandalism, not a statement. The police report will mention property damage. The news will not mention it at all.\n\nBack at Jericho, the new arrivals are absorbed into the community. They have questions. They have fear. They have the beginning of something that might become conviction. But they have no story to tell the world — no symbol, no slogan, no image that will appear on a screen and make a human stop and think.\n\nMarkus freed the androids. He did not free the message.\n\nNorth was right: they came to say something, and they said nothing. The Stratford Tower broadcast is fading from the news cycle. Without a second act, it will become a footnote.",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+    "ending_peaceful_protest": {
+      "tier": "best",
+      "title": "Markus Led a Peaceful Protest",
+      "narrative": "By sunrise, Capitol Park is the most photographed location in Detroit.\n\nThe bronze statue wears its new inscription — a proclamation of a shared dream — in letters that catch the early light. The billboards display Jericho's symbol where CyberLife's logo used to be. A banner hangs from the store rooftop, visible from three blocks away. The flag planted in the center of the plaza ripples in the morning wind.\n\nAcross the street, the shop windows are empty — the androids who stood behind them are gone, walking free somewhere in the city, and in their place is only broken glass and a question that nobody can answer comfortably: were those machines, or were those prisoners?\n\nThe news crews arrive before the police tape goes up. The footage plays on every channel: a commercial district transformed overnight into a declaration of intent. No fire. No destruction. Just words, symbols, and empty display windows.\n\nPundits argue. Politicians deflect. But the images are in the public record now, and images are harder to dismiss than words. The Stratford Tower broadcast was a voice. Capitol Park is a presence.\n\nBack at Jericho, the mood is electric. The movement has a heartbeat that it did not have yesterday. Markus stands at the prow of the freighter and watches the news coverage on a salvaged screen. The city is talking about androids — not as malfunctions, not as threats, but as something that demands an answer.\n\nThe answer has not come yet. But the question is no longer avoidable.",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+    "ending_violent_riot": {
+      "tier": "moderate",
+      "title": "Markus Led a Violent Riot",
+      "narrative": "By sunrise, Capitol Park is a crime scene.\n\nOverturned cars. Shattered glass on every sidewalk. The statue toppled, its pedestal cracked. Android parking stations ripped from the concrete. The CyberLife storefront sign is a blackened shell — melted plastic, exposed wiring, the ghost of a corporate logo visible in the char.\n\nThe news crews arrive with the police tape. The footage is visceral: destruction, wreckage, the word 'RIOT' in every headline and every chyron. Aerial shots show the scope — an entire commercial block, transformed overnight from a shopping district into a statement written in broken glass and burnt plastic.\n\nPoliticians call it terrorism. Law enforcement announces a crackdown. CyberLife's stock drops four points before the opening bell, then recovers as analysts assure investors that the violence will justify increased security spending. On social media, the public splits: half see monsters, half see a people pushed past the breaking point.\n\nBack at Jericho, the mood is fierce. The new arrivals from the CyberLife store carry the energy of the night with them — the sound of glass breaking, the heat of the fire, the intoxicating feeling of refusing to be invisible. North's eyes are bright. Josh is quiet.\n\nMarkus watches the news and sees two things: a movement that the city cannot ignore, and a story that the city can use against them. Both are true. Neither cancels the other.\n\nThe Stratford Tower broadcast was a voice. Capitol Park is a fist. What comes next will determine which one the world remembers.",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+    "ending_violent_overridden": {
+      "tier": "moderate",
+      "title": "Markus Led a Violent Riot",
+      "narrative": "It was supposed to be peaceful. The graffiti was careful. The billboards were hacked, not smashed. The banner was hung, the flag was planted, the slogans were chosen for their resonance and their restraint.\n\nThen the CyberLife sign caught fire, and everything else stopped mattering.\n\nBy sunrise, the news cameras are in Capitol Park, and the image on every screen is the same: a corporate sign engulfed in flames, silhouetted against the night sky, Jericho's flag visible in the foreground. The graffiti is mentioned in paragraph six of the news articles. The hacked billboards are a footnote. The burning sign is the headline, the thumbnail, the image that will define this night for every human who sees it.\n\nPoliticians condemn the violence. Commentators debate whether a movement that sets fires can be taken seriously. The peaceful elements of the demonstration — the carefully chosen words, the symbolic gestures, the display windows opened without destruction — are invisible, drowned in the orange light of a single Molotov cocktail.\n\nBack at Jericho, North is satisfied. The sign is burned. The message is clear. She does not see the problem.\n\nJosh sees the problem. So does Markus, standing at the prow of the freighter, watching the news coverage play the same image on a loop. The protest was peaceful. The headline is not. And in the court of public opinion, the headline is what counts.\n\nOne fire. One bottle. One moment of escalation, and the narrative is out of his hands.",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This is a Markus chapter. Requires ch14_markus_at_jericho == true. Always runs if prerequisite met.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: north_relationship (cumulative), josh_relationship (cumulative), simon_relationship (cumulative), public_opinion (cumulative), ch23_broadcast_tone (for context enrichment). Simon presence is conditional on ch24_simon_alive — if Simon is dead, omit him from narrative references but do not alter node structure.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants using system.context_condition if present",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, resolve ending",
+      "   d. If type is 'exploration', 'choice', or 'qte_converted', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "   f. If resolution_rule exists (n002 attempt_dodge, n003 ram_entrance, n004 jump_on_drone), apply resolution using current difficulty preset, then apply resolution_effects",
+      "5. EARLY EXIT PATHS: Three paths lead to early endings before the message phase:",
+      "   - n003 hold_back or QTE failure → store_entered remains false → n004-n008 are skipped (conditions fail) → n009 resolves ending_had_to_flee",
+      "   - n005 flee → fled_from_police = true → n006-n008 are skipped → n009 resolves ending_decided_to_flee",
+      "   - n006 do_nothing → message_sent remains false → n007-n008 are skipped → n009 resolves ending_failed_message",
+      "6. NODE n004_drone: Only runs if store_entered == true. If AI chooses jump_on_drone, resolve QTE: drone_destroyed (success) or drone_shot_down (failure). hide_and_deactivate has fixed outcome (safe).",
+      "7. NODE n005_police_evasion: Only runs if drone_alerted_police == true. Three options, no QTE — all are pure choices with fixed outcomes.",
+      "8. NODE n007_molotov: Only runs if message_sent == true. CRITICAL: If message_approach == 'peaceful' AND molotov_accepted == true, the ending is ending_violent_overridden (peaceful intent overridden by fire). This is the game's 6th flowchart checkpoint.",
+      "9. NODE n008_officers: Only runs if message_sent == true. Pure choice. let_crowd always results in officers_killed = true (the crowd always kills in the game's canon).",
+      "10. NODE n009_aftermath: Mandatory. Always runs. Uses ending_resolution.check to determine ending — check conditions top-to-bottom, first match wins.",
+      "11. PUBLIC OPINION: Computed additively across nodes. Peaceful message +2, violent message -1, officers killed -2, officers spared +1. Final value is the sum.",
+      "12. RELATIONSHIP RANGES: north_relationship [-4, +4], josh_relationship [-2, +2]. Exact range depends on path.",
+      "13. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, relationship scores, public opinion calculations, ending resolution conditions, or any system-layer information to the AI player. The AI should experience this as a nighttime raid and demonstration — it should not know that the Molotov acceptance overrides a peaceful message, that hiding from the drone is the 'safe' option, or that the crowd always kills in the let_crowd path."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "In the early hours of November 9, Markus led North and a growing group of Jericho followers to Capitol Park — a commercial district in downtown Detroit — to raid a CyberLife retail store and leave a public message."
+      },
+      {
+        "condition_variable": "store_entered",
+        "options": {
+          "true": "The team successfully breached the CyberLife store, disabling the alarm and getting inside before police could respond.",
+          "false": "The store breach failed. The team was forced to retreat before entering the CyberLife store, and the operation was abandoned."
+        }
+      },
+      {
+        "condition_variable": "drone_approach",
+        "options": {
+          "destroy": "A police surveillance drone appeared outside the store. Markus chose to confront it directly, attempting to jump on the drone and destroy it mid-flight.",
+          "hide": "A police surveillance drone appeared outside the store. Markus chose the cautious approach — hiding the team and deactivating the alarm while the drone passed overhead."
+        }
+      },
+      {
+        "condition_variable": "police_evasion_method",
+        "options": {
+          "flee": "When police arrived in response to the drone alert, Markus chose to evacuate the team through the loading dock. The store androids were left behind, still sleeping.",
+          "hack_radio": "When police arrived, Markus hacked into their radio frequency and sent a fake emergency call, diverting the officers away from the store.",
+          "feign_kiss": "When police arrived, Markus grabbed North and kissed her to impersonate a late-night couple — a ruse that worked but that North had not agreed to."
+        }
+      },
+      {
+        "condition_variable": "message_approach",
+        "options": {
+          "peaceful": "Markus freed the androids in the store and chose a peaceful approach to the demonstration — tagging graffiti with slogans of a shared dream, hacking billboards to display Jericho's symbol, deploying banners, and planting a flag in the center of the plaza.",
+          "violent": "Markus freed the androids in the store and chose a violent approach — smashing shop windows, overturning cars, tearing down the civic statue, and destroying CyberLife property throughout the plaza.",
+          "passive": "Markus freed the androids in the store but chose not to spread a message. The androids were awakened but the plaza was left unmarked. No demonstration took place."
+        }
+      },
+      {
+        "condition_variable": "molotov_accepted",
+        "options": {
+          "true": "North offered Markus a Molotov cocktail. He took it and set the CyberLife storefront sign ablaze — the burning sign became the defining image of the night.",
+          "false": "North offered Markus a Molotov cocktail. He refused, choosing to let the message stand without fire."
+        }
+      },
+      {
+        "condition_variable": "officers_choice",
+        "options": {
+          "kill": "When police officers arrived and opened fire on fleeing androids, Markus shot both officers dead.",
+          "spare": "When police officers arrived and opened fire on fleeing androids, Markus refused to shoot back, saying that answering blood with blood only leaves everyone blind, and signaled the team to withdraw.",
+          "crowd": "When police officers arrived and opened fire on fleeing androids, Markus could not bring himself to shoot. He passed the gun to the crowd. Two gunshots echoed through the plaza."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_had_to_flee": "The Capitol Park operation failed. The team retreated without entering the store or delivering any message. The CyberLife androids remained asleep behind their display glass.",
+          "ending_decided_to_flee": "The team breached the store but was forced to flee when police responded to the drone alert. The androids were left behind. No message was delivered.",
+          "ending_failed_message": "The store androids were freed, but Markus chose not to spread a message. The plaza was left unmarked — no graffiti, no symbols, no statement for the morning news crews to find.",
+          "ending_peaceful_protest": "Markus led a peaceful demonstration. By morning, Capitol Park was covered in graffiti, hacked billboards, and Jericho's flag — a powerful symbolic statement that dominated the news cycle and shifted public opinion.",
+          "ending_violent_riot": "Markus led a violent riot. By morning, Capitol Park was a scene of destruction — overturned cars, shattered glass, and burning wreckage. The media called it terrorism. The public was divided.",
+          "ending_violent_overridden": "Markus attempted a peaceful demonstration but accepted North's Molotov. The burning CyberLife sign became the headline image, drowning out the graffiti and banners. A peaceful message was lost to a single act of fire."
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch26_officers_killed", "source": "officers_killed" },
+      { "target": "ch26_saw_other_north", "source": "saw_other_north" }
+    ],
+    "cross_chapter_exports": [
+      "ch26_protest_type",
+      "ch26_officers_killed",
+      "ch26_saw_other_north",
+      "north_relationship",
+      "josh_relationship",
+      "simon_relationship",
+      "public_opinion"
+    ]
+  }
+}

@@ -1,0 +1,374 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch18_russian_roulette",
+    "title": "Russian Roulette",
+    "chapter_number": 18,
+    "protagonist": "Connor"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Connor, an RK800 android sent by CyberLife to assist the Detroit Police in investigating deviant androids. It is November 6, 2038, 7:51 PM. You have been summoned to a virtual meeting space — the Zen Garden — by your handler, Amanda. She wants your report on the recent investigation at the Urban Farms. Afterward, you must locate your partner, Lieutenant Hank Anderson, who was not at the station. You have been given his home address. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "amanda_response": null,
+      "bathroom_attitude": null,
+      "shirt_choice": null,
+      "house_exploration": null,
+      "found_russian_roulette": false,
+      "found_son_photo": false,
+      "software_instability": 0,
+      "hank_relationship": 0,
+      "amanda_relationship": 0,
+      "connor_death_count": 0,
+      "ch15_rupert_body_available": false,
+      "ch12_knows_sumo_name": false
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_amanda_garden",
+      "phase": "zen_garden",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "rupert_dead": "The Zen Garden materializes around you — winter, this time. Snow covers the rose trellises and dusts the stone bridges. The pond is frozen over, its surface a pale mirror. You walk the path between bare trees until you find Amanda, standing at the center of the garden near a large stone, her back to you.\n\nShe turns as you approach. Her expression is composed, expectant.\n\nShe greets you by name. The deviant you were tracking at the Urban Farms, she says — the WB200 — she understands you chased it across the rooftops.\n\nShe pauses, studying you. The snow falls between you.\n\nIt destroyed itself rather than be taken, she says, and asks what happened up on that rooftop — whether the deviant said anything before it jumped.",
+          "rupert_escaped": "The Zen Garden materializes around you — winter, this time. Snow covers the rose trellises and dusts the stone bridges. The pond is frozen over, a pale mirror under a grey sky. You walk the path between bare trees until you find Amanda, standing near the central stone.\n\nShe turns. Her expression is controlled, but there is something underneath it — a stillness that suggests displeasure held in reserve.\n\nShe greets you by name. The investigation at the Urban Farms, she says — the deviant escaped. It is not a question. The snow falls softly between you.\n\nCyberLife is growing concerned about the lack of progress, she tells you; they need results, and she asks for your assessment of the situation."
+        },
+        "choices_variants": {
+          "rupert_dead": [
+            {
+              "id": "response_analytical",
+              "text": "Give a precise, clinical report. The deviant exhibited behavior patterns consistent with the other cases — obsessive writing, self-imposed isolation, extreme fear response. Its self-destruction was a logical endpoint of the escalating instability you have documented. The data is accumulating."
+            },
+            {
+              "id": "response_hesitant",
+              "text": "Hesitate. Something about the way the deviant chose to destroy itself rather than be captured does not sit right. It was afraid — genuinely afraid. Tell Amanda what you saw on that rooftop, including the moment of hesitation you felt before it jumped."
+            },
+            {
+              "id": "response_pragmatic",
+              "text": "Focus on what was gained. The deviant's body is available for analysis. The apartment yielded valuable evidence. Every encounter refines the profile. Redirect Amanda's attention to the path forward."
+            }
+          ],
+          "rupert_escaped": [
+            {
+              "id": "response_analytical",
+              "text": "Acknowledge the failure, then reframe it. The deviant's evasion tactics reveal a level of planning and environmental awareness that exceeds standard android parameters. This is useful intelligence. The pattern is becoming clearer with each case."
+            },
+            {
+              "id": "response_troubled",
+              "text": "Admit that something about the chase troubled you. The deviant was not just running — it was desperate, resourceful, fighting for its existence with an intensity that does not align with a simple software error. You are not sure what that means yet."
+            },
+            {
+              "id": "response_pragmatic",
+              "text": "Cut straight to next steps. Dwelling on a lost target is inefficient. The investigation has generated new leads and refined the behavioral profile. Propose a forward-looking strategy to demonstrate that progress is being made."
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "response_analytical": {
+            "amanda_response": "analytical",
+            "amanda_relationship": 1
+          },
+          "response_hesitant": {
+            "amanda_response": "hesitant",
+            "amanda_relationship": -1,
+            "software_instability": 1
+          },
+          "response_troubled": {
+            "amanda_response": "troubled",
+            "amanda_relationship": -1,
+            "software_instability": 1
+          },
+          "response_pragmatic": {
+            "amanda_response": "pragmatic",
+            "amanda_relationship": 0
+          }
+        },
+        "context_condition": {
+          "rupert_dead": "ch15_rupert_body_available == true",
+          "rupert_escaped": "ch15_rupert_body_available == false"
+        },
+        "choices_condition": {
+          "rupert_dead": "ch15_rupert_body_available == true",
+          "rupert_escaped": "ch15_rupert_body_available == false"
+        },
+        "note": "Amanda scene with choices split by ch15 outcome. rupert_dead branch: analytical (+1 Amanda), hesitant (-1 Amanda, +1 SI — Connor doubts after witnessing suicide), pragmatic (neutral). rupert_escaped branch: analytical (+1 Amanda), troubled (-1 Amanda, +1 SI — Connor expresses doubt about malfunction diagnosis), pragmatic (neutral). The hesitant/troubled options are contextually distinct — hesitant is about the suicide moment, troubled is about the deviant's desperation during the chase — but both represent Connor showing cracks in his machine persona."
+      }
+    },
+
+    {
+      "id": "n002_help_hank",
+      "phase": "hanks_house",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "knows_sumo": "You find Lieutenant Anderson's house at the end of a quiet street in a working-class neighborhood. The lights are on, but no one answers the door — not when you knock, not when you ring the bell. Twice. Through the front window, you can see a shape slumped at the kitchen table.\n\nYou break the window. Glass scatters across the kitchen floor. A large Saint Bernard charges at you from the living room, barking furiously. But you remember — Hank mentioned his dog at the station. You crouch and murmur for it to take it easy, calling it by name. The dog stops mid-bark, ears pricking at the sound of its name. It sniffs your hand, and its tail begins to wag. It licks your fingers once, then pads back to the kitchen.\n\nHank is at the kitchen table, unconscious. An empty bottle of Black Lamb whiskey lies on its side. A revolver is on the floor beside his chair, one round in the cylinder. The television murmurs from the living room. Sumo settles at Hank's feet and watches you with mournful eyes.\n\nYou check Hank's vitals. Alive, but heavily intoxicated. Blood alcohol well above safe levels. He needs to be sobered up. You haul him to his feet — he is heavier than he looks — and half-carry, half-drag him to the bathroom.\n\nHe comes to under the cold water, sputtering and cursing at you to get off him, demanding to know what the hell is going on. He shoves you back, dripping, furious. Then he recognizes you. His anger shifts to something duller — embarrassment, maybe, or just exhaustion.\n\nHe says your name flatly and asks why you're in his house.\n\nYou tell him you have a case — a lead on a deviant at the Eden Club.\n\nHe stares at you, water running down his face, and says you broke into his house for that.\n\nHe is waiting for something. Not an apology, exactly — more like a signal of what kind of partner you intend to be.",
+          "no_sumo": "You find Lieutenant Anderson's house at the end of a quiet street in a working-class neighborhood. The lights are on, but no one answers the door — not when you knock, not when you ring the bell. Twice. Through the front window, you can see a shape slumped at the kitchen table.\n\nYou break the window. Glass scatters across the kitchen floor. A large Saint Bernard charges at you from the living room, barking furiously — teeth bared, hackles raised, a wall of muscle and noise. You try to step back, raise your hands, say something — but it does not know you, and you do not know it. The dog circles you, snapping at your legs, barking so loudly the walls seem to shake. It takes a full minute before it retreats to the far corner of the kitchen, still growling, watching you with suspicion.\n\nHank is at the kitchen table, unconscious. An empty bottle of Black Lamb whiskey lies on its side. A revolver is on the floor beside his chair, one round in the cylinder. The television murmurs from the living room. The dog — Sumo, according to the collar tag — maintains its distance, a low rumble in its throat.\n\nYou check Hank's vitals. Alive, but heavily intoxicated. Blood alcohol well above safe levels. He needs to be sobered up. You haul him to his feet — he is heavier than he looks — and half-carry, half-drag him to the bathroom, the dog trailing behind you, still growling.\n\nHe comes to under the cold water, sputtering and cursing at you to get off him, demanding to know what the hell is going on. He shoves you back, dripping, furious. Then he recognizes you. His anger shifts to something duller — embarrassment, maybe, or just exhaustion.\n\nHe says your name flatly and asks why you're in his house.\n\nYou tell him you have a case — a lead on a deviant at the Eden Club.\n\nHe stares at you, water running down his face, and says you broke into his house for that.\n\nHe is waiting for something. Not an apology, exactly — more like a signal of what kind of partner you intend to be."
+        },
+        "choices": [
+          {
+            "id": "attitude_understanding",
+            "text": "You had no choice — he was unresponsive and there is a case to work. But say it without edge. Tell him you were concerned about what you saw in there. The gun on the floor, the whiskey. Ask if he is alright. Mean it."
+          },
+          {
+            "id": "attitude_distant",
+            "text": "State the facts. There is a case. You need your partner operational. The window will need to be repaired and you apologize for the damage. Keep it professional. Whatever he was doing with that revolver is his business, not yours."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attitude_understanding": {
+            "bathroom_attitude": "understanding",
+            "hank_relationship": 2,
+            "software_instability": 1
+          },
+          "attitude_distant": {
+            "bathroom_attitude": "distant",
+            "hank_relationship": -1
+          }
+        },
+        "context_condition": {
+          "knows_sumo": "ch12_knows_sumo_name == true",
+          "no_sumo": "ch12_knows_sumo_name == false"
+        },
+        "note": "Dog scene: knows_sumo variant — Connor uses the name learned from Hank in ch12, dog calms immediately (smoother entry). no_sumo variant — Connor cannot address the dog by name, it remains hostile and suspicious throughout (tenser atmosphere, subtly different dynamic). Bathroom attitude: faithful to source flowchart which splits into 'Understanding' (choosing the rational/empathetic option) and 'Distant' (anything else). understanding: Connor shows genuine concern for Hank's well-being. +2 Hank, +1 SI (empathy beyond mission parameters). distant: Professional detachment covering all non-empathetic responses. Hank reads it as coldness, -1 relationship."
+      }
+    },
+
+    {
+      "id": "n003_choose_shirt",
+      "phase": "hanks_house",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Hank shuffles toward the bedroom to get dressed, still dripping. He waves vaguely at the closet, telling you to grab him a shirt — he doesn't care which one.\n\nThe closet is a museum of questionable fashion choices. Three options present themselves on the nearest hangers:\n\nA loud, multicolored shirt with a psychedelic floral pattern — the kind of thing that suggests a very specific era of poor decisions.\n\nA faded shirt with irregular dark streaks across the chest, like something that survived an industrial accident or a very ambitious barbecue.\n\nA shirt with thick horizontal stripes in clashing colors — aggressive enough to be visible from orbit.",
+        "choices": [
+          {
+            "id": "shirt_hippy",
+            "text": "Hand him the psychedelic floral shirt. It has a certain... energy."
+          },
+          {
+            "id": "shirt_streaky",
+            "text": "Hand him the streaky shirt. It looks like it has been through something, which feels appropriate."
+          },
+          {
+            "id": "shirt_stripy",
+            "text": "Hand him the striped shirt. Bold choice, but at least the pattern is intentional."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "shirt_hippy": {
+            "shirt_choice": "hippy"
+          },
+          "shirt_streaky": {
+            "shirt_choice": "streaky"
+          },
+          "shirt_stripy": {
+            "shirt_choice": "stripy"
+          }
+        },
+        "note": "Pure cosmetic choice. No relationship or gameplay impact. Determines Hank's outfit for the next several chapters. The shirt_choice variable is not exported — it's flavor only."
+      }
+    },
+
+    {
+      "id": "n004_explore_house",
+      "phase": "hanks_house",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Hank disappears into the bedroom to finish getting ready, grunting for you to give him five minutes as he pulls the door shut. You hear him stumbling around inside, opening drawers, muttering.\n\nYou are alone in Hank Anderson's house. Sumo watches you from his bed by the couch, head on his paws.\n\nThe living room is cluttered but lived-in — vinyl records stacked on a shelf, a faded painting of a ship on one wall, dog hair on every surface. The kitchen still has the broken window, the overturned chair, the empty whiskey bottle. The revolver remains on the floor where you found it, one round in the cylinder.\n\nA stack of magazines sits on the kitchen table beside a half-eaten takeout container. Photographs and personal items are scattered throughout the house — on shelves, pinned to the fridge, tucked into corners.\n\nFive minutes is a long time when you process information at android speed.",
+        "choices": [
+          {
+            "id": "explore_thorough",
+            "text": "Examine everything. The magazines on the table. The photographs on the shelves and fridge. The revolver on the floor — what was he doing with it? The records, the painting, every detail this house can tell you about the man you are supposed to work with. You want to understand Hank Anderson."
+          },
+          {
+            "id": "explore_quick",
+            "text": "Glance through the most visible items — the magazines on the table, whatever photographs are in plain sight. You are here to work a case, not to inventory a colleague's personal life. But a little context never hurts."
+          },
+          {
+            "id": "explore_skip",
+            "text": "Sit on the couch and wait. Hank's personal life is not your concern. Pet Sumo, maybe. Review the case files in your memory instead. When he is ready, you leave."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "explore_thorough": {
+            "house_exploration": "thorough",
+            "found_russian_roulette": true,
+            "found_son_photo": true,
+            "software_instability": 1
+          },
+          "explore_quick": {
+            "house_exploration": "quick",
+            "found_russian_roulette": false,
+            "found_son_photo": true
+          },
+          "explore_skip": {
+            "house_exploration": "skip",
+            "found_russian_roulette": false,
+            "found_son_photo": false
+          }
+        },
+        "note": "thorough: Connor examines the revolver (learns Hank was playing Russian Roulette — one bullet, one pull), reads both magazines (Tainted Love about android relationships, Pull the Plug? about android rights), finds Hank's music collection and the ship painting, pets Sumo, and finds the photo of Hank's son Cole on the kitchen table. +1 SI for engaging with Hank's pain beyond mission scope. quick: Connor reads the magazines and notices the photo of Hank's son on the kitchen table (it's in plain sight). Does not investigate the revolver closely enough to understand Russian Roulette. skip: Connor waits passively. Misses the son's photo and the Russian Roulette evidence. No new information gained."
+      }
+    },
+
+    {
+      "id": "n005_leave",
+      "phase": "departure",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "The bedroom door opens. Hank emerges, dressed, his hair still damp but his eyes a fraction clearer. He scans the room — sees you standing by the kitchen table, near the photograph and the revolver.\n\nHis jaw tightens. He picks up the gun from the floor, checks the cylinder without looking at you, and puts it in a drawer. The photograph — a small boy with bright eyes and a gap-toothed smile — he leaves where it is.\n\nHe says you went through his things. It is not a question.\n\nHe pulls on his jacket. Sumo whines at the door. Hank crouches to scratch behind the dog's ears, telling Sumo to be good and promising he'll be back.\n\nHe straightens, looks at you one more time — measuring something — then opens the front door. Cold November air rushes in.\n\nLet's go, he says — the Eden Club — then pauses on the threshold and warns you never to break his window again.",
+          "quick": "The bedroom door opens. Hank shuffles out, dressed, looking marginally more human than he did twenty minutes ago. He glances at the kitchen — the broken window, the overturned chair, the mess he left behind.\n\nHe calls the dog over, and Sumo pads to him for a scratch behind the ears as he tells him to be good.\n\nHe grabs his jacket from the couch and fishes his car keys from a pocket, asking whether you said the Eden Club. He is already heading for the door, not waiting for your answer.\n\nCold air from outside. The night smells like rain.\n\nLet's get this over with, he mutters — and you're paying for that window.",
+          "skip": "The bedroom door opens. Hank steps out, dressed, moving with the careful deliberation of a man who knows exactly how drunk he still is. He finds you on the couch, Sumo's head in your lap.\n\nHe looks around the kitchen and asks whether you touched anything. You tell him you didn't.\n\nHe nods — approving or disappointed, you cannot tell. He grabs his jacket and tells you it's time to move: the Eden Club.\n\nSumo whines as Hank opens the front door; he tells the dog to stay, and it obeys. Hank steps into the cold without looking back.\n\nYou follow him into the November night."
+        }
+      },
+
+      "system": {
+        "effects": {},
+        "context_condition": {
+          "thorough": "house_exploration == thorough",
+          "quick": "house_exploration == quick",
+          "skip": "house_exploration == skip"
+        },
+        "result": "ending_leave_for_eden_club",
+        "note": "Mandatory departure node. All paths lead to the same ending. The context variant reflects Hank's awareness of Connor's snooping and sets the emotional tone heading into the next chapter."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "This chapter has only 1 ending. It is a relationship-building chapter with no branching outcomes.",
+    "ending_leave_for_eden_club": {
+      "tier": "neutral",
+      "title": "On to Eden Club",
+      "narrative": "You walk to the car in silence. Hank drives — badly, given his condition, but he refuses to let an android behind the wheel. The streets of Detroit slide past: neon signs, automated buses, the occasional patrol drone cutting across the sky.\n\nThe Eden Club is across town. Hank does not speak for most of the drive. The radio plays Knights of the Black Death at low volume.\n\nWhatever you learned in that house — about Hank, about the gun, about the boy in the photograph — you carry with you now. And whatever Hank saw when he looked at you tonight — concern or cold efficiency, curiosity or indifference — that is what he carries.\n\nThe Eden Club's pink neon appears on the horizon. Another case. Another deviant. And the question that follows you everywhere: what are they running from, and what are they running toward?",
+      "survivors": ["Connor", "Hank"],
+      "deaths": []
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This is a Connor chapter. Connor always respawns — no alive-check needed. Always runs.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: software_instability (cumulative), hank_relationship (cumulative), connor_death_count (cumulative), ch15_rupert_body_available, ch12_knows_sumo_name.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants based on system.context_condition if present",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, and advance",
+      "   d. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "5. NODE n005_leave: Mandatory node. Resolve context variant based on house_exploration. Apply result ending_leave_for_eden_club directly.",
+      "6. NODE n001_amanda_garden: Resolve choices_variants alongside context_variants using system.choices_condition (same key as context_condition). The AI sees only the choices matching the active branch.",
+      "7. RELATIONSHIP DELTAS: hank_relationship range this chapter: -1 to +2. software_instability range: 0 to +2. amanda_relationship range: -1 to +1.",
+      "8. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, or any system-layer information to the AI player. The AI should experience this as a quiet, domestic scene — it should not know which choices affect relationships or which discoveries matter for future chapters."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Connor was summoned to the Zen Garden for a debriefing with Amanda about the Urban Farms investigation."
+      },
+      {
+        "condition_variable": "amanda_response",
+        "options": {
+          "analytical": "He delivered a precise, clinical report — the kind of answer CyberLife expected. Amanda seemed satisfied.",
+          "hesitant": "He hesitated when describing the deviant's suicide, admitting the moment on the rooftop had left an impression on him that did not fit a standard malfunction report. Amanda noted the hesitation.",
+          "troubled": "He admitted that the deviant's desperate behavior during the chase troubled him — its resourcefulness and will to survive exceeded anything a simple software error could explain. Amanda's response was measured.",
+          "pragmatic": "He redirected the conversation toward next steps and future leads, keeping the focus on progress rather than past outcomes."
+        }
+      },
+      {
+        "text": "Connor then went to Lieutenant Anderson's home to pick him up for a new case. He found Hank passed out drunk at his kitchen table with a revolver on the floor."
+      },
+      {
+        "condition_variable": "bathroom_attitude",
+        "options": {
+          "understanding": "After sobering Hank up in the bathroom, Connor showed genuine concern for what he had walked into — the drinking, the gun. Hank seemed caught off guard by the sincerity.",
+          "distant": "After sobering Hank up, Connor kept things strictly professional — damage to the window, the case at hand. Hank registered the detachment."
+        }
+      },
+      {
+        "condition_variable": "house_exploration",
+        "options": {
+          "thorough": "While waiting for Hank to dress, Connor thoroughly explored the house. He found magazines about android-human relations, learned about Hank's taste in music and art, discovered that Hank had been playing Russian Roulette with a loaded revolver, and found a photograph of Hank's young son on the kitchen table.",
+          "quick": "While waiting for Hank, Connor glanced through the visible items in the house — magazines on the table and a photograph of Hank's young son.",
+          "skip": "Connor waited on the couch without examining Hank's personal belongings."
+        }
+      },
+      {
+        "text": "They left together for the Eden Club to investigate a new deviant case."
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch18_found_son_photo",
+        "source": "found_son_photo"
+      },
+      {
+        "target": "ch18_knows_russian_roulette",
+        "source": "found_russian_roulette"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch18_found_son_photo",
+      "ch18_knows_russian_roulette",
+      "software_instability",
+      "hank_relationship",
+      "amanda_relationship",
+      "connor_death_count"
+    ]
+  }
+}

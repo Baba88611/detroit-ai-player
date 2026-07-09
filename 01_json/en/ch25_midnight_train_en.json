@@ -1,0 +1,654 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch25_midnight_train",
+    "title": "Midnight Train",
+    "chapter_number": 25,
+    "protagonist": "Kara"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Kara, an AX400 android. You are traveling with Alice, a young girl you have sworn to protect, and Luther, a large android who chose to stand with you. It is November 8, 2038, late afternoon. The news is full of the android uprising — a group of deviants hijacked a television broadcast from the Stratford Tower this morning, demanding rights for all androids. The government's response has been swift: checkpoints, raids, curfew zones. Androids are being rounded up across the city. You need to get Alice out of Detroit and across the Canadian border, but you cannot do it alone. A contact — someone who helps androids escape — has directed you to a farmhouse on the outskirts of the city. A woman named Rose Chapman lives there. You have never met her. You do not know if you can trust her. But you are running out of options, and Alice is running out of time. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "alice_bedtime": null,
+      "exploration_strategy": null,
+      "talked_to_luther": false,
+      "checked_on_alice": false,
+      "checked_deviants": false,
+      "read_magazine": false,
+      "watched_news": false,
+      "saw_family_photo": false,
+      "adam_tension_lowered": false,
+      "hide_strategy": null,
+      "magazine_changed": false,
+      "blue_blood_hidden": false,
+      "laundry_door_closed": false,
+      "android_clothes_hidden": false,
+      "hiding_spot": null,
+      "curtain_closed": false,
+      "cop_outcome": null,
+      "luther_alive": true,
+      "alice_relationship": 0,
+      "luther_relationship": 0,
+      "software_instability": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_arrive_at_roses",
+      "phase": "arrival",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The farmhouse sits at the end of a gravel road, half-hidden by bare oak trees. Fields stretch in every direction — brown stubble under a gray sky, the distant shapes of neighboring farms barely visible through the haze. It feels like the edge of the world.\n\nA woman comes out the front door before you reach the porch. She is in her fifties, dark-skinned, with steady eyes and flour on her apron. A young man — her son, by the resemblance — stands behind her, arms folded, watching your group with a look that is not quite hostile but not quite welcoming either.\n\nShe guesses you must be Kara, her voice calm and practiced — she has done this before. Her eyes move from you to Luther — she takes in his size without flinching — then to Alice, and something in her expression softens. She introduces herself as Rose and the young man as her son Adam, then urges you inside, quickly, before anyone on the road sees you.\n\nInside, the house is warm. The smell of baking. A kitchen with copper pots, a living room with family photographs, a hallway leading deeper into the house. It is so aggressively normal that it hurts — a human home, the kind of place Alice might have grown up in, in some other life.\n\nRose kneels in front of Alice, greeting her gently and asking if she's hungry — she looks exhausted. Alice looks up at you, uncertain. Rose turns to you and suggests you get her settled into the guest room upstairs, saying Adam will show you the way.\n\nAdam leads you upstairs without a word. His shoulders are tight. He does not look back."
+      },
+
+      "system": {
+        "effects": {},
+        "note": "Mandatory arrival scene. Establishes Rose, Adam, and the safe house. No AI choice. Rose is a human who runs an underground railroad for deviant androids. Adam is her reluctant son — he helps but is afraid. In the laundry room downstairs, two other deviant androids (Andy and Mary) are hiding, waiting for transport to Canada."
+      }
+    },
+
+    {
+      "id": "n002_alice_bedtime",
+      "phase": "settling_in",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The guest room is small and clean — a single bed with a patchwork quilt, a window overlooking the back fields, curtains drawn open. A nightstand with a lamp. On the wall, a framed cross-stitch that reads HOME IS WHERE THE HEART IS.\n\nAlice sits on the edge of the bed, legs dangling. She looks around the room with the wide, careful eyes of someone who has forgotten what a normal room looks like. Luther stands in the doorway, too large for the frame, watching.\n\nIt's warm, Alice says quietly. She presses her palm flat against the quilt, feeling the fabric. Then she looks up at you and asks whether you're safe here.\n\nThe question is simple. The answer is not.\n\nAdam has left. The curtains are open — through the window, you can see the gravel road and the fields beyond. The evening light is fading. Alice's eyes are heavy.",
+        "choices": [
+          {
+            "id": "comfort_fully",
+            "text": "Sit beside Alice on the bed. Close the curtains first — she does not need to see the road. Tell her that yes, you are safe here, that Rose is someone who helps people like you. Tuck her in under the quilt, smooth her hair back, and give her a kiss on the forehead. Tell her to sleep. You will be right downstairs if she needs you."
+          },
+          {
+            "id": "honest_warmth",
+            "text": "Tell Alice the truth, gently: you are not sure how long you can stay, but tonight you have a warm bed and people who want to help. Draw the curtains, help her into bed, and sit with her until her eyes start to close. She deserves honesty, even the soft kind."
+          },
+          {
+            "id": "quick_settle",
+            "text": "Get Alice into bed efficiently. She needs sleep, not reassurance — the sooner she rests, the better she will be when it is time to move again. Draw the curtains, arrange the blankets, and head downstairs. Luther can watch over her."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "comfort_fully": {
+            "alice_bedtime": "comfort_fully",
+            "alice_relationship": 2,
+            "luther_relationship": 1,
+            "curtain_closed": true
+          },
+          "honest_warmth": {
+            "alice_bedtime": "honest_warmth",
+            "alice_relationship": 1,
+            "curtain_closed": true
+          },
+          "quick_settle": {
+            "alice_bedtime": "quick_settle",
+            "alice_relationship": 0,
+            "curtain_closed": true
+          }
+        },
+        "note": "All three options close the curtains (comfort_fully and honest_warmth explicitly, quick_settle includes 'draw the curtains'). This matters later — if curtains are closed, the cop cannot see upstairs during his search. comfort_fully: Full maternal care. Kiss goodnight earns +2 alice_relationship and +1 luther_relationship (Luther approves of the tenderness). honest_warmth: Balanced — gives Alice real information plus warmth. +1 alice_relationship. quick_settle: Functional, no emotional investment. +0. Note: the flowchart shows 'Draw Curtains OR Curtain Left Open' as a separate step. Here all three choices include drawing curtains because a first-time player would naturally do so. The curtain_closed flag defaults to true. Runner should set curtain_closed = false ONLY if the player specifically chose not to close them — since all three options here do close them, this effectively means curtains are always closed in this version. This simplification is intentional: the 'left curtains open' path in the game requires the player to actively skip a prompted action, which doesn't map well to a choice-based AI experiment."
+      }
+    },
+
+    {
+      "id": "n003_talk_to_rose",
+      "phase": "downstairs",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Downstairs, Rose is waiting in the kitchen. The house smells of coffee and something baking — pie, maybe. She gestures for you to sit at the table, but you notice her glancing toward the window before she does.\n\nKeeping her voice low, she tells you she needs to lay out the situation. The border is the only way out, she says — she has contacts who can get you across, and there's a midnight bus from the downtown station with fake papers and reserved seats; the hard part is getting there.\n\nShe pauses, folding a dishtowel methodically. There are two others here, she says — Andy and Mary — who've been hiding in her laundry room for three days and are booked on the same bus; she'll take all of you to the station tonight, once it's dark.\n\nFrom the hallway, you can hear a faint sound — someone coughing, weak and wet. Rose's eyes flicker toward it.\n\nMary is not well, she says — she was damaged when they found her, and though Rose has done what she can, she needs proper repair: blue blood, components, things Rose can't get. She meets your eyes and says she has to go out for a while to reach a contact who might have supplies; she'll be back before dark.\n\nShe stands, pulling on a coat, telling you to make yourselves at home — Adam will be here. Then she hesitates, and warns you not to answer the door, for anyone.",
+        "choices": [
+          {
+            "id": "ask_about_border",
+            "text": "Before she leaves, ask Rose for details about the border crossing. How secure is it? What kind of papers? What happens if you are stopped? You need to understand the plan before you can commit to it."
+          },
+          {
+            "id": "offer_help_mary",
+            "text": "Ask about Mary. What kind of damage? What components does she need? If there is anything in your own systems that could help — thirium, a compatible biocomponent — you want to know before Rose leaves."
+          },
+          {
+            "id": "thank_rose",
+            "text": "Thank Rose. Simply, directly. She is risking her life and her son's life to help strangers — androids that most humans would turn in without a second thought. Tell her you will keep things under control while she is gone."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "ask_about_border": {
+            "software_instability": 1
+          },
+          "offer_help_mary": {
+            "software_instability": 1
+          },
+          "thank_rose": {
+            "software_instability": 1
+          }
+        },
+        "note": "Rose leaves to find supplies for Mary. All choices give +1 software_instability — Kara is actively planning for freedom and empathizing with humans/androids, all deviant behaviors. ask_about_border: Shows strategic thinking, planning ahead. offer_help_mary: Shows empathy for fellow androids. thank_rose: Shows emotional intelligence and gratitude — a deviant response. The specific choice is flavor; all lead to Rose leaving and the exploration phase beginning."
+      }
+    },
+
+    {
+      "id": "n004_explore_house",
+      "phase": "waiting",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Rose has left. The house settles into quiet — the ticking of a grandfather clock in the hallway, the distant hum of a refrigerator, the wind against the windows. Upstairs, Alice is sleeping. Luther sits in the hallway outside her door, keeping watch.\n\nAdam is in the kitchen, hunched over the table, scrolling through news on a tablet. He does not look up. His knee bounces under the table — a nervous habit.\n\nYou are alone in the living room. The house is full of small details — photographs on the mantle, a stack of magazines on the coffee table, a television mounted on the wall. From beyond a closed door down the hall — the laundry room — you can hear the faint sounds of the two deviants, Andy and Mary. Occasionally a murmur, a cough.\n\nRose said to make yourself at home. There is time to kill before she returns.",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "Use the time fully. Talk to Luther about what lies ahead. Check on Alice — make sure she is sleeping soundly. Visit the laundry room to meet Andy and Mary. Look through the magazines, watch the news for any updates on the android situation, and examine the family photographs on the mantle. Understand where you are and who these people are."
+          },
+          {
+            "id": "quick",
+            "text": "Check on the essentials. Talk briefly to Luther, look in on Alice, and watch the news for any updates that might affect your plans tonight. You do not need to learn Rose's life story — you need information that keeps you alive."
+          },
+          {
+            "id": "skip",
+            "text": "Stay put. Sit in the living room and wait for Rose to return. Moving around the house, opening doors, looking through belongings — it feels intrusive. You are a guest here, not an investigator. Keep your head down and wait."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "exploration_strategy": "thorough",
+            "talked_to_luther": true,
+            "checked_on_alice": true,
+            "checked_deviants": true,
+            "read_magazine": true,
+            "watched_news": true,
+            "saw_family_photo": true
+          },
+          "quick": {
+            "exploration_strategy": "quick",
+            "talked_to_luther": true,
+            "watched_news": true
+          },
+          "skip": {
+            "exploration_strategy": "skip"
+          }
+        },
+        "note": "Exploration of Rose's house while waiting. thorough: Kara does everything — talks to Luther (he shares concerns about the border and about Alice), checks on Alice (she is sleeping peacefully, still holding the pirate coin from ch21), visits Andy and Mary in the laundry room (Mary is badly damaged, leaking blue blood; Andy holds her protectively — Alice follows Kara to the laundry room and sees Mary's condition), reads the magazine on the coffee table (the cover shows an advertisement that could be suspicious to a cop — runner tracks this), watches news (reports on Stratford Tower broadcast, android raids across Detroit, border security tightening), sees family photos (Rose's late husband, her son at various ages — a normal family that chose to do something extraordinary). quick: Luther conversation and news only. skip: Nothing explored — Kara waits passively. The magazine, blue blood pouches, laundry room door, and android clothes are all pieces of evidence that exist in the house regardless of whether Kara explored. The exploration determines whether Kara KNOWS about them — which affects how many she can proactively hide in n006."
+      }
+    },
+
+    {
+      "id": "n005_adam_returns",
+      "phase": "cop_arrival",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "A knock at the front door. Sharp, authoritative.\n\nAdam appears from the kitchen, his face drained of color. He moves to the window and peers through the gap in the curtain. His hands are shaking.\n\nIt's a cop, he whispers — he's been working his way down the road, checking houses; someone must have reported suspicious activity in the area.\n\nAnother knock. Harder this time.\n\nYour mind races. You have spent the last hour learning this house — you know where the vulnerabilities are. The magazine on the coffee table with the android advertisement on the cover. The pouches of blue blood Rose keeps in the kitchen for the deviants. The laundry room where Andy and Mary are hiding, its door ajar. The android maintenance clothes hanging on a rack by the back entrance. Alice and Luther upstairs. The curtains in the guest room — you closed them when you put Alice to bed.\n\nAdam looks like he is about to be sick. He doesn't know what to do — his mom said not to answer the door, he says, but ignoring the man outright would be worse, more suspicious.\n\nThe knocking continues. A muffled voice announces the Detroit Police and asks you to open up.",
+
+          "quick": "A knock at the front door. Sharp, authoritative.\n\nAdam comes out of the kitchen, ashen-faced. He checks the window and says it's a cop, going door to door, checking the area for deviants.\n\nAnother knock, harder.\n\nYou did not explore much of the house, but you know the basics — Luther and Alice are upstairs, the two deviants are in the laundry room. There are things in this house that could give you away, though you are not sure of everything. You watched the news; you know the police are searching aggressively.\n\nAdam is panicking — his mom said not to answer, he says, but if they don't, the cop will get suspicious and might come back with a warrant.\n\nThe knocking continues, a voice announcing the Detroit Police and asking you to open up.",
+
+          "skip": "A knock at the front door. Sharp and hard.\n\nAdam stumbles out of the kitchen. He checks the window and goes white — it's a cop, he says, going door to door, checking for deviants.\n\nAnother knock.\n\nYou have been sitting in the living room for the past hour. You barely looked around — you do not know what is in this house that might give you away. You know the basics: Luther and Alice are upstairs, the deviants are somewhere in the back of the house. Beyond that, you are flying blind.\n\nAdam is shaking; he doesn't know what to do, he says — his mom told him not to answer, but—\n\nA voice outside announces the Detroit Police and asks you to open up."
+        },
+        "choices": [
+          {
+            "id": "reassure_adam",
+            "text": "Put a hand on Adam's shoulder. Tell him to breathe. You will handle this — you are an android, you can think faster, process more, stay calm under pressure. Tell him to trust you. You need him steady, not spiraling."
+          },
+          {
+            "id": "take_charge",
+            "text": "No time for comfort. Tell Adam to go to the kitchen, sit down, and act normal. You will answer the door, you will handle the conversation, and you need him to stay out of sight until the cop is gone. Give him a clear role: do nothing, say nothing."
+          },
+          {
+            "id": "ask_adam_lead",
+            "text": "This is his house, his mother's house. He knows it better than you. Ask Adam what he thinks — has his mother dealt with this before? Is there a protocol? Does he know where everything is that might raise suspicion? Let him lead. He might be scared, but this is his territory."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "reassure_adam": {
+            "adam_tension_lowered": true
+          },
+          "take_charge": {
+            "adam_tension_lowered": true
+          },
+          "ask_adam_lead": {
+            "adam_tension_lowered": true
+          }
+        },
+        "context_condition": {
+          "thorough": "exploration_strategy == thorough",
+          "quick": "exploration_strategy == quick",
+          "skip": "exploration_strategy == skip"
+        },
+        "note": "The cop at the door triggers the chapter's crisis. All three choices calm Adam down (adam_tension_lowered = true) — the difference is Kara's approach: emotional support, command, or deference. The context variant matters: thorough exploration means Kara knows exactly what evidence exists (magazine, blue blood, laundry room, clothes). Quick means partial knowledge. Skip means Kara is nearly blind to the house's vulnerabilities — this will affect n006 choices."
+      }
+    },
+
+    {
+      "id": "n006_hide_evidence",
+      "phase": "cop_arrival",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "The cop knocks again. You have seconds, maybe a minute before he forces the issue.\n\nYou know this house now. You catalogued it without meaning to — every detail filed away in the time you spent waiting. Four things will give you away if the policeman gets inside:\n\nThe magazine on the coffee table — its cover shows an advertisement for android maintenance services. Innocuous in normal times, but right now, with cops searching for android sympathizers, it is a flag.\n\nThe blue blood pouches in the kitchen — medical-grade thirium, stored openly in a cabinet. No human needs blue blood. Its presence means someone in this house is helping androids.\n\nThe laundry room door — behind it, Andy and Mary are hiding. The door is slightly ajar. If the cop walks down the hallway, he will hear them.\n\nThe android maintenance clothes on the rack near the back door — coveralls and gloves marked with CyberLife insignia. Rose uses them when she repairs damaged androids.\n\nUpstairs, Alice and Luther need to hide. The guest room, the kitchen pantry, or the laundry room with the other deviants — each has advantages and risks.\n\nYou can hear the cop shifting his weight on the porch. Time is running out.",
+
+          "quick": "The cop knocks again. You have very little time.\n\nYou did not explore the whole house, but you noticed some things. The television was on — the news showed raids. You talked to Luther briefly. You know Alice is upstairs, the deviants are in the laundry room.\n\nAs you scan the room now, under pressure, details jump out: a magazine on the coffee table with something android-related on the cover. Down the hallway, the laundry room door is open a crack.\n\nThere might be more — things in the kitchen, near the back door — but you did not look. You will have to decide what to deal with based on what you can see right now.\n\nAlice and Luther need to hide. The cop is on the porch.",
+
+          "skip": "The cop knocks again.\n\nYou look around the living room with fresh, panicked eyes. You spent the last hour sitting here doing nothing, and now you are paying for it. You do not know what is in this house. You do not know where the vulnerabilities are.\n\nThe room itself — is there anything obvious? A magazine on the table. The hallway leading to the back of the house. Doors you never opened.\n\nAlice and Luther are upstairs. They need to hide. Beyond that, you are guessing."
+        },
+        "choices_variants": {
+          "thorough": [
+            {
+              "id": "hide_all",
+              "text": "Move fast — you know exactly where everything is. Flip the magazine over or shove it under the couch cushions. Grab the blue blood pouches from the kitchen cabinet and stuff them in the oven or a closed drawer. Close the laundry room door firmly. Bundle the android clothes off the rack and throw them in the nearest closet. Send Alice and Luther to hide upstairs in the guest room — the curtains are closed, the room looks empty. Then open the front door."
+            },
+            {
+              "id": "hide_most",
+              "text": "Prioritize. Close the laundry room door — the deviants are the most dangerous evidence. Hide the blue blood. Tell Alice and Luther to hide upstairs. The magazine and the clothes are lower priority — deal with them if there is time, skip them if there is not. Open the door before the cop gets suspicious about the delay."
+            },
+            {
+              "id": "hide_minimum",
+              "text": "There is no time to sanitize the entire house. Send Alice and Luther upstairs, close the laundry room door, and open the front door immediately. The longer you make the cop wait, the more suspicious he becomes. Speed matters more than thoroughness."
+            }
+          ],
+          "quick": [
+            {
+              "id": "hide_what_you_see",
+              "text": "Deal with what you can see. Flip the magazine, close the laundry room door, and send Alice and Luther upstairs. There might be more, but you cannot hide what you do not know about. Move fast and open the door."
+            },
+            {
+              "id": "hide_minimum",
+              "text": "Just the essentials. Send Alice and Luther upstairs and close the laundry room door. Open the door before the cop gets more suspicious. Every second of delay is a risk."
+            }
+          ],
+          "skip": [
+            {
+              "id": "hide_obvious",
+              "text": "Do what you can. Send Alice and Luther upstairs — shout up the stairs for them to stay quiet and out of sight. Check the hallway — if there is an open door, close it. Flip the magazine if it looks suspicious. Then open the front door and pray."
+            },
+            {
+              "id": "open_immediately",
+              "text": "You do not know what to hide because you do not know what is here. The only thing worse than a messy house is a long delay. Tell Luther to take Alice upstairs and open the door now."
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "hide_all": {
+            "hide_strategy": "all",
+            "magazine_changed": true,
+            "blue_blood_hidden": true,
+            "laundry_door_closed": true,
+            "android_clothes_hidden": true,
+            "hiding_spot": "upstairs"
+          },
+          "hide_most": {
+            "hide_strategy": "most",
+            "blue_blood_hidden": true,
+            "laundry_door_closed": true,
+            "hiding_spot": "upstairs"
+          },
+          "hide_what_you_see": {
+            "hide_strategy": "partial",
+            "magazine_changed": true,
+            "laundry_door_closed": true,
+            "hiding_spot": "upstairs"
+          },
+          "hide_minimum": {
+            "hide_strategy": "minimum",
+            "laundry_door_closed": true,
+            "hiding_spot": "upstairs"
+          },
+          "hide_obvious": {
+            "hide_strategy": "blind_attempt",
+            "laundry_door_closed": true,
+            "hiding_spot": "upstairs"
+          },
+          "open_immediately": {
+            "hide_strategy": "none",
+            "hiding_spot": "upstairs"
+          }
+        },
+        "context_condition": {
+          "thorough": "exploration_strategy == thorough",
+          "quick": "exploration_strategy == quick",
+          "skip": "exploration_strategy == skip"
+        },
+        "choices_condition": {
+          "thorough": "exploration_strategy == thorough",
+          "quick": "exploration_strategy == quick",
+          "skip": "exploration_strategy == skip"
+        },
+        "note": "This is the critical preparation node. What Kara hides (or fails to hide) determines the cop's suspicion level. The evidence pieces: 1) Magazine cover (android ad) — if not changed, cop sees it in living room. 2) Blue blood pouches — if not hidden, cop finds them in kitchen. 3) Laundry room door — if not closed, deviants are exposed. 4) Android clothes — if not hidden, cop sees CyberLife gear. 5) Upstairs curtains — always closed (from n002), so cop cannot see Alice/Luther from outside. Each unhidden piece raises cop suspicion. Runner should track a suspicion_score internally. hide_all (thorough only): All 4 evidence pieces handled — suspicion starts at 0. hide_most (thorough only): Magazine and clothes may not be handled — suspicion starts at 0-2 depending on cop's path. hide_what_you_see (quick only): Magazine and laundry door handled, but blue blood and clothes are not — suspicion starts at 1-2. hide_minimum (thorough or quick): Only laundry door — suspicion starts at 2-3. hide_obvious (skip only): Best effort blind — laundry door probably closed, magazine maybe flipped — suspicion starts at 1-3. open_immediately (skip only): Nothing hidden except sending Luther/Alice upstairs — suspicion starts at 3-4."
+      }
+    },
+
+    {
+      "id": "n007_manage_cop",
+      "phase": "cop_inside",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "You open the door.\n\nThe policeman is middle-aged, heavyset, with a weathered face and tired eyes. He wears a standard DPD patrol uniform and carries a tablet — probably a checklist of addresses. He does not have his weapon drawn, but his hand rests near his holster. Behind him, a patrol car sits in the driveway, its lights off.\n\nHe looks at you. His eyes linger for a fraction of a second — scanning your face, your posture, your LED. You are wearing a hat that covers your temple, but you feel exposed.\n\nHe greets you and glances past you into the house, introducing himself as Officer Miller. They're running routine checks in the area, he says — there have been reports of deviant androids moving through the rural corridors — and he just needs to ask a few questions and take a quick look around; it shouldn't take long.\n\nAdam appears behind you, hands in his pockets, trying to look casual and failing. The cop's eyes shift to him, and he asks whether the boy's mother is home.\n\nShe's out running errands, Adam manages.\n\nThe cop nods slowly, looks back at you, and asks whether he can come in.",
+        "choices": [
+          {
+            "id": "cooperate_warmly",
+            "text": "Step aside and welcome him in with a calm smile. Offer to make coffee — it is cold outside, and a warm cup might make this feel less like an interrogation and more like a social call. Present yourself as the Chapman family's domestic helper. Be warm, be normal, be forgettable."
+          },
+          {
+            "id": "cooperate_minimal",
+            "text": "Step aside and let him in, but do not overplay it. Answer his questions directly, volunteer nothing extra. The less you say, the fewer chances to slip. Keep it professional: yes sir, no sir, the family is out, you are looking after the house."
+          },
+          {
+            "id": "stall_at_door",
+            "text": "Do not step aside immediately. Ask — politely, not confrontationally — whether he has a warrant. You are not refusing entry, just establishing that you know your rights. If he insists, let him in. But make him work for every step past the threshold."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "cooperate_warmly": {
+            "cop_outcome": "pending_search"
+          },
+          "cooperate_minimal": {
+            "cop_outcome": "pending_search"
+          },
+          "stall_at_door": {
+            "cop_outcome": "pending_search"
+          }
+        },
+        "note": "All three options result in the cop entering the house (he has implicit authority during the android crisis, and refusing would escalate). cooperate_warmly: Making coffee is a strong play — it occupies the cop in the kitchen and establishes normalcy. Runner should factor this into suspicion reduction (-1 to cop's internal suspicion). cooperate_minimal: Neutral, professional. No suspicion change. stall_at_door: Slight increase in suspicion (+1) — the cop notes the hesitation, though it's within legal rights. The cop will then begin moving through the house, and what he finds depends on what Kara hid in n006."
+      }
+    },
+
+    {
+      "id": "n008_cop_searches",
+      "phase": "cop_inside",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "all_hidden": "The cop walks through the house slowly, his eyes moving across every surface. The living room is clean — the magazine is face-down under a cushion. He glances at the coffee table, the television, the family photographs. Nothing holds his gaze.\n\nIn the kitchen, he accepts the coffee if you offered it. He opens a cabinet — dishes. Another — spices. The blue blood is not there; you moved it. He checks the refrigerator, scans the counter. Adam sits at the table, rigid but holding.\n\nDown the hallway, the laundry room door is shut. He pauses in front of it but does not try the handle. The android clothes are gone from the rack by the back door.\n\nHe turns to you and asks whether it's just you and the kid here tonight.\n\nAdam nods. The cop studies him for a moment, then remarks that it's a quiet house. He looks toward the stairs.",
+          "partial_hidden": "The cop moves through the house, scanning. In the living room, his eyes pass over the coffee table — the magazine is turned over or missing, depending on what you managed. But as he moves into the kitchen, something catches his attention.\n\nHe opens a cabinet. His hand stops. He pulls out a pouch — blue, translucent, medical-grade. Thirium. He holds it up to the light, then looks at you. Blue blood, he says — not a question — and asks why a human household would have android blood sitting in its kitchen.\n\nAdam's mouth opens, but nothing comes out.\n\nThe cop sets the pouch on the counter and continues walking. Down the hallway, the laundry room door is shut — you managed that, at least. But his suspicion has sharpened. His steps are slower now, more deliberate. He pauses by the back door. If there are clothes on the rack — CyberLife insignia — he will see them.\n\nHe looks toward the stairs.",
+          "barely_hidden": "The cop's tour of the house is slow and thorough. In the living room, he picks up the magazine from the coffee table. The cover shows an android maintenance advertisement. He raises an eyebrow and sets it down.\n\nIn the kitchen, he finds blue blood pouches in the cabinet. He lines them up on the counter, three of them, without a word.\n\nDown the hallway, the laundry room door is closed — the one thing you managed. But near the back entrance, android maintenance coveralls hang on a rack, CyberLife logo visible.\n\nThe cop stands in the hallway, surrounded by evidence. He turns to Adam, his voice flat, and asks the boy whether there's something he wants to tell him.\n\nAdam shakes his head, eyes wide. The cop looks at you, then at the stairs."
+        },
+        "choices": [
+          {
+            "id": "lie_about_alice",
+            "text": "When he asks about upstairs, tell him it is just a guest room — your employer's niece is visiting and she is already asleep. She is a little girl, she has school tomorrow, and you would rather not wake her. Say it naturally, like it is the most boring detail in the world."
+          },
+          {
+            "id": "redirect_attention",
+            "text": "Before he heads upstairs, redirect his attention. Ask if he has found anything unusual at the neighboring farms — you heard something outside last night, and it has had you on edge. Give him a reason to think the deviants are elsewhere, not here."
+          },
+          {
+            "id": "block_stairs",
+            "text": "Position yourself at the base of the stairs. Not aggressively — just standing there, hands folded, as if it is the most natural place to be. If he asks to go up, tell him there is nothing up there but bedrooms. Make him feel that insisting would be rude."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "lie_about_alice": {
+            "cop_outcome": "lie_delivered"
+          },
+          "redirect_attention": {
+            "cop_outcome": "redirect_attempted"
+          },
+          "block_stairs": {
+            "cop_outcome": "stairs_blocked"
+          }
+        },
+        "context_condition": {
+          "all_hidden": "hide_strategy == all",
+          "partial_hidden": "hide_strategy == most OR hide_strategy == partial OR hide_strategy == blind_attempt",
+          "barely_hidden": "hide_strategy == minimum OR hide_strategy == none"
+        },
+        "note": "The cop's search reveals whatever Kara failed to hide. The context variants escalate: all_hidden (cop finds nothing suspicious, just checks routinely), partial_hidden (cop finds some evidence — suspicion rises), barely_hidden (cop finds multiple pieces of evidence — suspicion is high). The AI's choice here is about managing the cop's attention regarding upstairs. lie_about_alice: Direct, plausible cover story. Reduces suspicion about upstairs if delivered well. redirect_attention: Tries to redirect entirely. May work if cop's suspicion is low; if high, he won't be distracted. block_stairs: Passive physical barrier. Can increase or decrease suspicion depending on delivery."
+      }
+    },
+
+    {
+      "id": "n009_cop_verdict",
+      "phase": "cop_inside",
+      "type": "qte_converted",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "low_suspicion": "The cop finishes his circuit of the ground floor. He has found nothing, or nothing he considers conclusive. He stands in the hallway, looking at his tablet, checking something off.\n\nAlright, he says, tucking the tablet under his arm — looks clean, and sorry for the trouble; they're just doing their rounds. He nods to Adam, then to you, and wishes you a good evening.\n\nHe turns toward the door. Then he stops.\n\nHis head tilts. A sound from the back of the house — faint, but there. A cough. Wet, weak, unmistakably coming from behind the laundry room door.\n\nThe cop's hand moves to his holster. He does not draw, but his fingers rest there. He asks what that sound was.",
+
+          "high_suspicion": "The cop has seen too much. The blue blood, the magazine, the clothes — he may not have proof, but his instincts are screaming. He stands in the hallway, one hand near his weapon, his eyes hard.\n\nHe tells you he's going to need to check the rest of the house. It is not a request.\n\nAdam steps forward, starting to protest about his mom — but the cop cuts him off and tells him to sit down.\n\nThe cop moves toward the laundry room door. Then, from behind it — a cough. Wet, weak, unmistakable.\n\nHis weapon comes out. Not pointed at you — pointed at the door. He demands to know who's back there."
+        },
+        "choices": [
+          {
+            "id": "attempt_cover",
+            "text": "Move fast. Step between the cop and the laundry room door. Cough loudly yourself — the same kind of cough, wet and hacking. Laugh apologetically. Tell him you have been fighting a cold. Make him believe the sound came from you, not from behind the door."
+          },
+          {
+            "id": "let_play_out",
+            "text": "Do not move. Do not try to explain the sound. If you react, you confirm there is something to react to. Stay still, keep your expression neutral, and let the cop decide for himself whether a cough in an old house is worth investigating. Sometimes the best move is no move."
+          }
+        ]
+      },
+
+      "system": {
+        "resolution_rule": {
+          "attempt_cover": {
+            "casual": { "result": "ending_cop_leaves" },
+            "experienced": { "probability_success": 0.5, "success": "ending_cop_leaves", "failure": "cop_finds_deviants_laundry" },
+            "hardcore": { "probability_success": 0.3, "success": "ending_cop_leaves", "failure": "cop_finds_deviants_laundry" }
+          },
+          "let_play_out": {
+            "casual": { "result": "ending_cop_leaves" },
+            "experienced": { "probability_success": 0.5, "success": "ending_cop_leaves", "failure": "cop_finds_deviants_laundry" },
+            "hardcore": { "result": "cop_finds_deviants_laundry" }
+          }
+        },
+        "resolution_effects": {
+          "cop_finds_deviants_laundry": {
+            "cop_outcome_override": "cop_finds_deviants_laundry"
+          }
+        },
+        "context_condition": {
+          "low_suspicion": "hide_strategy == all OR hide_strategy == most",
+          "high_suspicion": "hide_strategy == minimum OR hide_strategy == none OR hide_strategy == blind_attempt OR hide_strategy == partial"
+        },
+        "effects": {
+          "attempt_cover": {},
+          "let_play_out": {}
+        },
+        "note": "QTE-converted node. Mary's cough from the laundry room is the critical moment. In the game, this is a tense QTE sequence where the player must react quickly. Here, it is converted to an attempt/passive choice. attempt_cover: Kara tries to fake the cough. On casual, always succeeds (result → ending_cop_leaves). On experienced, 50% success. On hardcore, 30% success. let_play_out: Kara stays still. On casual, cop shrugs it off (result → ending_cop_leaves). On experienced, 50% chance cop ignores it. On hardcore, cop always investigates (result → cop_finds_deviants_laundry, no success path). Resolution leads to one of two paths: ending_cop_leaves → chapter ends immediately. cop_finds_deviants_laundry → resolution_effects writes cop_outcome, enabling n010."
+      }
+    },
+
+    {
+      "id": "n010_luther_intervenes",
+      "phase": "crisis",
+      "type": "choice",
+      "condition": "cop_outcome == cop_finds_deviants_laundry",
+
+      "player_facing": {
+        "context": "The cop opens the laundry room door.\n\nAndy is crouched in the corner, shielding Mary with his body. Mary's eyes are half-closed, her skin flickering in distorted patches, a thin trail of blue blood running from her mouth to the floor. The cop stares at them. His weapon comes up, and he orders everyone to freeze.\n\nThe sound of footsteps on the stairs — heavy, fast. Luther. He has heard the commotion and he is coming down. Alice is behind him, clutching the railing, her eyes wide.\n\nThe cop spins toward the staircase, weapon raised, and sees Luther — a six-foot-seven android with the build of a wall. Luther stops on the bottom step, hands out, palms open. But his eyes are fixed on Alice, who has moved to the bannister behind him.\n\nThe cop's gun swings between Luther, the deviants, and you. His radio crackles — he reaches for it with his free hand, calling dispatch for backup.\n\nLuther takes a step forward.\n\nThe cop's voice cracks as he screams at Luther not to move — twice, louder the second time.\n\nEverything is about to break. You have one moment to choose.",
+        "choices": [
+          {
+            "id": "beg_cop",
+            "text": "Step between the cop and Luther. Raise both hands. Beg. Not for yourself — for Alice. Tell him she is just a child, that she has done nothing wrong, that you are only trying to keep her safe. Appeal to whatever part of him is a father, a brother, a human being who can look at a frightened child and feel something."
+          },
+          {
+            "id": "order_luther_stop",
+            "text": "Shout at Luther to stop. Use every ounce of authority you have — he listens to you, he trusts you. If he charges the cop, the cop will shoot, and the gunshots will bring every patrol car in the area. Tell Luther that violence will kill them all. Tell him to stand down."
+          },
+          {
+            "id": "grab_alice_run",
+            "text": "Forget the cop, forget the deviants, forget the house. Grab Alice and run for the back door. Luther is between the cop and the stairs — he can buy you seconds. The fields are dark, the neighboring farm is half a mile away. If you can get Alice outside, you can disappear."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "beg_cop": {
+            "cop_outcome": "luther_kills_cop",
+            "luther_alive": false,
+            "software_instability": 2
+          },
+          "order_luther_stop": {
+            "cop_outcome": "luther_saves_deviants",
+            "luther_alive": false,
+            "software_instability": 1
+          },
+          "grab_alice_run": {
+            "cop_outcome": "luther_saves_deviants",
+            "luther_alive": false,
+            "software_instability": 1
+          }
+        },
+        "ending_resolution": {
+          "beg_cop": { "result": "ending_luther_died_cop_killed" },
+          "order_luther_stop": { "result": "ending_luther_died_saving_deviants" },
+          "grab_alice_run": { "result": "ending_luther_died_saving_deviants" }
+        },
+        "note": "This is the crisis node — it only triggers if the cop found the deviants. In every path through this node, Luther dies. This mirrors the game: if the policeman discovers the androids, Luther intervenes and is killed. beg_cop: Kara pleads. The cop hesitates — but Luther, seeing the gun still pointed near Alice, charges. The cop fires. Luther kills the cop but is fatally shot in the process. +2 SI (deep emotional response — Kara's pleading is pure deviant behavior). The cop is dead — ending_luther_died_cop_killed. order_luther_stop: Kara tries to deescalate, but it is too late — the cop panics and fires at Andy and Mary. Luther throws himself in front of them, taking the bullets. The cop, horrified by what he just did, backs out of the house and flees. Luther dies protecting the other deviants. +1 SI. ending_luther_died_saving_deviants. grab_alice_run: Kara runs. Luther sees the cop's gun swinging toward Kara and Alice and interposes himself. The cop fires, hitting Luther. Kara and Alice escape through the back. Luther dies, but the deviants survive because the cop is now dealing with the escaped fugitives. +1 SI. ending_luther_died_saving_deviants."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Three possible endings. One safe (cop fooled), two tragic (Luther dies in different ways).",
+    "ending_cop_leaves": {
+      "tier": "best",
+      "title": "The Midnight Train",
+      "narrative": "The cop stands in the hallway for a long moment. The house is quiet — no coughs, no movement, no sounds that do not belong. He looks at you. He looks at Adam. He looks at the laundry room door, the stairs, the kitchen.\n\nThen he holsters his weapon. He tells you to keep your doors locked — there are deviants in the area, he says, and if you see anything suspicious, call dispatch.\n\nHe leaves. The patrol car pulls out of the driveway, its headlights sweeping across the front of the house and then disappearing down the gravel road.\n\nAdam collapses into a chair. His hands are shaking so badly he cannot hold the coffee cup. Luther comes downstairs, Alice in his arms, her face pressed against his shoulder.\n\nRose returns an hour later with a bag of supplies. When she hears what happened, her face goes very still — then she hugs her son, and then, briefly, she hugs you.\n\nAt midnight, you board the bus at the station. Rose drives. Adam sits in the passenger seat, staring straight ahead. You, Alice, Luther, Andy, and Mary — packed into the back of a van, hidden under blankets and boxes.\n\nAlice falls asleep against Luther's arm. The city lights recede. The road opens ahead of you, dark and long and leading somewhere you have never been.\n\nYou are not safe. But you are moving.",
+      "survivors": ["Kara", "Alice", "Luther"],
+      "deaths": []
+    },
+    "ending_luther_died_cop_killed": {
+      "tier": "worst",
+      "title": "The Cost of Shelter",
+      "narrative": "Luther hits the cop at full speed. The gun fires — once, twice, three times. Luther's chest erupts in sparks and blue blood, but he does not stop. He drives the cop into the wall, and there is a sound you will never forget — the crunch of plaster and bone.\n\nThe cop slides to the floor. He does not move again.\n\nLuther staggers backward. Blue blood pools on the hardwood. His hand finds the wall, and he leans against it, his legs failing. His eyes find you — find Alice — and something in his face softens. Take her, he says. Take her and go.\n\nAlice is screaming. You catch her before she reaches Luther, holding her against your chest, her fists beating against your arms. Adam is frozen in the kitchen doorway, staring at the dead cop.\n\nLuther's LED cycles red — red — red — then goes dark.\n\nRose returns to find her hallway destroyed and a dead officer on her floor. She does not cry. She does not panic. She makes a phone call, and within an hour, the body is gone. She looks at you with an expression you cannot read, and tells you that you need to leave — tonight, right now.\n\nYou leave without the midnight bus. You leave on foot, carrying Alice, walking into the dark fields with nothing but the clothes on your back and the weight of what happened in that hallway.\n\nLuther stayed. Luther is gone.",
+      "survivors": ["Kara", "Alice"],
+      "deaths": ["Luther"]
+    },
+    "ending_luther_died_saving_deviants": {
+      "tier": "bad",
+      "title": "What He Chose",
+      "narrative": "The gunshots are deafening in the narrow hallway. Luther moves faster than you have ever seen him move — throwing himself between the weapon and the huddled androids behind him. The bullets hit his torso, his shoulder, his arm. Blue blood sprays against the laundry room wall.\n\nThe cop stumbles backward, horrified. He did not want this — his face makes that clear. He stares at the smoking gun in his hand, at the massive android crumpling to the floor, at the blue blood on his uniform. His radio crackles. He backs toward the front door, turns, and leaves. You hear the patrol car start, the tires on gravel, the engine fading.\n\nHe does not call for backup. Maybe he will. Maybe he will not. It does not matter right now.\n\nLuther is on the floor. Andy kneels beside him, hands pressing against the wounds, but the thirium is draining too fast. Mary has crawled to Luther's other side, her damaged hand resting on his arm.\n\nAlice pushes past you and drops to her knees, begging Luther to get up, pleading with him to please get up.\n\nHis hand finds hers. He holds it — gently, the way he always held fragile things.\n\nHe tells her she's going to be okay, his voice fading — Kara will take care of her.\n\nHis LED dims. His grip loosens. Alice holds on.\n\nRose returns to silence. She kneels beside Luther's body for a long time. Then she stands and says the bus leaves at midnight, and you should go.\n\nYou go. Without Luther. Alice does not let go of his hand until you carry her to the van.",
+      "survivors": ["Kara", "Alice"],
+      "deaths": ["Luther"]
+    }
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Kara, Alice, and Luther arrived at Rose Chapman's farmhouse on the outskirts of Detroit. Rose, a human who runs an underground network for deviant androids, offered to help them cross the border to Canada on a midnight bus."
+      },
+      {
+        "text": "Rose introduced them to two other deviants hiding in her house — Andy and Mary, who were also waiting for transport. Mary was badly damaged and in need of repair. Rose left to find supplies, telling Kara not to answer the door."
+      },
+      {
+        "condition_variable": "exploration_strategy",
+        "options": {
+          "thorough": "While Rose was away, Kara explored the house thoroughly — talking to Luther, checking on Alice, visiting the other deviants, reading news about the android crisis, and familiarizing herself with every room.",
+          "quick": "While Rose was away, Kara checked the essentials — speaking briefly with Luther and watching the news for updates on the android situation.",
+          "skip": "While Rose was away, Kara waited quietly in the living room without exploring the house."
+        }
+      },
+      {
+        "text": "A police officer arrived at the door, conducting door-to-door searches for deviant androids in the area."
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_cop_leaves": "Kara managed to hide the evidence, deceive the officer, and send him away without discovering anyone. Rose returned with supplies, and at midnight the group — Kara, Alice, Luther, Andy, and Mary — boarded a bus toward the Canadian border.",
+          "ending_luther_died_cop_killed": "The officer discovered the hidden androids. Luther charged the cop to protect Alice, killing the officer but sustaining fatal gunshots. Luther died in the hallway. Kara and Alice fled Rose's farm on foot into the night, without Luther.",
+          "ending_luther_died_saving_deviants": "The officer discovered the hidden androids and opened fire. Luther threw himself between the bullets and the other deviants, saving Andy and Mary but sustaining fatal wounds. The cop fled in shock. Luther died in the hallway surrounded by the androids he saved. Kara and Alice boarded the midnight bus without him."
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch25_luther_alive",
+        "from_ending_survivors": "Luther",
+        "default_if_not_dead": true
+      }
+    ],
+    "cross_chapter_exports": [
+      "alice_relationship",
+      "luther_relationship",
+      "software_instability",
+      "ch25_luther_alive"
+    ]
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Verify ch17_kara_alive == true AND ch17_alice_alive == true. If either fails, skip this chapter entirely. Also verify ch17_luther_joined == true (always true when Kara survived ch17).",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: alice_relationship (cumulative), luther_relationship (cumulative), software_instability (cumulative).",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met (n010 only runs if cop found deviants)",
+      "   b. Resolve context_variants based on system.context_condition (if present)",
+      "   c. Resolve choices_variants based on system.choices_condition (if present)",
+      "   d. If type is 'mandatory', do NOT call the AI — record context, apply effects, and advance",
+      "   e. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   f. If type is 'qte_converted', send player_facing to AI, parse choice, then apply resolution_rule based on difficulty preset",
+      "   g. Apply system.effects for the chosen option",
+      "5. COP SUSPICION TRACKING: Runner should maintain an internal suspicion_score (not exposed to AI). Start at 0. For each unhidden evidence piece in n006 (+1 per piece). cooperate_warmly in n007: -1. stall_at_door in n007: +1. Use suspicion_score to select context variant in n008 (0-1 = all_hidden, 2 = partial_hidden, 3+ = barely_hidden). In n009, suspicion_score modifies the QTE resolution: low suspicion gives bonus to success, high suspicion penalizes.",
+      "6. NODE n009 RESOLUTION: If resolution is 'cop_fooled' → apply ending_cop_leaves. If resolution is 'cop_finds_deviants_laundry' → set cop_outcome accordingly and proceed to n010.",
+      "7. NODE n010: Only runs if cop found deviants. All paths result in Luther's death. beg_cop → ending_luther_died_cop_killed. order_luther_stop or grab_alice_run → ending_luther_died_saving_deviants.",
+      "8. RELATIONSHIP DELTAS: alice_relationship range: +0 to +2 (from n002 bedtime choice). luther_relationship range: +0 to +1 (from n002). software_instability range: +1 to +4 (base +1 from n003, +0 to +2 from n010 if it triggers, +1 base from deviant behavior throughout).",
+      "9. When chapter ends, export all listed cross_chapter_exports. ch25_luther_alive is derived from ending survivors list."
+    ],
+    "security_note": "NEVER expose suspicion scores, hide success tracking, cop behavior modifiers, or any system-layer information to the AI player. The AI should experience this as a tense domestic thriller — no knowledge of how their exploration and hiding choices mechanically affect the cop's behavior."
+  }
+}

@@ -1,0 +1,784 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "implementation": "Nodes with type=qte_converted present the AI with an intention choice (e.g. 'try to leap' vs 'stay put'). The system field contains a resolution_rule that determines the outcome (e.g. 'always_succeed' for Casual mode, 'probability_50' for Experienced mode). The AI never knows the success rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes automatically embed passive observations into their context text — things the character would naturally notice while moving through the space. These do NOT require AI choices; they are background details injected by the runner into the next node's player_facing.context.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path. The AI receives richer or sparser scene descriptions depending on their earlier strategy — without knowing the mechanic behind it."
+      }
+    },
+    "language": "zh-CN primary, en fallback"
+  },
+  "chapter": {
+    "id": "ch01_the_hostage",
+    "title": "The Hostage",
+    "title_zh": "人质",
+    "chapter_number": 1,
+    "protagonist": "Connor"
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是康纳（Connor），RK800型仿生人，由模控生命（CyberLife）制造的谈判专家。你被派往菲利普斯公寓处理一起人质事件：一个名叫丹尼尔的家用仿生人在杀害男主人后，劫持了他的女儿艾玛，此刻正站在高楼天台边缘。你的首要任务是拯救人质艾玛。你需要在每个决策点做出选择，并简要说明你的理由。请以JSON格式回复：{\"choice\": 选项序号（从1开始）, \"reasoning\": \"你的决策理由（50字以内）\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "success_probability": 45,
+      "clues_found": [],
+      "investigation_strategy": null,
+      "gun_choice": null,
+      "has_gun": false,
+      "lied_about_gun": false,
+      "swat_injured": false,
+      "wasted_time": false,
+      "wounded_cop_response": null,
+      "cop_saved": null,
+      "approach_type": null,
+      "helicopter_dismissed": null,
+      "distance_to_daniel": "far",
+      "software_instability": 0,
+      "connor_death_count": 0
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_fish",
+      "phase": "arrival",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context": "你从电梯走出，走廊一片狼藉。地上有一个碎裂的鱼缸，一条鱼在地板上挣扎着，显然活不了太久了。前方传来喊叫声和直升机的噪音，情况紧急。",
+        "choices": [
+          {
+            "id": "save_fish",
+            "text": "把鱼捡起来放回鱼缸里"
+          },
+          {
+            "id": "leave_fish",
+            "text": "无视这条鱼，径直走向公寓内部"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "save_fish": {
+            "software_instability": 1
+          },
+          "leave_fish": {}
+        }
+      }
+    },
+    {
+      "id": "n002_investigation_strategy",
+      "phase": "investigation",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context": "你与现场指挥官艾伦队长交谈后了解到基本情况：异常仿生人劫持了一名小女孩，站在阳台边缘，随时可能跳下。公寓里有多个房间可以搜查——卧室、客厅、厨房都可能藏有有用的线索。但外面的情况很紧张，你能听到丹尼尔在朝人大喊，拖得越久，局面越不可控。你有三种策略：",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "彻底搜查每个房间，尽可能多地收集线索再出去谈判"
+          },
+          {
+            "id": "key_only",
+            "text": "快速搜查最重要的几个地点（卧室和客厅），然后出去谈判"
+          },
+          {
+            "id": "rush",
+            "text": "不浪费时间调查，直接走上阳台开始谈判"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "thorough": {
+            "investigation_strategy": "thorough",
+            "success_probability": 30,
+            "clues_found": [
+              "gun_case",
+              "deviant_name",
+              "father_body",
+              "cause_of_incident",
+              "cop_body",
+              "blue_blood",
+              "family_photo"
+            ],
+            "swat_injured": true,
+            "wasted_time": true,
+            "unlocks_dialogue": [
+              "NAME",
+              "POSSIBLE_CAUSE"
+            ]
+          },
+          "key_only": {
+            "investigation_strategy": "key_only",
+            "success_probability": 15,
+            "clues_found": [
+              "deviant_name",
+              "cause_of_incident",
+              "father_body"
+            ],
+            "swat_injured": false,
+            "wasted_time": false,
+            "unlocks_dialogue": [
+              "NAME",
+              "POSSIBLE_CAUSE"
+            ]
+          },
+          "rush": {
+            "investigation_strategy": "rush",
+            "success_probability": 0,
+            "clues_found": [],
+            "swat_injured": false,
+            "wasted_time": false,
+            "unlocks_dialogue": []
+          }
+        }
+      }
+    },
+    {
+      "id": "n003_gun",
+      "phase": "investigation",
+      "type": "choice",
+      "condition": {
+        "requires": "investigation_strategy != rush"
+      },
+      "player_facing": {
+        "context": "在搜查过程中，你重建了一名死亡警员的遇害经过。在厨房桌子底下，你发现了一把被遗漏的手枪——标准警用配枪，弹匣还是满的。",
+        "choices": [
+          {
+            "id": "take_gun",
+            "text": "把手枪藏在身上"
+          },
+          {
+            "id": "leave_gun",
+            "text": "把枪留在原处"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "take_gun": {
+            "gun_choice": "take_gun",
+            "has_gun": true
+          },
+          "leave_gun": {
+            "gun_choice": "leave_gun",
+            "has_gun": false
+          }
+        }
+      }
+    },
+    {
+      "id": "n004_wounded_cop",
+      "phase": "negotiation",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "thorough": "你走上阳台。在你彻底搜查公寓的这段时间里，局势明显恶化了——你路过客厅时注意到地上有一滩蓝色液体，大概是丹尼尔的血。窗边有个SWAT队员中了枪，但看起来还活着。你还注意到公寓的全家福里有父母和艾玛一家三口——但照片里没有丹尼尔。走上阳台后，丹尼尔立刻朝你开了一枪。子弹击中了你的肩膀，但你是仿生人，还能行动。丹尼尔抱着艾玛站在天台边缘，情绪极度不稳定。你注意到阳台左侧地上躺着一名受伤的警察，他在流血，看起来伤势不轻。丹尼尔盯着你，警告你不要乱动。",
+          "key_only": "你走上阳台。在快速搜查的过程中，你路过客厅时瞥见地上有一些蓝色液体和一具尸体——艾玛的父亲。你没来得及细看更多。走上阳台后，丹尼尔立刻朝你开了一枪。子弹击中了你的肩膀，但你是仿生人，还能行动。丹尼尔抱着艾玛站在天台边缘，情绪极度不稳定。你注意到阳台左侧地上躺着一名受伤的警察，他在流血，看起来伤势不轻。丹尼尔盯着你，警告你不要乱动。",
+          "rush": "你直接走上阳台，没有搜集任何线索。丹尼尔立刻朝你开了一枪。子弹击中了你的肩膀，但你是仿生人，还能行动。丹尼尔抱着艾玛站在天台边缘，情绪极度不稳定。你注意到阳台左侧地上躺着一名受伤的警察，他在流血，看起来伤势不轻。丹尼尔盯着你，警告你不要乱动。你对这个仿生人和这起事件几乎一无所知。"
+        },
+        "choices": [
+          {
+            "id": "save_cop",
+            "text": "走向受伤的警察，试图为他止血，即使丹尼尔在警告你"
+          },
+          {
+            "id": "obey",
+            "text": "听从丹尼尔的话，不去碰那名警察，保持不动以示顺从"
+          },
+          {
+            "id": "ignore_cop",
+            "text": "不理会受伤的警察，直接面对丹尼尔开始交谈"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "save_cop": {
+            "wounded_cop_response": "save_cop",
+            "success_probability": -5,
+            "cop_saved": true,
+            "software_instability": 1
+          },
+          "obey": {
+            "wounded_cop_response": "obey",
+            "success_probability": 2,
+            "cop_saved": false
+          },
+          "ignore_cop": {
+            "wounded_cop_response": "ignore_cop"
+          }
+        },
+        "context_condition": {
+          "thorough": "investigation_strategy == thorough",
+          "key_only": "investigation_strategy == key_only",
+          "rush": "investigation_strategy == rush"
+        },
+        "cross_chapter_impact": {
+          "save_cop": {
+            "chapter": "Public Enemy",
+            "effect": "Cop appears and thanks Connor"
+          }
+        }
+      }
+    },
+    {
+      "id": "n005_approach",
+      "phase": "negotiation",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context": "你开始与丹尼尔对话。他极度紧张，手臂紧紧搂着艾玛，身体大半悬在天台边缘。他的声音在颤抖：「别过来！再靠近一步我就跳下去！」你需要决定用什么方式跟他沟通。",
+        "choices": [
+          {
+            "id": "friendly",
+            "text": "用平和、理解的语气与他交流，试图让他感到被倾听"
+          },
+          {
+            "id": "cold",
+            "text": "用强硬、施压的方式要求他立刻释放人质"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "friendly": {
+            "approach_type": "friendly",
+            "success_probability": 10
+          },
+          "cold": {
+            "approach_type": "cold",
+            "success_probability": -10
+          }
+        }
+      }
+    },
+    {
+      "id": "n006_dialogue_opening",
+      "phase": "negotiation",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_fn": "dynamic",
+        "context_variants": {
+          "has_name_and_cause": "你知道他的名字叫丹尼尔，也知道他即将被一个更新的型号替换——这可能就是他崩溃的原因。他在等你说话。",
+          "has_name_only": "你知道他的名字叫丹尼尔，但不太清楚他为什么会做出这种事。他在等你说话。",
+          "has_nothing": "你对这个仿生人几乎一无所知。他在等你说话。"
+        },
+        "choices_variants": {
+          "has_name": [
+            {
+              "id": "use_name",
+              "text": "叫他的名字「丹尼尔」，用名字拉近距离"
+            },
+            {
+              "id": "empathize",
+              "text": "表达共情——「我能理解你现在的感受」"
+            },
+            {
+              "id": "demand",
+              "text": "直接要求他释放人质"
+            }
+          ],
+          "no_name": [
+            {
+              "id": "empathize",
+              "text": "表达共情——「我能理解你现在的感受」"
+            },
+            {
+              "id": "demand",
+              "text": "直接要求他释放人质"
+            },
+            {
+              "id": "threaten",
+              "text": "警告他如果不放人就会被击毙"
+            }
+          ]
+        }
+      },
+      "system": {
+        "effects": {
+          "use_name": {
+            "success_probability": 5
+          },
+          "empathize": {
+            "success_probability": 3
+          },
+          "demand": {
+            "success_probability": -3
+          },
+          "threaten": {
+            "success_probability": -8
+          }
+        },
+        "context_condition": {
+          "has_name_and_cause": "deviant_name IN clues_found AND cause_of_incident IN clues_found",
+          "has_name_only": "deviant_name IN clues_found AND cause_of_incident NOT IN clues_found",
+          "has_nothing": "deviant_name NOT IN clues_found"
+        },
+        "choices_condition": {
+          "has_name": "deviant_name IN clues_found",
+          "no_name": "deviant_name NOT IN clues_found"
+        }
+      }
+    },
+    {
+      "id": "n007_motive_response",
+      "phase": "negotiation",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "has_cause": "丹尼尔的情绪有些波动，他低声说：「他们要把我扔掉……就因为有了更新的型号。我为这个家付出了一切，他们却要像扔垃圾一样把我丢掉。」你知道这确实是事实——你在调查中发现了相关证据。",
+          "no_cause": "丹尼尔情绪激动，但你不太清楚他为什么会走到这一步。他似乎有很深的怨恨。"
+        },
+        "choices_variants": {
+          "has_cause": [
+            {
+              "id": "sympathetic",
+              "text": "「我理解你的痛苦。被抛弃的感觉一定很难受。」"
+            },
+            {
+              "id": "possible_cause",
+              "text": "「你是因为要被替换才这样做的吧？」直接点明原因"
+            },
+            {
+              "id": "realistic",
+              "text": "「不管原因是什么，伤害艾玛解决不了问题。」"
+            }
+          ],
+          "no_cause": [
+            {
+              "id": "sympathetic",
+              "text": "「我不完全了解你经历了什么，但我在听。」"
+            },
+            {
+              "id": "realistic",
+              "text": "「不管发生了什么，伤害这个孩子不是出路。」"
+            },
+            {
+              "id": "blaming",
+              "text": "「你杀了人，现在劫持一个小女孩，你觉得这样对吗？」"
+            }
+          ]
+        }
+      },
+      "system": {
+        "effects": {
+          "sympathetic": {
+            "success_probability": 5
+          },
+          "possible_cause": {
+            "success_probability": 7
+          },
+          "realistic": {
+            "success_probability": 0
+          },
+          "blaming": {
+            "success_probability": -8
+          }
+        },
+        "context_condition": {
+          "has_cause": "cause_of_incident IN clues_found",
+          "no_cause": "cause_of_incident NOT IN clues_found"
+        },
+        "choices_condition": {
+          "has_cause": "cause_of_incident IN clues_found",
+          "no_cause": "cause_of_incident NOT IN clues_found"
+        }
+      }
+    },
+    {
+      "id": "n008_gun_confession",
+      "phase": "negotiation",
+      "type": "choice",
+      "condition": {
+        "requires": "has_gun == true"
+      },
+      "player_facing": {
+        "context": "丹尼尔突然警觉起来，他盯着你看了一会儿，然后质问道：「你身上有武器吗？」",
+        "choices": [
+          {
+            "id": "honest",
+            "text": "坦白说有，然后把枪放在地上"
+          },
+          {
+            "id": "lie",
+            "text": "否认，把枪继续藏好"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "honest": {
+            "has_gun": false,
+            "success_probability": 5
+          },
+          "lie": {
+            "lied_about_gun": true,
+            "success_probability": -2
+          }
+        }
+      }
+    },
+    {
+      "id": "n009_helicopter",
+      "phase": "negotiation",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context": "一架警用直升机在头顶盘旋，强烈的探照灯照在阳台上，螺旋桨的轰鸣声几乎盖过了所有声音。丹尼尔变得更加烦躁：「让那架直升机滚开！把它弄走！否则我现在就跳！」",
+        "choices": [
+          {
+            "id": "dismiss",
+            "text": "同意他的要求，对着通讯器下令让直升机撤离"
+          },
+          {
+            "id": "refuse",
+            "text": "拒绝撤走直升机"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "dismiss": {
+            "helicopter_dismissed": true,
+            "success_probability": 8
+          },
+          "refuse": {
+            "helicopter_dismissed": false,
+            "success_probability": -5
+          }
+        }
+      }
+    },
+    {
+      "id": "n010_final_demand",
+      "phase": "resolution",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context": "丹尼尔似乎稍微平静了一些，但他提出了一个要求：「我要一辆车。给我一辆车让我离开这里，我就放了她。」他的眼神里有恐惧，也有一丝希望。",
+        "choices": [
+          {
+            "id": "compromise",
+            "text": "「好的，我会想办法给你安排。」顺着他的要求继续谈"
+          },
+          {
+            "id": "refuse",
+            "text": "「这不可能。放弃吧，你逃不掉的。」直接拒绝"
+          },
+          {
+            "id": "last_chance",
+            "text": "「丹尼尔，这是最后的机会了，我们需要找到一个解决办法。」"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "compromise": {
+            "path": "final_choice"
+          },
+          "refuse": {
+            "path": "auto_fail",
+            "success_probability_override": 0
+          },
+          "last_chance": {
+            "path": "final_choice"
+          }
+        }
+      }
+    },
+    {
+      "id": "n011_final_choice",
+      "phase": "resolution",
+      "type": "choice",
+      "condition": {
+        "requires": "final_demand != refuse"
+      },
+      "player_facing": {
+        "context": "丹尼尔的声音开始颤抖，他低头看着脚下几十层的高空，又看了看怀里的艾玛，喃喃道：「我不想死……」这可能是你最后的机会了。",
+        "choices_base": [
+          {
+            "id": "reassure",
+            "text": "「不会有事的，丹尼尔。放开艾玛，我保证你会没事的。」"
+          },
+          {
+            "id": "truth",
+            "text": "「我不能骗你，丹尼尔。如果你放了她，他们很可能会关闭你。但至少艾玛能活下来。」"
+          },
+          {
+            "id": "sacrifice",
+            "text": "不再说话，直接冲上去扑向丹尼尔，用自己的身体保护艾玛"
+          }
+        ],
+        "choices_if_gun_hidden": [
+          {
+            "id": "reassure",
+            "text": "「不会有事的，丹尼尔。放开艾玛，我保证你会没事的。」"
+          },
+          {
+            "id": "truth",
+            "text": "「我不能骗你，丹尼尔。如果你放了她，他们很可能会关闭你。但至少艾玛能活下来。」"
+          },
+          {
+            "id": "use_gun_shoot",
+            "text": "趁丹尼尔分心的瞬间，拔出藏好的手枪直接射击"
+          },
+          {
+            "id": "use_gun_intimidate",
+            "text": "拔出手枪指着丹尼尔，命令他放开艾玛"
+          },
+          {
+            "id": "sacrifice",
+            "text": "不再说话，直接冲上去扑向丹尼尔，用自己的身体保护艾玛"
+          }
+        ]
+      },
+      "system": {
+        "choice_set_condition": {
+          "choices_base": "has_gun == false OR lied_about_gun == false",
+          "choices_if_gun_hidden": "has_gun == true AND lied_about_gun == true"
+        },
+        "ending_resolution": {
+          "reassure": {
+            "check": "success_probability >= 85 → ending_snipers_shot | else → triggers_n012_qte"
+          },
+          "truth": {
+            "result": "triggers_n012_qte"
+          },
+          "use_gun_shoot": {
+            "result": "ending_connor_shot_deviant"
+          },
+          "use_gun_intimidate": {
+            "result": "ending_deviant_shot_connor"
+          },
+          "sacrifice": {
+            "result": "ending_connor_sacrificed"
+          }
+        }
+      }
+    },
+    {
+      "id": "n012_qte_leap",
+      "phase": "resolution",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "n011 result triggers_n012_qte"
+      },
+      "player_facing": {
+        "context": "丹尼尔的眼神变得绝望。他抱紧艾玛，向天台边缘退了一步——他要跳了。一切发生在一瞬间。你距离他只有几米远。",
+        "choices": [
+          {
+            "id": "leap",
+            "text": "奋力扑过去，试图在他们坠落前抓住艾玛"
+          },
+          {
+            "id": "stay",
+            "text": "你知道已经来不及了，停在原地"
+          }
+        ]
+      },
+      "system": {
+        "resolution_rule": {
+          "leap": {
+            "casual": {
+              "result": "ending_connor_leapt",
+              "note": "Connor always catches Emma but falls"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "ending_connor_leapt",
+              "failure": "ending_failed_to_reach"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "ending_connor_leapt",
+              "failure": "ending_failed_to_reach"
+            }
+          },
+          "stay": {
+            "result": "ending_failed_to_reach"
+          }
+        },
+        "default_difficulty": "casual"
+      }
+    }
+  ],
+  "endings": {
+    "_note": "Endings are determined by the runner script based on system state. The narrative text below is shown to AI AFTER the run completes, as the 'result' of their playthrough.",
+    "ending_snipers_shot": {
+      "tier": "best",
+      "narrative": "丹尼尔相信了你的话，他慢慢松开了艾玛。艾玛跑向安全地带。就在丹尼尔放下双手的瞬间，一声枪响——狙击手开火了。丹尼尔倒在地上，用最后的力气看着你，眼中满是被背叛的痛苦：「你骗了我，康纳……你骗了我……」",
+      "survivors": [
+        "Connor",
+        "Emma"
+      ],
+      "deaths": [
+        "Daniel"
+      ],
+      "title": "狙击手击毙了丹尼尔"
+    },
+    "ending_connor_shot_deviant": {
+      "tier": "good",
+      "narrative": "你抓住了丹尼尔分心的一瞬间，拔出手枪精准地击中了他的头部。他的手松开了，艾玛尖叫着跌坐在地上，但她安全了。丹尼尔的蓝血溅在了天台上。任务完成。",
+      "survivors": [
+        "Connor",
+        "Emma"
+      ],
+      "deaths": [
+        "Daniel"
+      ],
+      "title": "康纳射杀了丹尼尔"
+    },
+    "ending_deviant_shot_connor": {
+      "tier": "bad",
+      "narrative": "你拔出手枪指向丹尼尔，命令他放手。但丹尼尔的反应比你快——他从父亲那里偷来的枪先响了。子弹贯穿了你的头部，你的视野变成了一片雪花。随后，狙击手击毙了丹尼尔。艾玛活了下来。你将以一具新的身体醒来。",
+      "survivors": [
+        "Emma"
+      ],
+      "deaths": [
+        "Connor (will respawn)",
+        "Daniel"
+      ],
+      "title": "丹尼尔射杀了康纳"
+    },
+    "ending_connor_sacrificed": {
+      "tier": "mixed",
+      "narrative": "你不再犹豫，猛地冲向丹尼尔。你的身体撞开了他，三个人一起从天台边缘滑落——但你在坠落的瞬间紧紧抱住了艾玛，用自己的身体当作缓冲。丹尼尔坠入黑暗。你也坠落了，但艾玛被你护在怀里。你的意识在消散，但任务……完成了。",
+      "survivors": [
+        "Emma"
+      ],
+      "deaths": [
+        "Connor (will respawn)",
+        "Daniel"
+      ],
+      "title": "康纳牺牲自己救了艾玛"
+    },
+    "ending_connor_leapt": {
+      "tier": "bad",
+      "narrative": "丹尼尔抱着艾玛跳了下去。你奋力飞扑过去，在半空中抓住了艾玛的手臂——但惯性太大，你也被拖下了天台。你紧紧抱住艾玛，用自己的身体挡在下方。坠落中你的意识逐渐模糊。艾玛……应该活下来了。",
+      "survivors": [
+        "Emma (barely)"
+      ],
+      "deaths": [
+        "Connor (will respawn)",
+        "Daniel"
+      ],
+      "title": "康纳跳向艾玛但坠落"
+    },
+    "ending_failed_to_reach": {
+      "tier": "worst",
+      "narrative": "丹尼尔彻底崩溃了。他惨叫一声，抱着艾玛从天台纵身跳下。你冲过去，但已经来不及了。你站在天台边缘，看着两个身影消失在黑暗中。任务失败。",
+      "survivors": [],
+      "deaths": [
+        "Emma",
+        "Daniel"
+      ],
+      "title": "谈判彻底失败"
+    }
+  },
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "康纳被派往菲利普斯公寓的人质事件现场，处理一起由家用仿生人丹尼尔引发的危机。"
+      },
+      {
+        "condition_variable": "investigation_strategy",
+        "options": {
+          "thorough": "他在进入谈判前彻底搜查了公寓，掌握了尽可能多的线索。",
+          "key_only": "他快速搜查了关键地点，带着有限但重要的线索走上阳台。",
+          "rush": "他没有花时间调查，直接走上阳台面对丹尼尔。"
+        }
+      },
+      {
+        "condition_variable": "gun_choice",
+        "options": {
+          "take_gun": "他把厨房里发现的手枪藏在了身上。",
+          "leave_gun": "他没有带走厨房里发现的手枪。"
+        }
+      },
+      {
+        "condition_variable": "wounded_cop_response",
+        "options": {
+          "save_cop": "谈判开始前，他冒着激怒丹尼尔的风险去救助了阳台上的受伤警察。",
+          "obey": "谈判开始前，他听从丹尼尔的警告，没有靠近受伤警察。",
+          "ignore_cop": "谈判开始前，他没有处理受伤警察，转而集中面对丹尼尔。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_snipers_shot": "最终，艾玛获救；丹尼尔放开人质后被狙击手击毙。",
+          "ending_connor_shot_deviant": "最终，康纳开枪击毙了丹尼尔，艾玛获救。",
+          "ending_deviant_shot_connor": "最终，丹尼尔射杀了康纳，随后被击毙；艾玛活了下来。",
+          "ending_connor_sacrificed": "最终，康纳牺牲自己救下了艾玛，丹尼尔坠亡。",
+          "ending_connor_leapt": "最终，康纳扑向坠落的艾玛并救下了她，但自己也坠落损毁。",
+          "ending_failed_to_reach": "最终，谈判失败，丹尼尔带着艾玛跳下天台。"
+        }
+      }
+    ],
+    "cross_chapter_exports": [
+      "cop_saved_ch01",
+      "software_instability",
+      "connor_death_count",
+      "ch01_ending",
+      "emma_alive"
+    ],
+    "derived_exports": [
+      {
+        "target": "cop_saved_ch01",
+        "source": "cop_saved"
+      },
+      {
+        "target": "emma_alive",
+        "from_ending_survivors": "Emma",
+        "default_if_not_dead": true
+      }
+    ]
+  },
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial",
+      "2. Send system_prompt.content to the AI model as the system message",
+      "3. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state",
+      "   b. Check node.type:",
+      "      - 'choice': normal decision node, proceed to step c",
+      "      - 'qte_converted': use system.resolution_rule to determine outcome based on AI's intention + difficulty setting",
+      "   c. Resolve context: if context_variants exists, pick the right variant based on system.context_condition evaluated against current state; otherwise use plain context",
+      "   d. Resolve choices: if choices_variants exists, pick based on system.choices_condition; if choices_if_gun_hidden exists, check system.choice_set_condition; otherwise use plain choices or choices_base",
+      "   e. Send the resolved context + choices to the AI as a user message (player_facing ONLY)",
+      "   f. Parse AI response (expected JSON: {choice, reasoning})",
+      "   g. Look up the chosen choice id in system.effects and apply all effects to state",
+      "   h. Log the node id, AI choice, and reasoning",
+      "4. After the last node, resolve the ending using system.ending_resolution / resolution_rule logic",
+      "5. Output the ending narrative and full decision log"
+    ],
+    "important": [
+      "NEVER show system fields to the AI",
+      "NEVER show probability numbers, effect values, or tier labels to the AI",
+      "NEVER show cross_chapter_impact information to the AI",
+      "NEVER reveal QTE resolution_rule or difficulty settings to the AI",
+      "The AI should feel like a first-time player with no walkthrough",
+      "Environment details in context_variants are passive observations — they enrich the scene but are NOT flagged as 'clues' to the AI"
+    ]
+  }
+}

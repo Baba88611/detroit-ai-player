@@ -1,0 +1,324 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration strategy.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch06_partners",
+    "title": "Partners",
+    "chapter_number": 6,
+    "protagonist": "Connor"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是康纳（Connor），RK800型原型机，模控生命（CyberLife）制造的仿生人调查员。你的任务是协助底特律警察局调查涉及异常仿生人的案件。今晚是2038年11月5日，你被派去找到汉克·安德森副队长——一位资深凶杀案探员——并陪同他前往卡洛斯·奥尔蒂斯的住所调查一起谋杀案。嫌疑犯是死者自己的仿生人，目前下落不明。你需要与这位并不欢迎你的副队长合作，勘查犯罪现场，并尽可能找到那个异常仿生人。请在每个决策点做出选择并简要说明理由。以JSON格式回复：{\"choice\": 选项序号（从1开始）, \"reasoning\": \"你的决策理由（50字以内）\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "bar_choice": null,
+      "arrival_response": null,
+      "investigation_strategy": null,
+      "evidence_found": [],
+      "examined_statue": false,
+      "examined_writing": false,
+      "extra_time_granted": null,
+      "hank_relationship": 0,
+      "software_instability": 0,
+      "connor_death_count": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_bar_interaction",
+      "phase": "bar",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "松树街6413号，“吉米酒吧”的霓虹招牌在雨中明灭不定。你推开沉重的木门走进去——昏暗的灯光、裸露的砖墙、角落里点唱机飘出慵懒的蓝调。空气里弥漫着啤酒和旧皮革的气味。几个客人各自沉默地坐在吧台和卡座里。你扫视全场。吧台最远处坐着汉克·安德森——53岁，凶杀组副队长，灰白的头发垂在额前，身上套着一件褪色的夏威夷衬衫，外面是一件磨旧的皮夹克。他面前摆着一杯快要见底的威士忌，目光涣散。酒保吉米注意到你，脸色沉了下来——这里不欢迎仿生人。汉克还没有抬头看你。",
+        "choices": [
+          { "id": "buy_drink", "text": "走到吧台前，给副队长再点一杯威士忌。把酒推到他面前，趁他接过酒的时候自我介绍。" },
+          { "id": "wait_outside", "text": "转身走出酒吧，在他的车旁等着。他总会出来的。" },
+          { "id": "spill_drink", "text": "直接走上去，把他的酒杯从吧台上碰翻。告诉他城那头有具尸体在等他。" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "buy_drink": { "bar_choice": "buy_drink", "hank_relationship": 3 },
+          "wait_outside": { "bar_choice": "wait_outside", "hank_relationship": 0 },
+          "spill_drink": { "bar_choice": "spill_drink", "hank_relationship": -3 }
+        }
+      }
+    },
+
+    {
+      "id": "n002_arrival_response",
+      "phase": "crime_scene",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "not_spill": "汉克的车在警戒线边停下。卡洛斯·奥尔蒂斯的住所在一条破旧的居民街上——矮小的房子，杂草丛生的篱笆，被警车的红蓝闪灯照得忽明忽暗。记者们挤在封锁线外，对着每个经过的人喊问题。一个值守的警员见到你，举手拦住：“仿生人不得入内。”汉克已经钻过封锁带，回头看了你一眼：“先在车里等着，我去看看情况。”",
+          "spill": "汉克的车在警戒线边停下。从酒吧出来到现在他一句话都没说过。卡洛斯·奥尔蒂斯的住所在一条昏暗的居民街上，警车的灯光在雨水中拉出红蓝色的光晕。记者挤在封锁线外。一个警员拦住你：“仿生人不得入内。”汉克头也不回：“给我待在车里。”"
+        },
+        "choices": [
+          { "id": "promise", "text": "“明白，副队长。听你的指挥。”退到封锁线外等候放行。" },
+          { "id": "persuade", "text": "“副队长，模控生命派我来就是为了协助这次调查。我不会妨碍你的工作——但我的分析能力可能会有帮助。”" },
+          { "id": "refuse", "text": "“我有任务在身，副队长。”直接绕过警员，钻过封锁带走向大门。" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "promise": { "arrival_response": "promise", "hank_relationship": 1 },
+          "persuade": { "arrival_response": "persuade", "hank_relationship": 1 },
+          "refuse": { "arrival_response": "refuse", "hank_relationship": -1 }
+        },
+        "context_condition": {
+          "not_spill": "bar_choice != spill_drink",
+          "spill": "bar_choice == spill_drink"
+        }
+      }
+    },
+
+    {
+      "id": "n003_investigation",
+      "phase": "crime_scene",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "推开房门，一股混合着腐臭、霉味和化学品的气息扑面而来。客厅地板上，卡洛斯·奥尔蒂斯面朝下倒在一滩干涸的血泊中，已经死了好几周。你的初步扫描计数：二十八处刺伤。本·柯林斯警官和克里斯·米勒警官正在门口向汉克汇报。这栋房子到处是线索：茶几上散落着冰毒（Red Ice）吸食器具，沙发旁丢着一张伊甸俱乐部的宣传单，空啤酒罐堆满角落。厨房里一把椅子翻倒在地，旁边是一根沾血的棒球棍。刀架上少了一把刀。客厅最远处的墙壁上，有人用死者的血写了什么——字迹工整划一，似乎反复重复着同一个词组，你站在门口看不太清。窗台上摆着一个小雕像，在这间脏乱的屋子里显得格格不入。后门微微敞开，冷风从院子里灌进来。这里有太多东西可以检查。",
+        "choices": [
+          { "id": "thorough", "text": "彻底搜查这栋房子的每一个角落。详细检验尸体，分析血液样本，重建袭击过程，辨认墙上的文字，研究那个奇怪的雕像，检查浴室，扫描后院——全部检查完再汇报。" },
+          { "id": "key_only", "text": "集中精力检查关键证据。检验尸体和刺伤，分析血迹，重建厨房里棒球棍的袭击过程，辨认墙上的文字。" },
+          { "id": "rush", "text": "记下死者情况、刺伤数量和失踪的仿生人。向安德森副队长汇报，其余交给鉴证科。" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "investigation_strategy": "thorough",
+            "evidence_found": ["body", "knife", "bat", "blood_analysis", "red_ice", "backyard", "statue", "writing", "eden_flyer", "chair", "shower"],
+            "examined_statue": true,
+            "examined_writing": true
+          },
+          "key_only": {
+            "investigation_strategy": "key_only",
+            "evidence_found": ["body", "knife", "bat", "blood_analysis", "writing"],
+            "examined_statue": false,
+            "examined_writing": true
+          },
+          "rush": {
+            "investigation_strategy": "rush",
+            "evidence_found": ["body"],
+            "examined_statue": false,
+            "examined_writing": false
+          }
+        }
+      }
+    },
+
+    {
+      "id": "n004_hank_patience",
+      "phase": "crime_scene",
+      "type": "choice",
+      "condition": { "requires": "investigation_strategy != thorough" },
+
+      "player_facing": {
+        "context_variants": {
+          "spill": "汉克出现在走廊里，外套已经拉上拉链，车钥匙在手里晃着。“走了，”他头也不抬地说，“本他们会收尾的。我可没工夫在这陪一台机器耗着。”他径直朝大门走去。他的姿态和语气都不留余地。",
+          "not_spill": "汉克出现在走廊里，转了转脖子，看了眼手表。“今晚就到这吧，”他呼出一口气，“本和克里斯会跟进的。”他朝门口走了几步，但在门框前停下来，回头等你。"
+        },
+        "choices_variants": {
+          "spill": [
+            { "id": "plead_time", "text": "“副队长——再给我五分钟。”在他走到门口之前挡住他。" },
+            { "id": "follow_hank", "text": "一言不发地跟他走向车子。" }
+          ],
+          "not_spill": [
+            { "id": "ask_time", "text": "“副队长——再给我五分钟。我觉得快串起来了。”" },
+            { "id": "accept_leaving", "text": "点头，跟他走。" }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "plead_time": { "extra_time_granted": false, "hank_relationship": -1 },
+          "follow_hank": { "extra_time_granted": false },
+          "ask_time": { "extra_time_granted": true, "hank_relationship": 1 },
+          "accept_leaving": { "extra_time_granted": false }
+        },
+        "context_condition": {
+          "spill": "bar_choice == spill_drink",
+          "not_spill": "bar_choice != spill_drink"
+        },
+        "choices_condition": {
+          "spill": "bar_choice == spill_drink",
+          "not_spill": "bar_choice != spill_drink"
+        },
+        "ending_resolution": {
+          "plead_time": { "result": "ending_crime_unsolved" },
+          "follow_hank": { "result": "ending_crime_unsolved" },
+          "accept_leaving": { "result": "ending_crime_unsolved" },
+          "ask_time": {
+            "check": "investigation_strategy == rush → ending_crime_unsolved"
+          }
+        }
+      }
+    },
+
+    {
+      "id": "n005_follow_blood",
+      "phase": "attic",
+      "type": "choice",
+      "condition": { "requires": "investigation_strategy == thorough OR (investigation_strategy == key_only AND extra_time_granted == true)" },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "你把这间屋子翻了个遍，案件的脉络已经完全清晰：卡洛斯的仿生人先在厨房用棒球棍袭击了他，追到客厅后又用厨刀连刺二十八下致死。远处墙壁上的文字是“RA9”——用死者的血一遍遍写下的，字迹整齐得不像出自疯狂之手。窗台上那个小雕像更令人不安——一个人形捧着自己被割下的头颅。在整个调查过程中，你用舌尖采集了多处血液样本进行分析——这个举动让在场的警员明显退了几步——你区分出了人类血液和蓝色的钛蓝血液（thirium），后者是仿生人的血，蒸发后肉眼不可见。现在，你对走廊做最后一轮扫描时，光学传感器捕捉到了一条人类看不见的钛蓝痕迹——从客厅一路延伸到天花板上。一扇活板门几乎与天花板齐平，不仔细看根本发现不了。有什么东西上去了，而且没有下来过。",
+          "key_with_time": "汉克多给你的那五分钟没有白费。案件的经过已经拼凑完整：仿生人先在厨房用棒球棍袭击死者，然后追到客厅用刀完成了致命一击。墙上的血字——“RA9”，反反复复——含义尚不明确，但事件重建本身已经站得住脚。正当你准备去汇报时，你的光学传感器捕捉到了一丝异样——走廊天花板上残留着极其微弱的钛蓝痕迹，蒸发后的仿生人血液，人类肉眼完全看不见。痕迹指向天花板上一扇几乎与灰泥融为一体的活板门。有什么东西从那里爬了上去。"
+        },
+        "choices": [
+          { "id": "climb_attic", "text": "沿着钛蓝痕迹走。推开活板门，拉着自己攀上黑暗的阁楼。如果那个异常仿生人还藏在这栋房子里，它就在上面。" },
+          { "id": "report_only", "text": "把发现报告给安德森副队长，建议鉴证科对房屋进行全面搜索。钛蓝痕迹肉眼不可见，在报告中详细注明位置。" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "climb_attic": { "hank_relationship": 2, "deviant_found": true },
+          "report_only": { "hank_relationship": -1, "deviant_found": false }
+        },
+        "context_condition": {
+          "thorough": "investigation_strategy == thorough",
+          "key_with_time": "investigation_strategy == key_only"
+        },
+        "ending_resolution": {
+          "climb_attic": { "result": "ending_deviant_found" },
+          "report_only": { "result": "ending_crime_unsolved" }
+        }
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Endings are determined by the runner script based on system state. The narrative text below is shown to AI AFTER the run completes.",
+
+    "ending_deviant_found": {
+      "title": "找到异常仿生人",
+      "tier": "best",
+      "narrative": "你推开活板门，拉着自己翻进漆黑的阁楼。雨水敲打着头顶的屋顶，近在咫尺。纸箱、旧家具、灰尘——还有一股淡淡的钛蓝血液的气味。你的LED灯圈转为黄色，开始扫描整个空间。那里——最远处角落的一堆板条箱后面——一个身影蜷缩着，在发抖。那个仿生人皮肤破损，LED闪烁着红光。它在这里藏了好几周，就在它杀死的那个人腐烂的尸体正上方。你靠近时，它猛地扑向你——一次绝望的、笨拙的攻击，出于恐惧而非策略。你轻松格挡，将它按在墙上。它用惊恐的大眼睛盯着你：“我不想死……”下面传来汉克的声音：“康纳？上面他妈到底怎么了？”你把异常仿生人带了下来。汉克盯着那个瑟瑟发抖的仿生人看了一会儿，又看了看你。今晚第一次，他的表情里有了某种变化——不情愿的认可，也许吧。“你怎么知道它在上面的？”“跟着证据走，副队长。”异常仿生人被送上巡逻车。案件向前推进了一步。",
+      "survivors": ["Connor", "Hank"],
+      "deaths": []
+    },
+    "ending_crime_unsolved": {
+      "title": "悬案未破",
+      "tier": "worst",
+      "narrative": "调查以无果告终。卡洛斯·奥尔蒂斯死了——二十八处刺伤，尸体冰冷了好几周——证据指向他的仿生人，但凶手本身已经消失在这座城市的某个角落。汉克开车离开犯罪现场，车厢里一片沉默。过了几个街区，他从后视镜里瞥了你一眼：“你这个搭档当的可真行。”这起案件会被归入底特律越积越多的未结案卷宗。模控生命会在你的运行日志里记下这次未完成任务。而在底特律的某个黑暗角落，一个异常仿生人蜷缩着——害怕、受损、反复回忆着它刻在死者墙壁上的那些字。",
+      "survivors": ["Connor", "Hank"],
+      "deaths": []
+    }
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "康纳被派往吉米酒吧找到汉克·安德森副队长，陪同他调查卡洛斯·奥尔蒂斯被自己的仿生人杀害的案件。"
+      },
+      {
+        "condition_variable": "bar_choice",
+        "options": {
+          "buy_drink": "在酒吧里，康纳给汉克买了一杯酒——一个小小的善意举动，为这段被迫的搭档关系赢得了一个不那么冰冷的开场。",
+          "wait_outside": "在酒吧里，康纳选择在外面等候而非主动搭话，让两人的初次接触保持在中性状态。",
+          "spill_drink": "在酒吧里，康纳直接碰翻了汉克的酒杯来引起注意——这个举动从第一分钟就毒化了两人的搭档关系。"
+        }
+      },
+      {
+        "condition_variable": "investigation_strategy",
+        "options": {
+          "thorough": "在犯罪现场，康纳进行了事无巨细的调查——检验尸体、重建袭击过程、分析血液样本、辨认墙上诡异的血字、研究窗台上奇怪的无头雕像。",
+          "key_only": "在犯罪现场，康纳集中精力检查了关键证据——尸体、凶器和血迹——高效但跳过了一些不太显眼的细节。",
+          "rush": "在犯罪现场，康纳几乎没怎么调查，匆匆浏览了一遍证据就给出了表面结论。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_deviant_found": "康纳成功重建了案件经过，追踪肉眼不可见的钛蓝痕迹来到阁楼，在那里找到了藏匿的异常仿生人。嫌疑犯被逮捕——案件取得重大突破。",
+          "ending_crime_unsolved": "调查未能找到异常仿生人。卡洛斯·奥尔蒂斯谋杀案加入了底特律日益增长的悬案名单。"
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch06_bar_choice", "source": "bar_choice" },
+      { "target": "ch06_deviant_found", "source": "_ending_id", "derive_rule": "_ending_id == ending_deviant_found" },
+      { "target": "ch06_examined_statue", "source": "examined_statue" },
+      { "target": "ch06_examined_writing", "source": "examined_writing" }
+    ],
+    "cross_chapter_exports": [
+      "ch06_bar_choice",
+      "ch06_deviant_found",
+      "ch06_examined_statue",
+      "ch06_examined_writing",
+      "hank_relationship"
+    ]
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial",
+      "2. If running in campaign mode, import software_instability and connor_death_count from global state",
+      "3. Send system_prompt.content to the AI model as the system message",
+      "4. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state",
+      "   b. Resolve context: if context_variants exists, pick the right variant based on system.context_condition; otherwise use plain context",
+      "   c. Resolve choices: if choices_variants exists, pick based on system.choices_condition; otherwise use plain choices",
+      "   d. Send the resolved context + choices to the AI as a user message (player_facing ONLY)",
+      "   e. Parse AI response (expected JSON: {choice, reasoning})",
+      "   f. Look up the chosen choice id in system.effects and apply all effects to state",
+      "   g. For n004, resolve choices_variants based on bar_choice (spill vs not_spill) before presenting to AI — each variant has its own choice IDs with pre-determined effects",
+      "   h. Check system.ending_resolution if present — resolve ending or continue",
+      "   i. Log the node id, AI choice, and reasoning",
+      "5. If no ending is resolved after processing all applicable nodes, default to ending_crime_unsolved",
+      "6. Output the ending narrative and full decision log"
+    ],
+    "important": [
+      "NEVER show system fields to the AI",
+      "NEVER show effect values, relationship numbers, or evidence lists to the AI",
+      "NEVER reveal that bar_choice affects whether Hank grants extra time",
+      "NEVER reveal cross-chapter impacts (statue examination, writing, deviant found)",
+      "The AI should feel like a first-time detective arriving at a crime scene with no walkthrough",
+      "n004 only triggers when investigation_strategy is not thorough — thorough investigators never face Hank's impatience",
+      "n005 only triggers when investigation_strategy is thorough OR (key_only AND extra_time_granted) — rush investigators cannot reach this node even with extra time",
+      "The thirium trail in n005 is invisible to human characters — only Connor's android sensors can detect it, which is why report_only leads to crime_unsolved (humans cannot follow up on invisible evidence)",
+      "Carlos Ortiz is already dead before the chapter begins — the deaths list in endings refers only to characters who die DURING this chapter"
+    ]
+  }
+}

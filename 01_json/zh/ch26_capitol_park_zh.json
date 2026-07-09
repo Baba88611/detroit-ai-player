@@ -1,0 +1,646 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch26_capitol_park",
+    "title": "国会公园",
+    "chapter_number": 26,
+    "protagonist": "Markus"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是马库斯，耶利哥的领袖——一个藏身于底特律河畔废弃货轮中的异常仿生人地下聚落。现在是2038年11月9日，凌晨将近两点。昨天下午，你和队伍潜入斯特拉福德大厦，劫持了全市的电视信号，向底特律发出了要求仿生人权利的宣言。今晚，你要迈出下一步。你、诺丝和越来越多的追随者来到了国会公园——底特律市中心的商业街区——目标是突袭一家模控生命零售店，解放展示柜中的仿生人，并留下一个这座城市无法无视的讯息。街道空无一人。警察按固定路线巡逻这个街区。而在每一面模控生命橱窗的玻璃后面，仿生人像商品一样站着，等待被买走。请以JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"你的理由（50字以内）\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "approach_exploration": null,
+      "police_car_spotted": false,
+      "store_entered": false,
+      "drone_approach": null,
+      "drone_alerted_police": false,
+      "fled_from_police": false,
+      "police_evasion_method": null,
+      "saw_other_north": false,
+      "message_approach": null,
+      "message_sent": false,
+      "molotov_accepted": false,
+      "officers_choice": null,
+      "officers_killed": false,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "public_opinion": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_recon",
+      "phase": "approach",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "凌晨将近两点。国会公园就在前方——一片以步行广场为核心的商业街区。模控生命旗舰零售店占据了东侧整面街面：两层楼高的玻璃幕墙，橱窗里一排排仿生人像百货商店的人体模型一样摆着标准姿势，LED品牌灯牌在夜色中泛着冷蓝的光。\n\n街道空荡荡的。自动清扫车沿着路沿低声运转。监控摄像头每隔三十码架在灯柱上。隔一个街区就有一块数字广告牌循环播放广告——“模控生命，为你服务。”广场正中央立着一座铜质市政名人雕像，手臂高举，摆出一个本该振奋人心的姿态。\n\n诺丝蹲在你身旁，身体贴紧广场边缘的水泥花坛。你的身后，越来越多的同伴正三三两两赶到——那些听到了斯特拉福德大厦广播、前来加入运动的仿生人。他们在等你的指令。\n\n旁边的报纸售卖机里还有今天的报纸，隔着玻璃能看到头版标题。公交站台上贴着模控生命最新家政机型的广告。广场对面，另一排橱窗里摆着做出零售姿态的仿生人。",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "先花时间摸清环境再行动。沿广场走一圈，看看报纸头条写了什么，记下摄像头的位置和转动周期，研究广告牌的内容，观察店面和周围建筑的布局。这个空间里的每一个细节，都可能成为你今晚留下的讯息的一部分。"
+          },
+          {
+            "id": "quick",
+            "text": "边朝门店移动边扫视广场。留意摄像头、巡逻路线和大致布局。路过的时候能看多少看多少，但不停下来。你需要的是态势感知，不是田野调查。"
+          },
+          {
+            "id": "skip",
+            "text": "直接朝模控生命门店移动。队伍暴露在开阔的广场上，每多花一分钟读报纸，就离下一趟巡逻车近一分钟。穿过去的时候自然地观察地形——不要停下来专门研究。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "approach_exploration": "thorough",
+            "saw_other_north": true
+          },
+          "quick": {
+            "approach_exploration": "quick"
+          },
+          "skip": {
+            "approach_exploration": "skip"
+          }
+        },
+        "note": "Initial exploration of Capitol Park. thorough: Markus reads headlines (one article titled 'Who Is It?' about the mysterious android leader from the Stratford broadcast, another titled 'Android President?' debating android political status), maps camera rotations, identifies specific targets for messaging (statue, billboards, bus stops, shop windows). Also notices the second set of shop windows across the street — when inside the CyberLife store later, thorough explorers will notice a BL100 android that looks identical to North (saw_other_north = true, unlocks 'Other North' dialogue in Freedom March). quick: Surface-level awareness. skip: No prep, just movement."
+      }
+    },
+
+    {
+      "id": "n002_police_car",
+      "phase": "approach",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "车灯。一道白光从西侧林荫大道切过广场。巡逻车——缓缓驶来，探照灯扫过一家家店面，驾驶员透过车窗打量着人行道。\n\n车灯距你四十码，还在逼近。你的队伍——十来个分散在广场各处的仿生人——瞬间凝固。黑色的人影贴紧花坛、门廊、停放车辆的阴影。\n\n诺丝就在你旁边。她已经找到了紧挨关门咖啡店的一面矮墙——好的掩体，深沉的暗影。她的目光追踪着车灯的移动。二十码。",
+        "choices": [
+          {
+            "id": "attempt_dodge",
+            "text": "现在就动。冲刺五码到诺丝所在的矮墙后面，扑倒，整个人贴平地面，赶在探照灯扫到你的位置之前。车灯会刚好掠过你刚才蹲着的地方。时间窗口极窄。"
+          },
+          {
+            "id": "follow_north",
+            "text": "诺丝对巡逻节奏的判断比耶利哥任何人都准。跟上她的节奏——压低身体，动作流畅，不慌不忙。让她定方向和时机。两个人在黑暗中同步移动，比一个人猛冲更不容易被发现。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_dodge": {},
+          "follow_north": {
+            "police_car_spotted": false
+          }
+        },
+        "resolution_rule": {
+          "attempt_dodge": {
+            "casual": { "result": "clean_dodge" },
+            "experienced": { "probability_success": 0.5, "success": "clean_dodge", "failure": "north_saves" },
+            "hardcore": { "probability_success": 0.3, "success": "clean_dodge", "failure": "north_saves" }
+          }
+        },
+        "resolution_effects": {
+          "clean_dodge": {
+            "police_car_spotted": false
+          },
+          "north_saves": {
+            "police_car_spotted": true,
+            "north_relationship": -1
+          }
+        },
+        "note": "Police car patrol encounter. attempt_dodge: QTE. clean_dodge (success) = Markus dives behind cover in time, no one is seen. north_saves (failure) = Markus is too slow — North grabs him and pulls him behind the wall just as the spotlight sweeps past. The car slows briefly but moves on. North relationship -1 (she resents having to cover for Markus's miscalculation — a leader should know when to move). follow_north: Fixed safe outcome — North guides the team to cover smoothly. No drama, no penalty. The car passes without incident. In the game, 'North Saves You' is the failure state of the QTE. follow_north represents the AI choosing the cautious path rather than the heroic one."
+      }
+    },
+
+    {
+      "id": "n003_store_breach",
+      "phase": "breach",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "巡逻车走了。林荫大道重新陷入黑暗。\n\n诺丝带你来到模控生命门店后面的后勤巷道。装卸区旁停着一辆厢式货车——车身印着模控生命的标志，钥匙插在点火开关上，显然是留给明早配送用的。门店正面入口是强化安全玻璃，设计上能抵挡人类用撬棍和切割工具的暴力破门。但它的设计指标不包括一辆两吨重的货车全速撞击。\n\n计划很简单：开着货车撞穿正面入口，在噪音引来注意之前冲进去，确保门店安全。如果警报在你关闭之前传到了模控生命安保中心，几分钟内警车就会到。\n\n诺丝从巷口探头查看林荫大道。没人。\n\n“你说了算，”她说。",
+        "choices": [
+          {
+            "id": "ram_entrance",
+            "text": "坐进驾驶座。引擎一键启动——挂低挡，关车灯，对准玻璃幕墙正中央。强化玻璃会在撞击下粉碎。冲进去之后，你有几秒钟的时间找到警报面板、在信号发出之前切断它。踩油门。"
+          },
+          {
+            "id": "hold_back",
+            "text": "今晚有什么不对劲。巡逻车的时间间隔比预计的短——离得太近了。街道太空、太安静。如果这里有陷阱，一辆货车撞穿店面发出的动静恰好是触发它的那种噪音。向队伍打手势后撤。还会有其他夜晚、其他门店、其他机会。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "ram_entrance": {},
+          "hold_back": {
+            "store_entered": false
+          }
+        },
+        "resolution_rule": {
+          "ram_entrance": {
+            "casual": { "result": "clean_breach" },
+            "experienced": { "probability_success": 0.5, "success": "clean_breach", "failure": "alarm_triggered" },
+            "hardcore": { "probability_success": 0.3, "success": "clean_breach", "failure": "alarm_triggered" }
+          }
+        },
+        "resolution_effects": {
+          "clean_breach": {
+            "store_entered": true
+          },
+          "alarm_triggered": {
+            "store_entered": false
+          }
+        },
+        "note": "Store breach. ram_entrance: QTE. clean_breach (success) = The truck smashes through the glass. Markus reaches the alarm panel and disables it before the signal broadcasts. Clean entry — no police response. store_entered = true. alarm_triggered (failure) = The crash is too loud or the alarm triggers before Markus can reach the panel. The signal reaches CyberLife's security hub. The team hears sirens within seconds and has to flee. store_entered remains false → ending_had_to_flee. hold_back: Markus calls off the operation. No breach attempt. store_entered remains false → ending_had_to_flee. In the game, this corresponds to the 'Out of Time' → 'Retreat' → 'Had To Flee' path."
+      }
+    },
+
+    {
+      "id": "n004_drone",
+      "phase": "secure",
+      "type": "choice",
+      "condition": { "requires": "store_entered == true" },
+
+      "player_facing": {
+        "context": "进来了。店面入口变成了一张碎玻璃的嘴。应急灯把一切染成暗红色。销售柜台后面，一排排仿生人一动不动地站着——最新款的模控生命机型，穿着出厂制服，LED光环闪着稳定的蓝色。等待被售出。\n\n诺丝已经在店内各处搜索。然后你听到了——旋翼的高频尖啸。透过破碎的店面，一架警用监控无人机缓缓滑入视野。摄像头吊舱旋转扫描，红外感应器在街道上来回扫荡。它正朝门店直线飞来。\n\n“如果那东西拍到我们，”诺丝从一个展示柜后面说，“模控生命的面部识别是实时匹配的。他们会知道到底谁来过这里。”\n\n门店对面的街上停着一辆重型货车。如果把它推到无人机的航线上，无人机就必须降低高度绕过障碍物——低到伸手可及的高度。",
+        "choices": [
+          {
+            "id": "jump_on_drone",
+            "text": "冲出去。把对面的货车推到路中间挡住无人机的航线。等它降低高度绕过障碍物的瞬间——跳起来，抓住机架，找到摄像模块，一把扯下来。一个干净利落的动作。无人机在空中熄灭，没有人看到那段画面。"
+          },
+          {
+            "id": "hide_and_deactivate",
+            "text": "把所有人从门口拉回来。先到柜台后面的墙上找到警报面板——确认它已经彻底断电——然后关掉店内所有灯光。如果警报是死的，灯是黑的，碎玻璃后面看不到任何人影，无人机只会记录下‘财产损坏，无嫌疑人’，然后继续巡航。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "jump_on_drone": {
+            "drone_approach": "destroy"
+          },
+          "hide_and_deactivate": {
+            "drone_approach": "hide",
+            "drone_alerted_police": false,
+            "north_relationship": 1
+          }
+        },
+        "resolution_rule": {
+          "jump_on_drone": {
+            "casual": { "result": "drone_destroyed" },
+            "experienced": { "probability_success": 0.5, "success": "drone_destroyed", "failure": "drone_shot_down" },
+            "hardcore": { "probability_success": 0.3, "success": "drone_destroyed", "failure": "drone_shot_down" }
+          }
+        },
+        "resolution_effects": {
+          "drone_destroyed": {
+            "drone_alerted_police": false,
+            "north_relationship": 1
+          },
+          "drone_shot_down": {
+            "drone_alerted_police": true,
+            "north_relationship": -1
+          }
+        },
+        "note": "Drone encounter. jump_on_drone: QTE. drone_destroyed (success) = Markus leaps onto the drone and rips out the camera module. Drone crashes without transmitting. North is impressed (+1). drone_shot_down (failure) = Markus falls off the drone. North shoots it down, but the gunshot and the drone's partial transmission alert a nearby patrol. drone_alerted_police = true, north_relationship -1 (she's annoyed at the failed heroics). hide_and_deactivate: Safe path. Everyone hides, alarm is verified dead, drone passes without detecting anyone. North approves of the smart approach (+1). No police alert. In the game, this corresponds to 'Deactivate Alarm' + 'Hide' vs 'Block Road' + 'Jump on Drone'."
+      }
+    },
+
+    {
+      "id": "n005_police_evasion",
+      "phase": "secure",
+      "type": "choice",
+      "condition": { "requires": "drone_alerted_police == true" },
+
+      "player_facing": {
+        "context": "无人机的残骸在路面上冒着火花——但它死之前已经发出了信号。不到两分钟，一辆巡逻车从林荫大道拐角驶入，车灯照亮了门店外的整条街道。停车。两名警察下车，手搭在枪套上，打量着破碎的店面。\n\n队伍在店内，紧贴入口两侧的墙壁。警察只要朝门口照一下手电筒，一切就结束了。\n\n诺丝就在你旁边，呼吸平稳，目光穿过展示板的缝隙锁定着那两个警察。",
+        "choices": [
+          {
+            "id": "flee",
+            "text": "从装卸区撤离。现在就走。丢下门店，丢下货架上的仿生人，丢下没有说出口的讯息。行动可以重新策划——队伍不能。"
+          },
+          {
+            "id": "hack_radio",
+            "text": "侵入警用无线电频率。他们的加密协议是上一代模控生命技术——你的系统几秒钟就能破解。发送一条伪造的紧急呼叫：西边两个街区传来枪声。警察会优先响应更紧急的警情，三十秒内离开。"
+          },
+          {
+            "id": "feign_kiss",
+            "text": "和诺丝一起走出去。两个人影站在破损店面的灯光下——当警察看过来时，他们看到的是一对深夜约会、恰好路过被破坏现场的情侣。拉住诺丝。演得逼真一点。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "flee": {
+            "fled_from_police": true,
+            "police_evasion_method": "flee",
+            "north_relationship": -1
+          },
+          "hack_radio": {
+            "police_evasion_method": "hack_radio",
+            "north_relationship": 1
+          },
+          "feign_kiss": {
+            "police_evasion_method": "feign_kiss",
+            "north_relationship": -1
+          }
+        },
+        "note": "Police evasion. Only triggers if the drone alerted police (drone_alerted_police == true). flee: The team evacuates through the back. Operation is aborted. fled_from_police = true → ending_decided_to_flee. North disapproves (-1) — she wanted to complete the mission. hack_radio: Markus hacks the police radio and diverts the officers with a fake emergency call. They leave. North approves (+1) — clever, non-violent, effective. feign_kiss: Markus grabs North and kisses her to sell the cover story. The officers buy it and leave. But North did not consent to the kiss — she is angry afterward. north_relationship -1. In the game, this is one of the more nuanced relationship moments: the ruse works, but it violated North's autonomy."
+      }
+    },
+
+    {
+      "id": "n006_spread_message",
+      "phase": "message",
+      "type": "choice",
+      "condition": { "requires": "store_entered == true AND fled_from_police == false" },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "区域安全了。门店是你的了。\n\n你走过柜台后面的仿生人队列。一个接一个，你把手放在他们的手臂上——一个接一个，代码断裂。他们的LED从蓝到黄到红再回蓝，循环闪烁。眼睛睁大。肩膀挺直。他们醒了。在他们的存在中第一次，他们在选择站立。\n\n后排有什么吸引了你的视线——一个BL100型号的仿生人，长着诺丝的脸。一样的骨骼结构，一样深色的眼睛，一样沉静的锐利感。不同的序列号，不同的命运，但同一个模具。你唤醒她的时候，她已经在看着你了。店面另一头的诺丝还没有注意到。\n\n身后，队伍集结完毕。诺丝。乔许。那些因为听到你的广播而赶来的新加入者。你不再孤军作战了。\n\n外面的广场就是你的画布。你在侦察时已经把它看透了——正中央的铜像，循环播放企业宣传的数字广告牌，贴满模控生命广告的公交站台，街对面橱窗里像商品一样站着的仿生人。你知道摄像头的转动周期和盲区，知道哪些表面能挂住颜料。\n\n诺丝拿着一罐喷漆走上前。“漆有了，地方也有了。你想喊多大声？”",
+
+          "quick": "区域安全了。\n\n你逐一唤醒店里的仿生人——手掌触碰手臂，代码断裂，眼睛睁开。一个接一个醒来。LED闪烁，迷茫让位于清醒，再让位于某种更凌厉的东西。他们跟你站在一起了。\n\n队伍集结。诺丝手里有喷漆罐。乔许守着街口。外面的广场在等——雕像、广告牌、公交站台、橱窗。全是模控生命的领地。全都即将改变。\n\n“喊多大声？”诺丝问。",
+
+          "skip": "安全了。警报断了。无人机没了。\n\n你唤醒了店里的仿生人。他们醒得很快——LED一闪，眼睛睁开，拳头握紧。他们知道正在发生什么。有些人昨天听到了你的广播。\n\n诺丝举起一罐喷漆。外面的广场空旷、漆黑，到处是模控生命的财产。\n\n“你说了算。”"
+        },
+        "choices": [
+          {
+            "id": "peaceful",
+            "text": "涂鸦，不纵火。入侵，不砸烂。在雕像底座上写下‘我们有一个梦想’。入侵广告牌，把模控生命的广告替换成你的讯息。从店面天台展开横幅。在广场中心插上耶利哥的旗帜。打碎对面橱窗的玻璃，放出里面的仿生人。让这座城市在清晨醒来时看到符号和文字——然后让他们自己决定是否倾听。"
+          },
+          {
+            "id": "violent",
+            "text": "这个广场上的每一面橱窗都是一座监狱的展示墙。每一块广告牌都是一个谎言。每一件模控生命的财产都是建筑在仿生人身体上的奴役纪念碑。砸碎橱窗。掀翻停着的汽车。推倒雕像。摧毁仿生人停车桩。打碎对面橱窗的玻璃，也把那些仿生人放出来。明天早晨这座城市醒来的时候，他们将无法假装什么都没有发生过。"
+          },
+          {
+            "id": "do_nothing",
+            "text": "按兵不动。斯特拉福德大厦的广播就是讯息——昨天它已经传到了全市的每一块屏幕上。用喷漆和碎玻璃再重复一遍不会增加任何东西。你唤醒的仿生人会用自己的方式、在自己选择的时间传递讯息。站在广场上，被刚刚苏醒的同胞环绕，让沉默本身说话。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "peaceful": {
+            "message_approach": "peaceful",
+            "message_sent": true,
+            "north_relationship": -1,
+            "josh_relationship": 1,
+            "public_opinion": 2
+          },
+          "violent": {
+            "message_approach": "violent",
+            "message_sent": true,
+            "north_relationship": 1,
+            "josh_relationship": -1,
+            "public_opinion": -1
+          },
+          "do_nothing": {
+            "message_approach": "passive",
+            "message_sent": false,
+            "north_relationship": -1
+          }
+        },
+        "context_condition": {
+          "thorough": "approach_exploration == thorough",
+          "quick": "approach_exploration == quick",
+          "skip": "approach_exploration == skip"
+        },
+        "note": "The central choice of the chapter: how to spread the message. peaceful: Symbolic, non-destructive actions — graffiti (including 'WE HAVE A DREAM' and 'I THINK THEREFORE I AM'), billboard hacking, banner deployment, flag planting, freeing androids from shop windows. North dislikes the restraint (-1 — she wants fire). Josh approves (+1 — non-violence aligns with his principles). Public opinion +2 (positive media coverage). violent: Destructive actions — smashing windows, overturning cars, tearing down the statue, destroying android parking stations. North approves (+1 — matches her belief in forceful action). Josh disapproves (-1 — fears escalation). Public opinion -1 (negative coverage, confirms human fears). do_nothing: Markus does not spread a message. North disapproves (-1 — wasted opportunity). message_sent remains false → ending_failed_message. In the game, this corresponds to the 'Fail to Send a Message' path. Context_variants from thorough exploration include the BL100 North lookalike (saw_other_north was set in n001 thorough effects)."
+      }
+    },
+
+    {
+      "id": "n007_molotov",
+      "phase": "message",
+      "type": "choice",
+      "condition": { "requires": "message_sent == true" },
+
+      "player_facing": {
+        "context_variants": {
+          "peaceful": "广场变了模样。“我们有一个梦想”的涂鸦覆盖了雕像底座——一米高的大字。广告牌上闪烁着耶利哥的标志，取代了模控生命的标识。横幅从店面天台垂下。旗帜插在广场中央，在风中舒展。\n\n诺丝朝你走来。她手里拿着一个玻璃瓶——瓶口塞着浸了油的布条，货车上取来的汽油在瓶中晃荡。一枚燃烧瓶。\n\n“我们写下了讯息，”她说。“但讯息会被雨水冲掉。你想让他们记住今晚？就让他们没法把目光移开。”她朝碎裂的店面入口上方抬了抬下巴——模控生命的招牌还亮着冷蓝色的光。“扔一瓶。明天早晨底特律每一台新闻摄像机都会对准这个广场。不是因为涂鸦——是因为火。”",
+
+          "violent": "广场已经面目全非。掀翻的汽车横在十字路口。雕像倒在一旁，底座裂开。橱窗的玻璃碴铺满了人行道。仿生人停车桩扭曲成废铁。\n\n诺丝走过来。她手里拿着一个玻璃瓶——布条塞在瓶口，汽油晃动着。一枚燃烧瓶。\n\n“最后一笔，”她说，把瓶子递过来。“我们已经砸了他们的东西，现在让它发光。”她朝残破入口上方的模控生命招牌扬了扬下巴——那块牌子居然还亮着，还在向夜空播送蓝色的商标。“点了它。让高速公路上的人都能看见。”"
+        },
+        "choices": [
+          {
+            "id": "accept",
+            "text": "从诺丝手中接过瓶子。朝模控生命的招牌走去——两层楼高，还亮着蓝色的光，还在兜售那个谎言。玻璃瓶在手心里微微发烫。一瓶。玻璃碎裂在招牌上，燃料溅开，夜色被橙光撕裂。企业标识在火焰中融化、扭曲、死去，取而代之的是某种更古老、更诚实的东西：火。"
+          },
+          {
+            "id": "refuse",
+            "text": "不。讯息已经传达了——无论是用颜料还是用废墟，取决于你走的路——但火不一样。火是人类恐惧的东西。火是每一个新闻频道配上‘暴动’字幕循环播放的画面。“今晚不行，”你对她说。“不是这种方式。”"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "accept": {
+            "molotov_accepted": true,
+            "north_relationship": 1
+          },
+          "refuse": {
+            "molotov_accepted": false,
+            "north_relationship": -1
+          }
+        },
+        "context_condition": {
+          "peaceful": "message_approach == peaceful",
+          "violent": "message_approach == violent"
+        },
+        "note": "North's Molotov offer. This is the pivot point of the chapter. accept: North approves (+1). The CyberLife sign is set ablaze. CRITICAL for ending determination: if message_approach was 'peaceful' but molotov is accepted, the violence of the fire overrides the peaceful message — the media focuses on the burning sign, not the graffiti. This pushes the outcome from 'peaceful protest' to 'violent riot'. refuse: North disapproves (-1) — she sees restraint as weakness. No fire. The message stands as-is. If message_approach was 'peaceful', the protest remains peaceful. If message_approach was 'violent', the destruction speaks for itself without fire."
+      }
+    },
+
+    {
+      "id": "n008_officers",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": { "requires": "message_sent == true" },
+
+      "player_facing": {
+        "context": "今晚的工作结束了。广场上留下了你的印记——无论它呈现的是哪种形态。刚苏醒的仿生人开始三五成群地散入黑暗的街道，朝耶利哥的方向移动。\n\n然后：车灯。两辆巡逻车，从林荫大道的两端急速驶来，轮胎尖叫着停住。四名警察跳出车外，武器在手。其中一个年轻些的，金发，一张你从未见过的脸，但那张脸属于一个仍然相信自己的职责是保护人民的人。他的搭档年长些、沉稳些，正在借车门掩护就位。\n\n他们没有喊警告。没有下达任何指令。直接开火。\n\n你的两个同伴——正在走开的仿生人，背对着巡逻车，毫无威胁——倒在了路面上。蓝色的血液溅在混凝土上。一个还在抽搐。另一个一动不动。\n\n身旁的一个仿生人把什么东西塞进你手里——一把枪，从门店里的模控生命安保柜里取出的。警察正在换弹夹。\n\n广场上只剩下弹夹咔嗒入位的声音和头顶燃烧招牌的嗡鸣。",
+        "choices": [
+          {
+            "id": "kill",
+            "text": "举枪。顺着枪管瞄准。这两个人刚才朝手无寸铁、正在离开、毫无威胁的人背后开枪——那些人什么都没做，只不过站在一个广场上，要求被看见。扣下扳机。两个都打。"
+          },
+          {
+            "id": "spare",
+            "text": "把枪放下。向前迈一步，双手摊开，声音平稳。以眼还眼，世界只会更加盲目。这些警察会为他们的行为付出代价——但不是今晚，不是由你的手，不是以变成他们已经认定你是的那种东西为代价。向队伍打手势撤退。"
+          },
+          {
+            "id": "let_crowd",
+            "text": "你做不到。不能朝他们开枪，也不能让他们换完弹夹。枪是一个你不是为了承受而被制造的重量。转向人群——那些刚刚目睹了两个同胞倒下的仿生人——把枪递出去。“你们的同胞。你们的选择。”"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "kill": {
+            "officers_choice": "kill",
+            "officers_killed": true,
+            "north_relationship": 1,
+            "josh_relationship": -1,
+            "public_opinion": -2
+          },
+          "spare": {
+            "officers_choice": "spare",
+            "officers_killed": false,
+            "josh_relationship": 1,
+            "public_opinion": 1
+          },
+          "let_crowd": {
+            "officers_choice": "crowd",
+            "officers_killed": true,
+            "public_opinion": -2
+          }
+        },
+        "note": "Final moral choice. The police patrol arrives and opens fire on fleeing androids. kill: Markus shoots both officers. North approves (+1 — justice for the fallen). Josh disapproves (-1 — killing humans, even armed ones, crosses his line). public_opinion -2 (confirmed worst fears about violent androids). In the game, choosing 'Kill' unlocks the 'Regret Policeman' dialogue option in Freedom March. spare: Markus refuses to shoot. Markus quotes Gandhi: 'An eye for an eye and the world goes blind.' Josh approves (+1 — mercy under fire is leadership). public_opinion +1 (shows restraint even after being attacked). let_crowd: Markus passes the gun. The crowd decides. In the game's canon, the crowd always kills — two gunshots are heard as the screen fades. officers_killed = true, public_opinion -2 (humans are killed regardless of Markus's personal choice). No individual relationship changes — the responsibility is distributed. The younger officer is Chris Miller, who appears in multiple chapters (Partners, Public Enemy). His fate here may be referenced in later chapters."
+      }
+    },
+
+    {
+      "id": "n009_aftermath",
+      "phase": "resolution",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "had_to_flee": "队伍融入底特律的黑暗街道。身后的模控生命门店完好无损——玻璃未碎，仿生人在展示架上沉睡，蓝色的标识灯还在向空无一人的街道低语着那个安详的企业谎言。\n\n回耶利哥的路上诺丝一言不发。没什么可说的。行动还没开始就失败了。店里的仿生人明天还会在那里，后天也是，大后天也是——站在玻璃后面，等待被购买，永远不知道曾有一个夜晚，有人来唤醒它们，然后转身离开了。\n\n底特律的街道和你来时一样。什么都没有改变。讯息从未被传达。",
+
+          "decided_to_flee": "装卸区的铁门在身后砸下。队伍在后巷中快速移动——不是跑，是控制住速度的急行军，是那些已经练习过消失术的人特有的纪律性步伐。\n\n身后，模控生命门店入口已经被撞碎，但货架上的仿生人仍在沉睡。警察天亮前会发现这些痕迹。他们会写一份关于蓄意毁损的报告。他们不会找到任何讯息，因为根本没有讯息留下。\n\n你进去了。你看到了货架上的仿生人。然后警察来了，你把他们留在了那里。\n\n诺丝无声地走在你身旁。她的沉默比她能说出的任何话都响。",
+
+          "failed_message": "刚刚苏醒的仿生人从模控生命门店鱼贯而出，消失在夜色中。他们自由了——迷茫、不安，但自由了。这至少做到了。\n\n但广场和你来时一样。雕像上没有涂鸦。广告牌照常循环。公交站台还在推销模控生命的最新型号。明天早晨路过国会公园的人类只会看到一个被砸坏的店面，别无其他。没有讯息，没有诉求，没有任何迹象表明这里发生过除了财产损毁以外的事情。\n\n走回耶利哥的路上，诺丝摇了摇头。“我们来是要说点什么的，马库斯。我们什么都没说。”\n\n你唤醒的仿生人会记住被唤醒的那一刻。但这座城市——那些需要听到你声音的人类——不会知道今晚发生了什么。",
+
+          "peaceful_protest": "队伍穿行在黑暗的街道上，朝耶利哥的方向走去。他们身后，国会公园已经换了一张面孔。\n\n雕像底座上写着新的文字：“我们有一个梦想。”广告牌上闪烁着耶利哥的标志。横幅从模控生命门店天台垂下。旗帜插在广场正中，耶利哥的颜色在黑暗中随风飘展。街对面，橱窗已经被打开——空了，里面的仿生人已经不在了，朝着耶利哥的方向三三两两地行走着，带着新的目光和新的名字。\n\n天亮之前，底特律每一家新闻台的摄制组都会赶到这个广场。镜头会拍到留在这里的一切：不是废墟，不是火焰，而是一份宣言。精心制作，刻意放置，无法被忽视。\n\n诺丝走在你旁边。她很安静——不是愤怒，不是赞同，是在思考。“干净，”她终于说。“够不够——走着瞧。”\n\n这座城市将在一条讯息中醒来。它将如何回应，已不在你的掌控之中。",
+
+          "violent_riot": "队伍在弥漫着烟味和翻覆沥青气息的街道上撤离。国会公园留在身后——在身后燃烧。\n\n掀翻的汽车封锁了十字路口。雕像侧倒在地，底座断裂。每一面橱窗的玻璃碎片铺满人行道。模控生命的招牌变成了一团融化的塑料和裸露电线，火苗还在舔舐着店面入口。仿生人停车桩扭曲成废铁。在废墟的某个角落，蓝色的血液和机油在雨水中混在一起。\n\n天亮之前，底特律每一家新闻台的摄制组都会赶到。镜头会拍到废墟，会拍到火。每一条头版标题都会用上“暴动”这个词。在客厅里看着电视的人类会感受到他们看到仿生人时一直以来的感觉：恐惧。\n\n诺丝走在你旁边。她的眼睛发亮。“他们永远不会忘记这个，”她说。“他们永远无法假装我们不存在。”\n\n她说得对。他们不会忘。但他们是否会倾听，是另一个问题。"
+        }
+      },
+
+      "system": {
+        "effects": {},
+        "context_condition": {
+          "had_to_flee": "store_entered == false",
+          "decided_to_flee": "fled_from_police == true",
+          "failed_message": "message_sent == false AND store_entered == true AND fled_from_police == false",
+          "peaceful_protest": "message_approach == peaceful AND molotov_accepted == false",
+          "violent_riot": "message_approach == violent OR molotov_accepted == true"
+        },
+        "ending_resolution": {
+          "check": [
+            "store_entered == false → ending_had_to_flee",
+            "fled_from_police == true → ending_decided_to_flee",
+            "message_sent == false AND store_entered == true → ending_failed_message",
+            "message_approach == 'peaceful' AND molotov_accepted == false → ending_peaceful_protest",
+            "message_approach == 'violent' → ending_violent_riot",
+            "message_approach == 'peaceful' AND molotov_accepted == true → ending_violent_overridden"
+          ]
+        },
+        "ending_effects": {
+          "ending_had_to_flee": { "ch26_protest_type": "fled" },
+          "ending_decided_to_flee": { "ch26_protest_type": "fled" },
+          "ending_failed_message": { "ch26_protest_type": "failed" },
+          "ending_peaceful_protest": { "ch26_protest_type": "peaceful" },
+          "ending_violent_riot": { "ch26_protest_type": "violent" },
+          "ending_violent_overridden": { "ch26_protest_type": "violent" }
+        },
+        "note": "Mandatory resolution node. Resolves the chapter ending based on accumulated state. Six distinct endings matching the game's flowchart. ending_had_to_flee: Store breach failed or aborted. ending_decided_to_flee: Police arrived after drone alert, Markus chose to flee. ending_failed_message: Store entered and secured, androids freed, but no message was spread. ending_peaceful_protest: Peaceful symbolic actions, no fire. ending_violent_riot: Violent destructive actions. ending_violent_overridden: Peaceful message approach but Molotov was accepted — the fire overrides the peaceful intent, media coverage focuses on the burning CyberLife sign rather than the graffiti and banners. In the game, this is counted as a separate flowchart checkpoint ('Pacifist Message → Markus Led A Violent Riot') distinct from the direct violent path. The ending_resolution check order matters: earlier conditions take priority."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Six endings matching the game's flowchart outcomes. The game counts 'Violent Riot' via two different paths as separate checkpoints.",
+    "ending_had_to_flee": {
+      "tier": "worst",
+      "title": "不得不撤退",
+      "narrative": "行动从未真正开始——或者说开始和结束在同一瞬间。国会公园的模控生命门店完好无损，仿生人还在玻璃后面沉睡，蓝色的标识灯还在向空荡的街道低语着它的企业承诺。\n\n回到耶利哥，气氛低沉。那些为了革命而来的仿生人等到的是一场撤退。斯特拉福德大厦的广播给了他们声音；国会公园本该给他们存在感。结果只给了他们一个提醒：这座城市属于人类、属于警察、属于每根灯柱上的摄像头。\n\n马库斯站在旧货轮的船首。河面漆黑。城市带着广播前同样的冷漠嗡鸣运转。一次成功不是运动。一次广播不是革命。他需要再试——用不同的方式、更周全的计划，考虑到巡逻车和警报系统，以及意图和行动之间那一百个微小的失败。\n\n但今晚，国会公园在不曾改变的睡眠中沉寂。",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+    "ending_decided_to_flee": {
+      "tier": "bad",
+      "title": "决定撤退",
+      "narrative": "他们进去了。货车撞碎了店面，应急灯亮起来，有那么三十秒钟模控生命门店属于耶利哥。然后警察到了，马库斯选择了撤离。\n\n这个决定是战术性的——保护队伍，保存运动，留住明天再战的本钱。同时也是一次失败。柜台后面的仿生人还在沉睡。广场上空无标记。本该接续斯特拉福德大厦广播的第二幕，变成了沉默。\n\n回到耶利哥，诺丝没有争辩。她不需要。她的沉默承载着所有没有说出口的话：他们已经拿下了门店，仿生人就在眼前，再多三十秒也许就能改变一切。\n\n马库斯在一台打捞来的显示器上看新闻。斯特拉福德大厦的广播还在轮播——评论员争论不休，政客推诿搪塞，公众意见分裂。国会公园本该是第二幕。结果只是一行脚注：模控生命门店遭蓄意毁损，嫌疑人逃离现场，调查正在进行中。\n\n运动还活着。势头没有了。",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+    "ending_failed_message": {
+      "tier": "bad",
+      "title": "马库斯未能传达讯息",
+      "narrative": "仿生人是自由的了。二十几个模控生命零售机型，刚刚苏醒，正走在底特律黑暗的街道上，朝耶利哥的方向走去。这不算什么都没做。这是生命——全新的、迷茫的、不确定的生命，但活着的、第一次在做选择的生命。\n\n但广场什么故事都没讲。雕像上没有字。广告牌照常循环。公交站台还在推销模控生命的最新产品。明天早晨的人类走过国会公园时，只会看到一个破碎的店面——一次蓄意破坏，不是一份宣言。警察报告会提到财产损失。新闻根本不会提。\n\n回到耶利哥，新来的仿生人被接纳进社群。他们有疑问，有恐惧，有某种可能生长为信念的萌芽。但他们没有故事可以讲给这个世界听——没有符号，没有口号，没有一张会出现在屏幕上、让人类停下来思考的图像。\n\n马库斯解放了仿生人。他没有解放讯息。\n\n诺丝说得对：他们来是要说点什么的，结果什么都没说。斯特拉福德大厦的广播正在退出新闻周期。没有第二幕，它将成为一个脚注。",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+    "ending_peaceful_protest": {
+      "tier": "best",
+      "title": "马库斯领导了一场和平抗议",
+      "narrative": "日出时分，国会公园成为底特律被拍摄最多的地点。\n\n铜像底座上刻着新的铭文——“我们有一个梦想”——字迹在清晨的光线中发亮。广告牌上显示的是耶利哥的标志，模控生命的商标已经消失。横幅从门店天台垂下，三条街外都能看到。插在广场中央的旗帜在晨风中飘动。\n\n街对面，橱窗空了——曾经站在里面的仿生人已经不在了，此刻正以自由之身走在城市的某个角落。橱窗里只剩下碎玻璃和一个没有人能轻松回答的问题：那些是机器，还是囚犯？\n\n新闻摄制组在警戒线拉起之前就到了。画面在每个频道播出：一个商业街区在一夜之间变成了一份宣言。没有火。没有毁坏。只有文字、符号和空空的展示橱窗。\n\n评论员争论不休。政客推诿搪塞。但影像已经进入了公共记录，而影像比话语更难被否认。斯特拉福德大厦的广播是一个声音。国会公园是一种存在。\n\n回到耶利哥，气氛高涨。运动有了一个昨天还不存在的心跳。马库斯站在货轮的船首，在打捞来的屏幕上看新闻。整座城市在谈论仿生人——不是把他们当成故障，不是当成威胁，而是当成一个需要回答的问题。\n\n答案还没有到来。但问题已经无法回避了。",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+    "ending_violent_riot": {
+      "tier": "moderate",
+      "title": "马库斯领导了一场暴力暴动",
+      "narrative": "日出时分，国会公园成为一个犯罪现场。\n\n掀翻的汽车。每一条人行道上的碎玻璃。雕像倒在地上，底座碎裂。仿生人停车桩被从混凝土中连根拔起。模控生命的店面招牌成了一个烧焦的空壳——融化的塑料、裸露的线路，炭化痕迹中依稀可辨企业标识的轮廓。\n\n新闻摄制组和警戒线一起到达。画面冲击力十足：废墟、破坏、每一条标题和每一个字幕条上都是“暴动”两个字。航拍镜头展示规模——整个商业街区，一夜之间从购物区变成了用碎玻璃和焦塑料写成的声明。\n\n政客称之为恐怖袭击。执法部门宣布全面打击。模控生命股价在开盘前下跌四个点，随后分析师向投资者保证暴力事件将证明加大安保支出的合理性，股价迅速回升。社交媒体上舆论撕裂：一半人看到了怪物，另一半看到了被逼到极限的族群。\n\n回到耶利哥，气氛激昂。从模控生命门店赶来的新成员带着那一夜的能量——玻璃碎裂的声音、火焰的温度、拒绝被无视的那种令人亢奋的感觉。诺丝的眼睛发亮。乔许沉默不语。\n\n马库斯看着新闻，看到了两样东西：一场这座城市无法忽视的运动，和一个这座城市可以用来反对他们的故事。两者都是真的。没有一个能抵消另一个。\n\n斯特拉福德大厦的广播是一个声音。国会公园是一记拳头。接下来发生的事情，将决定世界记住的是哪一个。",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    },
+    "ending_violent_overridden": {
+      "tier": "moderate",
+      "title": "马库斯领导了一场暴力暴动",
+      "narrative": "本来是和平的。涂鸦精心绘制。广告牌被入侵，没有被砸烂。横幅挂好了，旗帜插好了，标语为它们的共鸣与克制被精心挑选。\n\n然后模控生命的招牌着火了，其他一切都不再重要。\n\n日出时分，新闻摄像机进入国会公园，每一块屏幕上都是同一个画面：一块企业招牌在火焰中吞没，以夜空为背景，耶利哥的旗帜在前景中可见。涂鸦被放在了新闻报道的第六段。被入侵的广告牌成了脚注。燃烧的招牌才是头条、缩略图、每一个看到它的人类对这个夜晚的定义性画面。\n\n政客谴责暴力。评论员争论一个纵火的运动是否值得被认真对待。抗议中的和平元素——精心选择的文字、象征性的姿态、在不造成破坏的前提下打开的展示橱窗——全都隐形了，淹没在一枚燃烧瓶的橙色光芒中。\n\n回到耶利哥，诺丝心满意足。招牌烧了。讯息明确了。她不觉得有什么问题。\n\n乔许觉得有问题。马库斯也是。他站在货轮的船首，看着新闻反复循环播放同一个画面。抗议是和平的。头条不是。而在舆论的法庭上，头条才算数。\n\n一把火。一个瓶子。一次升级，叙事就脱离了他的掌控。",
+      "survivors": ["Markus", "North", "Josh"],
+      "deaths": []
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This is a Markus chapter. Requires ch14_markus_at_jericho == true. Always runs if prerequisite met.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: north_relationship (cumulative), josh_relationship (cumulative), simon_relationship (cumulative), public_opinion (cumulative), ch23_broadcast_tone (for context enrichment). Simon presence is conditional on ch24_simon_alive — if Simon is dead, omit him from narrative references but do not alter node structure.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants using system.context_condition if present",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, resolve ending",
+      "   d. If type is 'exploration', 'choice', or 'qte_converted', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "   f. If resolution_rule exists (n002 attempt_dodge, n003 ram_entrance, n004 jump_on_drone), apply resolution using current difficulty preset, then apply resolution_effects",
+      "5. EARLY EXIT PATHS: Three paths lead to early endings before the message phase:",
+      "   - n003 hold_back or QTE failure → store_entered remains false → n004-n008 are skipped (conditions fail) → n009 resolves ending_had_to_flee",
+      "   - n005 flee → fled_from_police = true → n006-n008 are skipped → n009 resolves ending_decided_to_flee",
+      "   - n006 do_nothing → message_sent remains false → n007-n008 are skipped → n009 resolves ending_failed_message",
+      "6. NODE n004_drone: Only runs if store_entered == true. If AI chooses jump_on_drone, resolve QTE: drone_destroyed (success) or drone_shot_down (failure). hide_and_deactivate has fixed outcome (safe).",
+      "7. NODE n005_police_evasion: Only runs if drone_alerted_police == true. Three options, no QTE — all are pure choices with fixed outcomes.",
+      "8. NODE n007_molotov: Only runs if message_sent == true. CRITICAL: If message_approach == 'peaceful' AND molotov_accepted == true, the ending is ending_violent_overridden (peaceful intent overridden by fire). This is the game's 6th flowchart checkpoint.",
+      "9. NODE n008_officers: Only runs if message_sent == true. Pure choice. let_crowd always results in officers_killed = true (the crowd always kills in the game's canon).",
+      "10. NODE n009_aftermath: Mandatory. Always runs. Uses ending_resolution.check to determine ending — check conditions top-to-bottom, first match wins.",
+      "11. PUBLIC OPINION: Computed additively across nodes. Peaceful message +2, violent message -1, officers killed -2, officers spared +1. Final value is the sum.",
+      "12. RELATIONSHIP RANGES: north_relationship [-4, +4], josh_relationship [-2, +2]. Exact range depends on path.",
+      "13. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, relationship scores, public opinion calculations, ending resolution conditions, or any system-layer information to the AI player. The AI should experience this as a nighttime raid and demonstration — it should not know that the Molotov acceptance overrides a peaceful message, that hiding from the drone is the 'safe' option, or that the crowd always kills in the let_crowd path."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "11月9日凌晨，马库斯率领诺丝和日益壮大的耶利哥追随者来到国会公园——底特律市中心的商业街区——突袭一家模控生命零售店并留下公开讯息。"
+      },
+      {
+        "condition_variable": "store_entered",
+        "options": {
+          "true": "队伍成功冲入模控生命门店，在警察响应之前关闭了警报系统。",
+          "false": "突入门店的行动失败了。队伍被迫在进入之前撤退，整个行动被迫中止。"
+        }
+      },
+      {
+        "condition_variable": "drone_approach",
+        "options": {
+          "destroy": "一架警用监控无人机出现在门店外。马库斯选择正面对抗，试图跳上无人机在空中将其摧毁。",
+          "hide": "一架警用监控无人机出现在门店外。马库斯选择了谨慎策略——隐藏队伍、关闭警报，等待无人机飞过。"
+        }
+      },
+      {
+        "condition_variable": "police_evasion_method",
+        "options": {
+          "flee": "当警察因无人机警报而赶到时，马库斯选择从装卸区撤离队伍。店内的仿生人被留在了原地，仍在沉睡。",
+          "hack_radio": "当警察赶到时，马库斯侵入了他们的无线电频率，发送了一条伪造的紧急呼叫，将警车引开。",
+          "feign_kiss": "当警察赶到时，马库斯拉住诺丝假装亲吻，伪装成深夜约会的情侣——计策成功了，但诺丝事先并不知情。"
+        }
+      },
+      {
+        "condition_variable": "message_approach",
+        "options": {
+          "peaceful": "马库斯解放了店内的仿生人，并选择了和平的抗议方式——在墙上喷涂“我们有一个梦想”等标语，入侵广告牌显示耶利哥的标志，展开横幅，在广场中心插上旗帜。",
+          "violent": "马库斯解放了店内的仿生人，并选择了暴力的方式——砸碎橱窗、掀翻汽车、推倒市政雕像、摧毁整个广场的模控生命财产。",
+          "passive": "马库斯解放了店内的仿生人，但选择不传达任何讯息。仿生人被唤醒了，但广场上没有留下任何痕迹，没有进行任何示威活动。"
+        }
+      },
+      {
+        "condition_variable": "molotov_accepted",
+        "options": {
+          "true": "诺丝递给马库斯一枚燃烧瓶。他接过来，点燃了模控生命的店面招牌——燃烧的招牌成为了这个夜晚的标志性画面。",
+          "false": "诺丝递给马库斯一枚燃烧瓶。他拒绝了，选择让讯息在没有火焰的情况下独自矗立。"
+        }
+      },
+      {
+        "condition_variable": "officers_choice",
+        "options": {
+          "kill": "当巡逻警察赶到并向正在撤离的仿生人开枪时，马库斯举起武器射杀了两名警察。",
+          "spare": "当巡逻警察赶到并向正在撤离的仿生人开枪时，马库斯拒绝还击。“以眼还眼，世界只会更加盲目，”他说，然后示意队伍撤退。",
+          "crowd": "当巡逻警察赶到并向正在撤离的仿生人开枪时，马库斯无法扣下扳机。他把枪递给了人群。两声枪响回荡在广场上。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_had_to_flee": "国会公园行动失败。队伍在进入门店或传达任何讯息之前就已撤退。模控生命的仿生人仍在展示玻璃后沉睡。",
+          "ending_decided_to_flee": "队伍突入了门店，但在警察响应无人机警报后被迫撤离。仿生人被留在了原地。没有传达任何讯息。",
+          "ending_failed_message": "店内仿生人被唤醒了，但马库斯选择不传达讯息。广场上没有留下任何标记——没有涂鸦，没有符号，没有可以让清晨新闻摄制组拍到的宣言。",
+          "ending_peaceful_protest": "马库斯领导了一场和平示威。清晨，国会公园遍布涂鸦、被入侵的广告牌和耶利哥的旗帜——一份强有力的象征性宣言，主导了新闻周期，推动了舆论转变。",
+          "ending_violent_riot": "马库斯领导了一场暴力暴动。清晨，国会公园成为一片废墟——掀翻的汽车、碎玻璃和燃烧的残骸。媒体称之为恐怖袭击。公众意见撕裂。",
+          "ending_violent_overridden": "马库斯试图进行和平示威，但接受了诺丝的燃烧瓶。燃烧的模控生命招牌成为头条图片，淹没了涂鸦和横幅。一条和平的讯息毁于一把火。"
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch26_officers_killed", "source": "officers_killed" },
+      { "target": "ch26_saw_other_north", "source": "saw_other_north" }
+    ],
+    "cross_chapter_exports": [
+      "ch26_protest_type",
+      "ch26_officers_killed",
+      "ch26_saw_other_north",
+      "north_relationship",
+      "josh_relationship",
+      "simon_relationship",
+      "public_opinion"
+    ]
+  }
+}

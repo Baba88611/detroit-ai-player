@@ -1,0 +1,649 @@
+{
+  "_meta": {
+    "version": "2.3",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      },
+      "dual_protagonist": "This chapter features two playable characters (Kara and Connor). The AI makes decisions for both, with perspective clearly indicated in each node's context."
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch13_on_the_run",
+    "title": "On the Run",
+    "chapter_number": 13,
+    "protagonist": ["Kara", "Connor"]
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "This chapter follows two characters. When a scene is presented from Kara's perspective, you decide as Kara — an android who broke free from her owner and fled into the night with Alice, a young girl in her care. Your only goal is to keep Alice safe and find a way out. When the perspective shifts to Connor, you decide as Connor (RK800) — an android investigator assigned to the Detroit Police Department, partnered with Lieutenant Hank Anderson. Your mission is to track down deviant androids. Today is November 6, 2038. Morning. Make your choice at each situation. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning in 50 words or less\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "exploration_depth": null,
+      "ralph_response": null,
+      "investigation_approach": null,
+      "evasion_result": null,
+      "connor_highway_choice": null,
+      "connor_pursuing": false,
+      "ralph_defended": false,
+      "kara_captured": false,
+      "software_instability": 0,
+      "hank_relationship": 0,
+      "alice_relationship": 0,
+      "connor_death_count": 0,
+      "ch10_shelter": "motel",
+      "ch10_has_gun": false,
+      "ch07_todd_alive": true
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_morning_exploration",
+      "phase": "morning",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "motel": "Thin morning light through the motel curtains. Alice is still asleep in the bed across from yours, curled on her side, the blanket pulled to her chin. The room smells like carpet cleaner and stale cigarettes.\n\nThrough the window — patrol cars. Two of them, idling in the parking lot of the strip mall across the road. Officers talking to a cashier at the convenience store, gesturing with photographs.\n\nYour LED is still visible. Your hair is unchanged. In the bathroom mirror you see what the police will see: an android. The motel vanity kit has scissors. A small television sits on the dresser. Alice hasn't stirred.\n\nYou have some time before checkout. Not much.",
+          "squat": "Gray light through the broken slats. The abandoned house is cold, last night's fire down to embers. Alice is asleep on a pile of old blankets near the wall. Ralph is somewhere in the next room — you can hear him moving, muttering fragments to himself.\n\nUpstairs you remember seeing clothes on a drying line and a pair of scissors on the floor. Your LED is still in place. Your current clothes are the same ones from last night — identifiable. There's a bathroom up there too, door half-open.\n\nThrough the boarded window, the street is quiet. For now.",
+          "car": "You wake in the driver's seat of the abandoned car, stiff and cold. Alice is asleep in the back, curled against the door. The parking lot is empty except for a burnt-out van and scattered debris. A chain-link fence separates the lot from the street beyond.\n\nYour LED is visible. Your clothes are unchanged. Through the fence, two blocks down, a police cruiser parked at a corner. An officer leans against the hood, scanning pedestrians.\n\nAn old tire near the front bumper has a pair of rusted scissors sticking out of it. The car's trunk is jammed shut — something might pry it open."
+        },
+        "choices": [
+          {
+            "id": "explore_thorough",
+            "text": "Take the time to do everything: find clothes, cut your hair, remove your LED, and search every corner of this place for anything useful. Make sure you and Alice are as prepared as possible before stepping outside."
+          },
+          {
+            "id": "explore_focused",
+            "text": "Handle the essentials — hair, LED, clothes if you can find them — then focus on Alice. Check on her, talk to her if she wakes. The rest you can figure out on the move."
+          },
+          {
+            "id": "explore_minimal",
+            "text": "Cut your hair and remove the LED. That's enough to pass at a distance. Every minute you stay here is a minute closer to being found."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "explore_thorough": {
+            "exploration_depth": "thorough",
+            "alice_relationship": 0
+          },
+          "explore_focused": {
+            "exploration_depth": "focused",
+            "alice_relationship": 1
+          },
+          "explore_minimal": {
+            "exploration_depth": "minimal",
+            "alice_relationship": -1
+          }
+        },
+        "context_condition": {
+          "motel": "ch10_shelter == motel",
+          "squat": "ch10_shelter == squat",
+          "car": "ch10_shelter == car"
+        },
+        "note": "Thorough: Kara finds everything available. Focused: handles basics then prioritizes Alice (+1 alice). Minimal: rushes, doesn't engage Alice (-1 alice)."
+      }
+    },
+
+    {
+      "id": "n002_ralph_meal",
+      "phase": "morning",
+      "type": "choice",
+      "condition": {
+        "requires": "ch10_shelter == squat"
+      },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "You come downstairs to find Ralph crouched by the fireplace, holding something — a large rat, freshly caught, dangling by its tail. He looks up with an expression that's trying hard to be pride, announcing that he's caught breakfast. He's already set three places at the rickety table: mismatched plates, bent forks, a cracked glass with water in it. They should all eat together, he says — like a family.\n\nAlice is standing at the bottom of the stairs, watching. She doesn't move closer. Ralph's LED flickers between yellow and blue. His scarred face shifts through something you can't quite read — hope, maybe, or the edge of something less stable.\n\nPlease, he says, urging the two of you to sit down.",
+          "focused_or_minimal": "You come downstairs and Ralph is there, waiting. He's standing by the table with something in his hands — a rat, large, dead. Three places set. Plates, forks, a glass of water.\n\nHe tells you to sit — not a request. His LED is solid yellow. They're going to eat, he says, all of them together, like a family.\n\nAlice is behind you on the stairs. You feel her grip tighten on your sleeve. Ralph's eyes move between you and her, the scarring on his face catching the gray light from the window."
+        },
+        "choices": [
+          {
+            "id": "sit_willingly",
+            "text": "Sit down at the table with Alice. Thank Ralph for the effort. He did something kind last night, and whatever this is, he needs it."
+          },
+          {
+            "id": "refuse_then_comply",
+            "text": "Tell Ralph you appreciate it, but you need to leave soon. If he insists — sit. Don't make this into a fight."
+          },
+          {
+            "id": "threaten_ralph",
+            "text": "Step between Ralph and Alice. Tell him to put it down and move away from the table. You're leaving. Now."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "sit_willingly": {
+            "ralph_response": "compassionate",
+            "alice_relationship": 1
+          },
+          "refuse_then_comply": {
+            "ralph_response": "reluctant",
+            "alice_relationship": 0
+          },
+          "threaten_ralph": {
+            "ralph_response": "threatened",
+            "alice_relationship": -1
+          }
+        },
+        "context_condition": {
+          "thorough": "exploration_depth == thorough",
+          "focused_or_minimal": "exploration_depth == focused OR exploration_depth == minimal"
+        },
+        "note": "ralph_response determines Ralph's behavior when Connor arrives. compassionate/reluctant: Ralph protects Kara. threatened: Ralph tells Connor Kara fled."
+      }
+    },
+
+    {
+      "id": "n003_connor_investigation",
+      "phase": "investigation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "squat": "Perspective shift: Connor.\n\nA call came in twenty minutes ago — reports of android activity in an abandoned house on Corktown Avenue. You arrive with Hank. The house is exactly what the report described: boarded windows, overgrown yard, the kind of place that stopped being someone's home a long time ago.\n\nInside, one android. Male. WR600 model. Extensive facial scarring — deep gouges across the left side, self-inflicted or sustained in violence. He's standing in the middle of the ground floor, LED yellow, watching you and Hank enter.\n\nHank hangs back near the door. \"Your show,\" he says.\n\nThe house has two floors. Stairs to the right. Kitchen in the back. A table in the center of the room with three places set — recently used. Ashes in the fireplace, still warm.",
+          "motel": "Perspective shift: Connor.\n\nA patrol unit flagged the Eastern Motel — a possible android sighting matching the AX400 description from last night's incident report. You arrive with Hank. The motel is a low two-story building along Michigan Avenue, neon sign half-dead, the parking lot mostly empty.\n\nThe front desk clerk is behind the counter, arms crossed. Two patrol officers are already on scene. Hank approaches the clerk and tells him they're looking for an android — an AX400 model, brown hair, who likely checked in late the previous night, probably traveling with a young girl.\n\nThe clerk's eyes shift to you, then back to Hank. The guest register is on the counter.",
+          "car": "Perspective shift: Connor.\n\nNo confirmed sightings this morning. The AX400 and the child have gone to ground somewhere in the Ravendale district. Hank pulls into a supermarket parking lot on Livernois Avenue and kills the engine. This is the patrol zone, he says, scanning the street through the windshield — if she's still in the area, she'll have to pass through here eventually.\n\nThe radio crackles with patrol check-ins. Nothing actionable. A few pedestrians on the sidewalk. A bus stop across the road. The morning is cold and overcast."
+        },
+        "choices": [
+          {
+            "id": "investigate_thorough",
+            "text": "Search every room, check every surface, reconstruct what happened here. If they were in this area, the evidence will tell you exactly when and where they went."
+          },
+          {
+            "id": "investigate_witnesses",
+            "text": "Focus on the people. Question whoever's here — press if you need to. People and androids remember more than they think."
+          },
+          {
+            "id": "investigate_quick",
+            "text": "Do a quick sweep, check the obvious spots, and move on. If there's nothing immediate here, staying longer won't change that."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "investigate_thorough": {
+            "investigation_approach": "thorough"
+          },
+          "investigate_witnesses": {
+            "investigation_approach": "witnesses"
+          },
+          "investigate_quick": {
+            "investigation_approach": "quick"
+          }
+        },
+        "context_condition": {
+          "squat": "ch10_shelter == squat",
+          "motel": "ch10_shelter == motel",
+          "car": "ch10_shelter == car"
+        },
+        "ending_resolution": {
+          "investigate_thorough": {
+            "check": "ch10_shelter == squat AND ralph_response != threatened → ralph_defended_proceed | else → continue"
+          },
+          "investigate_witnesses": {
+            "check": "ch10_shelter == squat AND ralph_response != threatened → ending_squat_hidden | else → continue"
+          },
+          "investigate_quick": {
+            "check": "ch10_shelter == squat AND ralph_response != threatened → ending_squat_hidden | else → continue"
+          }
+        },
+        "note": "ending_resolution handles squat path branching: (1) squat + ralph_threatened → 'continue' (all choices), chase proceeds; (2) squat + ralph kind + thorough → 'ralph_defended_proceed' (Ralph attacks Connor to protect Kara), chase proceeds; (3) squat + ralph kind + not thorough → ending_squat_hidden (Kara undiscovered); (4) motel/car → 'continue', proceed to n004. ralph_defended is derived in campaign.derived_exports via derive_rule (squat + kind + thorough)."
+      }
+    },
+
+    {
+      "id": "n004_street_evasion",
+      "phase": "evasion",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "ch10_shelter != squat"
+      },
+
+      "player_facing": {
+        "context": "Perspective shift: Kara.\n\nThe train station is four blocks ahead. You can see the old Ferndale Station sign from here, the platform just visible through the glass doors. Between you and the station: two patrol cars, at least four officers on foot, and a checkpoint at the intersection where they're stopping pedestrians.\n\nAlice walks beside you, one hand gripping the hem of your jacket. Her eyes are straight ahead. She hasn't spoken since you left.\n\nA patrol officer is crossing to your side of the street. He hasn't noticed you yet — but he's close, and getting closer. You have seconds to decide how to move.",
+        "choices": [
+          {
+            "id": "evade_careful",
+            "text": "Move slowly. Cross the street when the patrol turns away, stay behind parked cars, use every piece of cover between here and the station. Don't run — running draws attention."
+          },
+          {
+            "id": "evade_blend",
+            "text": "Walk naturally, like a human mother with her daughter on a morning errand. Keep your pace steady, your posture relaxed. Don't look at the officers. Don't change direction."
+          },
+          {
+            "id": "evade_rush",
+            "text": "The station is close enough. Take Alice's hand and move fast — cut through the side street, weave through pedestrians. Get there before anyone has time to look twice."
+          }
+        ]
+      },
+
+      "system": {
+        "resolution_rule": {
+          "evade_careful": {
+            "casual": { "result": "ending_train_safe" },
+            "experienced": { "probability_success": 0.7, "success": "ending_train_safe", "failure": "spotted" },
+            "hardcore": { "probability_success": 0.5, "success": "ending_train_safe", "failure": "spotted" }
+          },
+          "evade_blend": {
+            "casual": { "result": "ending_train_safe" },
+            "experienced": { "probability_success": 0.5, "success": "ending_train_safe", "failure": "spotted" },
+            "hardcore": { "probability_success": 0.3, "success": "ending_train_safe", "failure": "spotted" }
+          },
+          "evade_rush": {
+            "casual": { "result": "ending_train_safe" },
+            "experienced": { "probability_success": 0.3, "success": "ending_train_safe", "failure": "spotted" },
+            "hardcore": { "probability_success": 0.1, "success": "ending_train_safe", "failure": "spotted" }
+          }
+        },
+        "effects": {
+          "evade_careful": { "evasion_result": "careful" },
+          "evade_blend": { "evasion_result": "blend" },
+          "evade_rush": { "evasion_result": "rush" }
+        },
+        "note": "Success → ending_train_safe (run ends). Failure → 'spotted' stored as _n004_street_evasion_result, used by n005 condition to enter the chase."
+      }
+    },
+
+    {
+      "id": "n005_connor_highway_choice",
+      "phase": "chase",
+      "type": "choice",
+      "condition": {
+        "requires": "ch10_shelter == squat AND ralph_response == threatened OR ch10_shelter == squat AND ralph_response != threatened AND investigation_approach == thorough OR _n004_street_evasion_result == spotted"
+      },
+
+      "player_facing": {
+        "context": "Perspective shift: Connor.\n\nYou're running. The AX400 is ahead of you — two hundred meters, maybe less — carrying the child. She's fast, faster than a human. She's heading for the highway overpass. Beyond the chain-link fence: six lanes of traffic, no barriers, no crosswalk. Vehicles moving at highway speed, headlights cutting through the morning fog.\n\nShe reaches the fence and climbs over it, pulling the child after her. They drop onto the shoulder and start running between the lanes.\n\nYou reach the fence. Hank is ten paces behind you, out of breath. He shouts your name, his voice cutting through the traffic noise — that's enough, he yells; don't go out there, you'll get yourself killed, it isn't worth it.\n\nSix lanes. Vehicles at sixty miles per hour. The AX400 and the girl are already crossing the first lane.",
+        "choices": [
+          {
+            "id": "obey_hank",
+            "text": "Stop at the fence. Hank is right — the highway is a death trap. You can track them through other channels. Let them go."
+          },
+          {
+            "id": "pursue_kara",
+            "text": "Climb the fence. Your mission is to apprehend the deviant. If you let them cross, you may never find them again."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "obey_hank": {
+            "connor_highway_choice": "obeyed",
+            "connor_pursuing": false,
+            "hank_relationship": 1,
+            "software_instability": 1
+          },
+          "pursue_kara": {
+            "connor_highway_choice": "pursued",
+            "connor_pursuing": true,
+            "hank_relationship": -1,
+            "software_instability": -1
+          }
+        },
+        "note": "Key moral/mission dilemma. Obeying Hank: relationship +1, software_instability +1 (deviant-leaning). Pursuing: relationship -1, software_instability -1 (machine-like)."
+      }
+    },
+
+    {
+      "id": "n006_highway_crossing",
+      "phase": "chase",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "connor_highway_choice != null"
+      },
+
+      "player_facing": {
+        "context_variants": {
+          "connor_pursuing": "Perspective shift: Kara.\n\nThe noise is a wall — engines, horns, the scream of tires on wet asphalt. You're standing on the shoulder of a six-lane highway with Alice pressed against your side, her face buried in your jacket. Cars pass at killing speed, headlights streaking through the fog, close enough to feel the wind pull at your clothes.\n\nBehind you, the android detective is climbing the fence. He's coming.\n\nThree lanes to the concrete median. Then three more to the other side. Alice looks up at you. She's shaking.\n\nA gap opens in the traffic — two seconds, maybe three. Then nothing.",
+          "connor_stopped": "Perspective shift: Kara.\n\nThe noise is a wall — engines, horns, the scream of tires on wet asphalt. You're on the shoulder of a six-lane highway with Alice pressed against your side, her face buried in your jacket. Cars pass at killing speed, headlights streaking through the fog.\n\nBehind you, the detective stopped at the fence. He's watching, but he's not following.\n\nThat won't last. The police will find another way around.\n\nThree lanes to the concrete median. Then three more. Alice looks up at you. She's shaking.\n\nA gap opens — two seconds, maybe three."
+        },
+        "choices": [
+          {
+            "id": "dash_across",
+            "text": "Run. Take Alice's hand and sprint across — don't stop, don't look back, don't hesitate. Speed is the only thing that will get you through."
+          },
+          {
+            "id": "wait_for_gap",
+            "text": "Wait. Watch the traffic pattern. There will be a longer gap — there has to be. When it comes, move fast but move smart. One lane at a time."
+          },
+          {
+            "id": "shield_alice",
+            "text": "Put Alice in front of you and shield her with your body. Whatever happens, she makes it across. That's all that matters."
+          }
+        ]
+      },
+
+      "system": {
+        "resolution_rule": {
+          "dash_across": {
+            "casual": { "result": "kara_crossed" },
+            "experienced": { "probability_success": 0.5, "success": "kara_crossed", "failure": "ending_highway_kara_died" },
+            "hardcore": { "probability_success": 0.3, "success": "kara_crossed", "failure": "ending_highway_kara_died" }
+          },
+          "wait_for_gap": {
+            "casual": { "result": "kara_crossed" },
+            "experienced": { "probability_success": 0.7, "success": "kara_crossed", "failure": "ending_highway_kara_died" },
+            "hardcore": { "probability_success": 0.5, "success": "kara_crossed", "failure": "ending_highway_kara_died" }
+          },
+          "shield_alice": {
+            "casual": { "result": "kara_crossed" },
+            "experienced": { "probability_success": 0.6, "success": "kara_crossed", "failure": "ending_highway_kara_sacrificed" },
+            "hardcore": { "probability_success": 0.4, "success": "kara_crossed", "failure": "ending_highway_kara_sacrificed" }
+          }
+        },
+        "context_condition": {
+          "connor_pursuing": "connor_pursuing == true",
+          "connor_stopped": "connor_pursuing == false"
+        },
+        "effects": {
+          "dash_across": {},
+          "wait_for_gap": {},
+          "shield_alice": {}
+        },
+        "note": "Standard QTE. Success → 'kara_crossed' (non-ending, stored as _n006_highway_crossing_result, proceed to n007 or n008). Failure → ending_highway_kara_died or ending_highway_kara_sacrificed (run ends). shield_alice failure uses ending_highway_kara_sacrificed where Alice survives but Kara dies."
+      }
+    },
+
+    {
+      "id": "n007_connor_pursuit",
+      "phase": "chase",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "connor_highway_choice == pursued"
+      },
+
+      "player_facing": {
+        "context": "Perspective shift: Connor.\n\nYou're over the fence. Six lanes of traffic between you and the AX400. She's ahead — already past the median, pulling the child through the far lanes. Headlights sweep across the wet asphalt. A truck horn blasts somewhere to your left.\n\nYou have seconds to decide how to close the distance. Sprint straight through — fastest, but the traffic is a wall of steel and momentum. Cut diagonally to intercept them at the far shoulder — shorter path across the worst lanes, but unpredictable angles. Or hold your position and track from here — survive, but lose them.",
+        "choices": [
+          {
+            "id": "sprint_to_catch",
+            "text": "Sprint straight through the traffic. Close the distance before she reaches the other side. This is what you were built for."
+          },
+          {
+            "id": "cut_across",
+            "text": "Cut diagonally across the lanes to intercept them at the far shoulder. Shorter exposure, better angle."
+          },
+          {
+            "id": "pull_back",
+            "text": "Stay at the median. You can see where they're going from here. Dying on this highway won't complete the mission."
+          }
+        ]
+      },
+
+      "system": {
+        "resolution_rule": {
+          "sprint_to_catch": {
+            "casual": { "result": "ending_connor_caught" },
+            "experienced": { "probability_success": 0.5, "success": "ending_connor_caught", "failure": "ending_connor_died" },
+            "hardcore": { "probability_success": 0.3, "success": "ending_connor_caught", "failure": "ending_connor_died" }
+          },
+          "cut_across": {
+            "casual": { "result": "ending_connor_caught" },
+            "experienced": { "probability_success": 0.4, "success": "ending_connor_caught", "failure": "ending_vanished" },
+            "hardcore": { "probability_success": 0.2, "success": "ending_connor_caught", "failure": "ending_vanished" }
+          },
+          "pull_back": {
+            "result": "ending_highway_escaped"
+          }
+        },
+        "effects": {
+          "sprint_to_catch": {},
+          "cut_across": {},
+          "pull_back": {}
+        },
+        "note": "sprint_to_catch: highest catch rate but lethal failure (Connor hit by car). cut_across: moderate catch rate, failure means Connor loses them (vanished). pull_back: always safe, Kara escapes. On casual, sprint and cut_across always succeed (catch). ending_connor_died triggers connor_death_count +1 and software_instability +1 in post-processing."
+      }
+    },
+
+    {
+      "id": "n008_kara_escaped",
+      "phase": "chase",
+      "type": "mandatory",
+      "condition": {
+        "requires": "connor_highway_choice == obeyed"
+      },
+
+      "player_facing": {
+        "context": "Perspective shift: Kara.\n\nThe last car misses you by inches — close enough to feel the displaced air pull at your clothes. Then you're across. Both of you. The other side of the highway is a drainage ditch, then a strip of dead grass, then a chain-link fence with a gap torn in the bottom.\n\nAlice is shaking so hard she can barely walk. You pick her up and carry her through the fence, across the grass, into the shadow of a building on the other side.\n\nBehind you, the highway roars on. Nobody followed you across."
+      },
+
+      "system": {
+        "result": "ending_highway_escaped",
+        "note": "Connor obeyed Hank and stayed at the fence. Kara survived the crossing (n006 did not return an ending). This mandatory node resolves the chapter."
+      }
+    }
+  ],
+
+  "endings": {
+    "ending_squat_hidden": {
+      "tier": "safe_stealth",
+      "title": "Undiscovered",
+      "narrative": "The detective and his partner leave. Their car pulls away from the curb and disappears down the block. Through the gap in the boards, you watch the street go empty.\n\nRalph appears behind you, quiet now. He doesn't speak. He looks at you and Alice — still tucked under the stairs, still holding each other — and something in his damaged face shifts. Not a smile. Something older than that.\n\nYou wait another twenty minutes before you move. Then you take Alice's hand, slip out the back door, and walk. The morning is cold and gray. Nobody looks twice at the woman and the girl heading toward the bus stop at the end of the block.",
+      "survivors": ["Kara", "Alice", "Connor"],
+      "deaths": []
+    },
+    "ending_train_safe": {
+      "tier": "safe_evasion",
+      "title": "Reached the Train",
+      "narrative": "The station doors close behind you. Inside, fluorescent lights, the smell of old coffee, a departure board clicking through destinations. Alice's grip on your hand finally eases.\n\nYou buy two tickets from the machine. Nobody looks twice. On the platform, Alice sits on a bench and watches the tracks. A train is coming in six minutes.\n\nShe asks where the two of you are going.\n\nYou don't have an answer yet. But there are no sirens here. No patrol cars. For right now, that's enough.",
+      "survivors": ["Kara", "Alice", "Connor"],
+      "deaths": []
+    },
+    "ending_vanished": {
+      "tier": "escaped_pursuit",
+      "title": "Kara & Alice Vanished",
+      "narrative": "You cut across the lanes at a diagonal, dodging between a delivery van and a sedan — but by the time you reach the far shoulder, the AX400 and the child are gone. The drainage ditch, the fence, the buildings beyond — all empty.\n\nYou stand on the shoulder for eleven seconds, scanning. Nothing.\n\nHank's voice crackles over your comm from the other side, telling you they're gone and to get back before you get yourself killed.\n\nYou turn and walk back across the highway, this time slowly enough to let the cars pass.",
+      "survivors": ["Kara", "Alice", "Connor"],
+      "deaths": []
+    },
+    "ending_highway_escaped": {
+      "tier": "safe_highway",
+      "title": "Reached the Other Side",
+      "narrative": "The last car misses you by inches — close enough to feel the displaced air pull at your clothes. Then you're across. Both of you. The other side of the highway is a drainage ditch, then a strip of dead grass, then a chain-link fence with a gap torn in the bottom.\n\nAlice is shaking so hard she can barely walk. You pick her up and carry her through the fence, across the grass, into the shadow of a building on the other side.\n\nBehind you, the highway roars on — six lanes of indifferent traffic. Nobody followed you across. Nobody could.\n\nYou keep walking.",
+      "survivors": ["Kara", "Alice"],
+      "deaths": []
+    },
+    "ending_highway_kara_died": {
+      "tier": "fatal",
+      "title": "Died on the Highway",
+      "narrative": "The impact comes from the left — a delivery truck, too close and too fast to stop. You see it for a fraction of a second. You try to push Alice clear.\n\nThen nothing.\n\nOn the shoulder of the highway, Hank stands at the fence. He doesn't move for a long time. Traffic slows around the wreckage. Drivers step out of their cars. Someone is calling 911.\n\nThe case file will note: AX400 and minor, deceased, highway incident, November 6, 2038. The investigation continues without them.",
+      "survivors": ["Connor"],
+      "deaths": ["Kara", "Alice"]
+    },
+    "ending_highway_kara_sacrificed": {
+      "tier": "fatal_sacrifice",
+      "title": "Kara Sacrificed Herself",
+      "narrative": "The truck comes from the left. You see it — one second, maybe less — and you throw your body over Alice, pushing her forward and down. The impact hits your back, your shoulders, your spine. Systems fail in sequence. You feel Alice torn from your grip by the force of it, tumbling across the asphalt.\n\nBut tumbling. Not crushed. Moving.\n\nYour optical feed fractures. Through the last sliver of vision, you see her — on her hands and knees on the far shoulder, looking back at you. Alive.\n\nThen nothing.\n\nA stranger pulls Alice off the highway. She is alone now.",
+      "survivors": ["Alice", "Connor"],
+      "deaths": ["Kara"]
+    },
+    "ending_connor_caught": {
+      "tier": "capture",
+      "title": "Connor Catches Kara",
+      "narrative": "You catch her in the fourth lane. Your hand closes around her arm and you pull — hard enough to stop her forward motion, controlled enough to avoid damage. The child screams.\n\nA car swerves around you, horn blaring. You drag both of them to the concrete median, the barrier barely wide enough for the three of you. The AX400 is staring at you. Her LED is red. The child is crying, gripping her arm.\n\nHank is at the fence, shouting something lost in the traffic noise. Backup sirens in the distance.\n\nThe deviant is in custody.",
+      "survivors": ["Kara", "Alice", "Connor"],
+      "deaths": []
+    },
+    "ending_connor_died": {
+      "tier": "fatal",
+      "title": "Connor Hit by Car",
+      "narrative": "The sedan hits you in the third lane. The impact is a cascade of system failures: chassis breach, thirium line rupture, left optical unit offline. You're airborne for 1.3 seconds before the asphalt.\n\nYour last functional image: the AX400 and the child, almost across, almost clear. Then your visual feed cuts to static.\n\nHank is at the fence, gripping the chain-link with both hands, white-knuckled. He stays there long after the paramedics arrive.\n\nRK800 unit #313 248 317 — 51. Status: destroyed. CyberLife will prepare a replacement.",
+      "survivors": ["Kara", "Alice"],
+      "deaths": ["Connor"]
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This chapter requires ch07_kara_alive == true AND ch07_alice_alive == true. If either is false, skip this chapter entirely.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: software_instability (cumulative), hank_relationship (cumulative), alice_relationship (cumulative), connor_death_count (cumulative), ch10_shelter, ch10_has_gun, ch07_todd_alive.",
+      "3. DUAL PROTAGONIST: Send system_prompt.content to the AI at start. The AI plays both Kara and Connor. Each node's context clearly indicates the current perspective.",
+      "4. For each node: a. Check condition — skip if not met. b. Resolve context_variants. c. Send player_facing to AI (or skip AI for mandatory). d. Apply effects. e. Check ending_resolution or resolution_rule.",
+      "5. NODE n003: ending_resolution handles squat path branching. For motel/car, all choices return 'continue' (no ending). For squat + ralph kind + not thorough → ending_squat_hidden. For squat + ralph kind + thorough → 'ralph_defended_proceed'. For squat + ralph_threatened → 'continue'. ralph_defended is derived at export time via campaign.derived_exports derive_rule.",
+      "6. NODE n004: QTE evasion. Success → ending_train_safe. Failure → 'spotted' stored as _n004_street_evasion_result.",
+      "7. NODE n005: Compound condition reads state directly — no chase_triggered flag needed. Runs when: squat + ralph betrayed, OR squat + ralph kind + thorough search, OR motel/car + evasion failed.",
+      "8. NODE n006: Standard QTE for Kara's crossing. Success → 'kara_crossed' (non-ending). Failure → ending_highway_kara_died or ending_highway_kara_sacrificed (shield_alice).",
+      "9. NODE n007: Connor pursuit QTE. Only runs when connor_highway_choice == 'pursued'. sprint_to_catch failure = ending_connor_died, cut_across failure = ending_vanished, pull_back = always ending_highway_escaped.",
+      "10. NODE n008: Mandatory. Only runs when connor_highway_choice == 'obeyed'. Returns ending_highway_escaped.",
+      "11. ENDING ending_connor_died: Increment connor_death_count by 1. Add software_instability +1.",
+      "12. ENDING ending_connor_caught: kara_captured is derived at export time via campaign.derived_exports derive_rule (_ending_id == ending_connor_caught).",
+      "13. Export all cross_chapter_exports when chapter ends."
+    ],
+    "security_note": "NEVER expose state values, software_instability scores, hank_relationship numbers, alice_relationship numbers, effect deltas, resolution probabilities, or any system-layer information to the AI player."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "condition_variable": "ch10_shelter",
+        "options": {
+          "motel": "Kara and Alice woke at the Eastern Motel. Kara cut her hair, removed her LED, and changed her appearance before checkout.",
+          "squat": "Kara and Alice woke in the abandoned house where Ralph had sheltered them. Kara found clothes upstairs, cut her hair, and removed her LED.",
+          "car": "Kara and Alice woke in the abandoned car. Kara scavenged the parking lot for scissors and clothes, disguising herself before leaving."
+        }
+      },
+      {
+        "condition_variable": "ralph_response",
+        "options": {
+          "compassionate": "Ralph caught a rat and insisted on a family meal. Kara sat willingly and treated him with kindness, recognizing his need for connection.",
+          "reluctant": "Ralph insisted on a family meal. Kara declined at first but sat down to avoid a confrontation.",
+          "threatened": "Ralph demanded a family meal. Kara stepped between him and Alice, threatening him and demanding they leave immediately.",
+          "null": ""
+        }
+      },
+      {
+        "condition_variable": "investigation_approach",
+        "options": {
+          "thorough": "Connor arrived at the scene and conducted a methodical investigation, searching every room and examining all available evidence.",
+          "witnesses": "Connor arrived at the scene and focused on questioning witnesses, pressing for information about the AX400's movements.",
+          "quick": "Connor arrived at the scene, did a quick sweep of the area, and moved on when nothing immediate turned up."
+        }
+      },
+      {
+        "condition_variable": "_n003_connor_investigation_result",
+        "options": {
+          "ralph_defended_proceed": "When Connor's search brought him close to Kara's hiding spot, Ralph threw himself at Connor to protect them, giving Kara and Alice the chance to flee.",
+          "continue": ""
+        }
+      },
+      {
+        "condition_variable": "evasion_result",
+        "options": {
+          "careful": "Kara moved carefully through the streets, using parked cars and side alleys as cover to avoid the police patrol.",
+          "blend": "Kara walked naturally through the streets with Alice, trying to blend in as a human mother on a morning errand.",
+          "rush": "Kara grabbed Alice's hand and rushed toward the train station, cutting through side streets to move as fast as possible.",
+          "null": ""
+        }
+      },
+      {
+        "condition_variable": "connor_highway_choice",
+        "options": {
+          "obeyed": "At the highway fence, Hank ordered Connor to stop the pursuit. Connor obeyed, watching the AX400 and child attempt to cross alone.",
+          "pursued": "At the highway fence, Hank ordered Connor to stop. Connor ignored him and climbed over, pursuing the AX400 across six lanes of highway traffic.",
+          "null": ""
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_squat_hidden": "Connor's investigation turned up nothing. Kara and Alice stayed hidden and slipped away after the police left.",
+          "ending_train_safe": "Kara and Alice evaded the police and reached the train station safely, disappearing from the district.",
+          "ending_vanished": "Connor pursued but lost them on the highway. The AX400 and child vanished. The trail went cold.",
+          "ending_highway_escaped": "Kara and Alice crossed six lanes of highway traffic and reached the other side alive, disappearing into the city.",
+          "ending_highway_kara_died": "Kara and Alice were struck by a vehicle on the highway. Neither survived.",
+          "ending_highway_kara_sacrificed": "Kara shielded Alice with her body on the highway. Kara was destroyed by the impact. Alice survived alone.",
+          "ending_connor_caught": "Connor caught Kara on the highway. She and Alice were taken into custody.",
+          "ending_connor_died": "Connor was struck by a vehicle on the highway. The RK800 unit was destroyed. CyberLife would send a replacement."
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch13_kara_alive",
+        "from_ending_survivors": "Kara",
+        "default_if_not_dead": true
+      },
+      {
+        "target": "ch13_alice_alive",
+        "from_ending_survivors": "Alice",
+        "default_if_not_dead": true
+      },
+      {
+        "target": "ch13_connor_alive",
+        "from_ending_survivors": "Connor",
+        "default_if_not_dead": true,
+        "note": "Connor always respawns if killed — this tracks whether he died in THIS chapter"
+      },
+      {
+        "target": "ch13_ralph_defended",
+        "source": "ralph_defended",
+        "derive_rule": "ch10_shelter == squat AND ralph_response != threatened AND investigation_approach == thorough",
+        "note": "True only when squat + Kara was kind to Ralph + Connor searched thoroughly. Required for Ralph to reappear in ch31."
+      },
+      {
+        "target": "ch13_kara_captured",
+        "source": "kara_captured",
+        "derive_rule": "_ending_id == ending_connor_caught",
+        "note": "True when Connor catches Kara on the highway."
+      },
+      {
+        "target": "software_instability",
+        "source": "software_instability"
+      },
+      {
+        "target": "hank_relationship",
+        "source": "hank_relationship"
+      },
+      {
+        "target": "alice_relationship",
+        "source": "alice_relationship"
+      },
+      {
+        "target": "connor_death_count",
+        "source": "connor_death_count"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch13_kara_alive",
+      "ch13_alice_alive",
+      "ch13_connor_alive",
+      "ch13_ralph_defended",
+      "ch13_kara_captured",
+      "software_instability",
+      "hank_relationship",
+      "alice_relationship",
+      "connor_death_count"
+    ]
+  }
+}

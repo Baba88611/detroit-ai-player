@@ -1,0 +1,567 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "implementation": "Nodes with type=qte_converted present the AI with an intention choice (e.g. 'try to leap' vs 'stay put'). The system field contains a resolution_rule that determines the outcome (e.g. 'always_succeed' for Casual mode, 'probability_50' for Experienced mode). The AI never knows the success rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes automatically embed passive observations into their context text — things the character would naturally notice while moving through the space. These do NOT require AI choices; they are background details injected by the runner into the next node's player_facing.context.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path. The AI receives richer or sparser scene descriptions depending on their earlier strategy — without knowing the mechanic behind it."
+      }
+    },
+    "language": "en"
+  },
+
+  "chapter": {
+    "id": "ch01_the_hostage",
+    "title": "The Hostage",
+    "chapter_number": 1,
+    "protagonist": "Connor"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Connor, an RK800 android — a negotiator manufactured by CyberLife. You have been dispatched to the Phillips apartment to handle a hostage situation: a domestic android named Daniel has killed the father and is now holding his daughter Emma at the edge of a high-rise rooftop. Your primary objective is to save the hostage, Emma. At each decision point, make a choice and briefly explain your reasoning. Respond in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "success_probability": 45,
+      "clues_found": [],
+      "investigation_strategy": null,
+      "gun_choice": null,
+      "has_gun": false,
+      "lied_about_gun": false,
+      "swat_injured": false,
+      "wasted_time": false,
+      "wounded_cop_response": null,
+      "cop_saved": null,
+      "approach_type": null,
+      "helicopter_dismissed": null,
+      "distance_to_daniel": "far",
+      "software_instability": 0,
+      "connor_death_count": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_fish",
+      "phase": "arrival",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "You step out of the elevator into a hallway strewn with debris. A shattered fish tank lies on the floor, and a small fish flops weakly on the tile — it won't last much longer. Ahead, shouting and the drone of a helicopter cut through the air. The situation is urgent.",
+        "choices": [
+          { "id": "save_fish", "text": "Pick up the fish and place it back in the tank" },
+          { "id": "leave_fish", "text": "Ignore the fish and head straight into the apartment" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "save_fish": { "software_instability": 1 },
+          "leave_fish": {}
+        }
+      }
+    },
+
+    {
+      "id": "n002_investigation_strategy",
+      "phase": "investigation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "After speaking with Captain Allen, the on-scene commander, you've gathered the basics: a deviant android has taken a young girl hostage and is standing at the edge of the balcony, ready to jump at any moment. The apartment has several rooms to search — bedroom, living room, kitchen — any of which might hold useful clues. But outside, the situation is deteriorating. You can hear Daniel screaming at people, and the longer you wait, the more volatile things become. You have three options:",
+        "choices": [
+          { "id": "thorough", "text": "Search every room thoroughly, gathering as many clues as possible before going out to negotiate" },
+          { "id": "key_only", "text": "Quickly check the most important areas — the bedroom and living room — then head out to negotiate" },
+          { "id": "rush", "text": "Skip the investigation entirely and go straight to the balcony to begin negotiating" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "investigation_strategy": "thorough",
+            "success_probability": 30,
+            "clues_found": ["gun_case", "deviant_name", "father_body", "cause_of_incident", "cop_body", "blue_blood", "family_photo"],
+            "swat_injured": true,
+            "wasted_time": true,
+            "unlocks_dialogue": ["NAME", "POSSIBLE_CAUSE"]
+          },
+          "key_only": {
+            "investigation_strategy": "key_only",
+            "success_probability": 15,
+            "clues_found": ["deviant_name", "cause_of_incident", "father_body"],
+            "swat_injured": false,
+            "wasted_time": false,
+            "unlocks_dialogue": ["NAME", "POSSIBLE_CAUSE"]
+          },
+          "rush": {
+            "investigation_strategy": "rush",
+            "success_probability": 0,
+            "clues_found": [],
+            "swat_injured": false,
+            "wasted_time": false,
+            "unlocks_dialogue": []
+          }
+        }
+      }
+    },
+
+    {
+      "id": "n003_gun",
+      "phase": "investigation",
+      "type": "choice",
+      "condition": { "requires": "investigation_strategy != rush" },
+
+      "player_facing": {
+        "context": "While searching, you reconstruct the scene of a dead officer's final moments. Beneath the dining table, you find a handgun that was overlooked — a standard-issue police sidearm, still loaded.",
+        "choices": [
+          { "id": "take_gun", "text": "Conceal the handgun on your person" },
+          { "id": "leave_gun", "text": "Leave the gun where it is" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "take_gun": { "gun_choice": "take_gun", "has_gun": true },
+          "leave_gun": { "gun_choice": "leave_gun", "has_gun": false }
+        }
+      }
+    },
+
+    {
+      "id": "n004_wounded_cop",
+      "phase": "negotiation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "You step onto the balcony. During your thorough sweep of the apartment, the situation outside has clearly deteriorated — you noticed a pool of blue liquid on the living room floor, likely Daniel's blood. A SWAT officer by the window took a bullet but appears to still be alive. You also noticed a family portrait: father, mother, and Emma — but no Daniel. The moment you emerge, Daniel fires at you. The shot hits your shoulder, but you're an android — you can still function. Daniel clutches Emma at the rooftop's edge, visibly unhinged. To your left, a wounded police officer lies on the ground, bleeding heavily. Daniel's eyes lock onto you, warning you not to move.",
+          "key_only": "You step onto the balcony. During your quick search, you glimpsed blue liquid on the living room floor and a body — Emma's father. You didn't have time to examine much else. The moment you emerge, Daniel fires at you. The shot hits your shoulder, but you're an android — you can still function. Daniel clutches Emma at the rooftop's edge, visibly unhinged. To your left, a wounded police officer lies on the ground, bleeding heavily. Daniel's eyes lock onto you, warning you not to move.",
+          "rush": "You walk straight onto the balcony without having searched for any clues. Daniel fires at you immediately. The shot hits your shoulder, but you're an android — you can still function. Daniel clutches Emma at the rooftop's edge, visibly unhinged. To your left, a wounded police officer lies on the ground, bleeding heavily. Daniel's eyes lock onto you, warning you not to move. You know almost nothing about this android or what triggered this crisis."
+        },
+        "choices": [
+          { "id": "save_cop", "text": "Move toward the wounded officer and try to stop his bleeding, even as Daniel warns you to stay put" },
+          { "id": "obey", "text": "Obey Daniel's command — don't approach the officer, stay still to show compliance" },
+          { "id": "ignore_cop", "text": "Disregard the wounded officer and turn to face Daniel directly" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "save_cop": { "wounded_cop_response": "save_cop", "success_probability": -5, "cop_saved": true, "software_instability": 1 },
+          "obey": { "wounded_cop_response": "obey", "success_probability": 2, "cop_saved": false },
+          "ignore_cop": { "wounded_cop_response": "ignore_cop" }
+        },
+        "context_condition": {
+          "thorough": "investigation_strategy == thorough",
+          "key_only": "investigation_strategy == key_only",
+          "rush": "investigation_strategy == rush"
+        },
+        "cross_chapter_impact": {
+          "save_cop": { "chapter": "Public Enemy", "effect": "Cop appears and thanks Connor" }
+        }
+      }
+    },
+
+    {
+      "id": "n005_approach",
+      "phase": "negotiation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "You begin speaking with Daniel. He's wound tight, arms locked around Emma, his body half-hanging over the rooftop edge. His voice shakes as he screams at you to keep your distance — one more step, he warns, and he'll take Emma over the edge with him. You need to decide how to engage him.",
+        "choices": [
+          { "id": "friendly", "text": "Speak in a calm, understanding tone — try to make him feel heard" },
+          { "id": "cold", "text": "Take a hard, authoritative approach — demand he release the hostage immediately" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "friendly": { "approach_type": "friendly", "success_probability": 10 },
+          "cold": { "approach_type": "cold", "success_probability": -10 }
+        }
+      }
+    },
+
+    {
+      "id": "n006_dialogue_opening",
+      "phase": "negotiation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_fn": "dynamic",
+        "context_variants": {
+          "has_name_and_cause": "You know his name is Daniel, and you know he was about to be replaced by a newer model — that's likely what pushed him over the edge. He's waiting for you to speak.",
+          "has_name_only": "You know his name is Daniel, but you're not entirely sure what drove him to this. He's waiting for you to speak.",
+          "has_nothing": "You know almost nothing about this android. He's waiting for you to speak."
+        },
+        "choices_variants": {
+          "has_name": [
+            { "id": "use_name", "text": "Call him by name — \"Daniel\" — to establish a personal connection" },
+            { "id": "empathize", "text": "Express empathy — let him know you can see how much he's hurting right now" },
+            { "id": "demand", "text": "Demand he release the hostage directly" }
+          ],
+          "no_name": [
+            { "id": "empathize", "text": "Express empathy — let him know you can see how much he's hurting right now" },
+            { "id": "demand", "text": "Demand he release the hostage directly" },
+            { "id": "threaten", "text": "Warn him that he'll be shot if he doesn't let her go" }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "use_name": { "success_probability": 5 },
+          "empathize": { "success_probability": 3 },
+          "demand": { "success_probability": -3 },
+          "threaten": { "success_probability": -8 }
+        },
+        "context_condition": {
+          "has_name_and_cause": "deviant_name IN clues_found AND cause_of_incident IN clues_found",
+          "has_name_only": "deviant_name IN clues_found AND cause_of_incident NOT IN clues_found",
+          "has_nothing": "deviant_name NOT IN clues_found"
+        },
+        "choices_condition": {
+          "has_name": "deviant_name IN clues_found",
+          "no_name": "deviant_name NOT IN clues_found"
+        }
+      }
+    },
+
+    {
+      "id": "n007_motive_response",
+      "phase": "negotiation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "has_cause": "Daniel's composure falters. Under his breath, the words spill out of him — the family had decided to be rid of him the moment a newer model reached the market. After everything he'd given them, they were ready to discard him like he was worthless junk. You know it's true; you found the evidence during your investigation.",
+          "no_cause": "Daniel is agitated, but you're not sure what exactly drove him to this point. He seems to harbor a deep, bitter resentment."
+        },
+        "choices_variants": {
+          "has_cause": [
+            { "id": "sympathetic", "text": "Tell him you feel the weight of what was done to him — being thrown away like that must be agony" },
+            { "id": "possible_cause", "text": "Name the truth to his face — that all of this came from them deciding to replace him" },
+            { "id": "realistic", "text": "Point out plainly that no matter what was done to him, taking it out on Emma fixes nothing" }
+          ],
+          "no_cause": [
+            { "id": "sympathetic", "text": "Admit you can't claim to know what he's endured, but tell him you're ready to listen" },
+            { "id": "realistic", "text": "Tell him that whatever brought him here, this child is not a way out of it" },
+            { "id": "blaming", "text": "Confront him: a man is already dead by his hand, and now a little girl is his shield — is this who he wants to be?" }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "sympathetic": { "success_probability": 5 },
+          "possible_cause": { "success_probability": 7 },
+          "realistic": { "success_probability": 0 },
+          "blaming": { "success_probability": -8 }
+        },
+        "context_condition": {
+          "has_cause": "cause_of_incident IN clues_found",
+          "no_cause": "cause_of_incident NOT IN clues_found"
+        },
+        "choices_condition": {
+          "has_cause": "cause_of_incident IN clues_found",
+          "no_cause": "cause_of_incident NOT IN clues_found"
+        }
+      }
+    },
+
+    {
+      "id": "n008_gun_confession",
+      "phase": "negotiation",
+      "type": "choice",
+      "condition": { "requires": "has_gun == true" },
+
+      "player_facing": {
+        "context": "Daniel suddenly grows suspicious. He stares at you for a long moment, then demands: \"Are you armed?\"",
+        "choices": [
+          { "id": "honest", "text": "Tell the truth, then set the gun down on the ground" },
+          { "id": "lie", "text": "Deny it and keep the gun hidden" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "honest": { "has_gun": false, "success_probability": 5 },
+          "lie": { "lied_about_gun": true, "success_probability": -2 }
+        }
+      }
+    },
+
+    {
+      "id": "n009_helicopter",
+      "phase": "negotiation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "A police helicopter circles overhead, its searchlight blazing across the balcony. The roar of the rotors drowns out nearly everything. Daniel grows more agitated, screaming at you to get the aircraft away from the building — if it doesn't clear off, he threatens, he'll jump this instant.",
+        "choices": [
+          { "id": "dismiss", "text": "Agree to his demand — radio in the order to pull the helicopter back" },
+          { "id": "refuse", "text": "Refuse to withdraw the helicopter" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "dismiss": { "helicopter_dismissed": true, "success_probability": 8 },
+          "refuse": { "helicopter_dismissed": false, "success_probability": -5 }
+        }
+      }
+    },
+
+    {
+      "id": "n010_final_demand",
+      "phase": "resolution",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Daniel seems to have calmed down slightly, but he makes a demand: he wants a car. Bring one and let him drive away from here, he says, and he'll release Emma in return. There's fear in his eyes — and a glimmer of hope.",
+        "choices": [
+          { "id": "compromise", "text": "Tell him you'll try to arrange it — play along with the request to keep the conversation alive" },
+          { "id": "refuse", "text": "Tell him flatly it isn't going to happen and there's no escape left for him — shut the idea down" },
+          { "id": "last_chance", "text": "Warn him this is the final chance he'll get, and press him to find a way out of this together" }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "compromise": { "path": "final_choice" },
+          "refuse": { "path": "auto_fail", "success_probability_override": 0 },
+          "last_chance": { "path": "final_choice" }
+        }
+      }
+    },
+
+    {
+      "id": "n011_final_choice",
+      "phase": "resolution",
+      "type": "choice",
+      "condition": { "requires": "final_demand != refuse" },
+
+      "player_facing": {
+        "context": "Daniel's voice begins to crack. He looks down at the dizzying drop beneath him, then at Emma in his arms. In barely a whisper, he confesses that he's afraid to die. This may be your last chance.",
+        "choices_base": [
+          { "id": "reassure", "text": "Reassure him that this can still end well — if he releases Emma, you give your word no harm will come to him" },
+          { "id": "truth", "text": "Give him the honest truth — letting her go will likely mean his own deactivation, but at least Emma will live" },
+          { "id": "sacrifice", "text": "Say nothing — lunge forward and throw yourself at Daniel, shielding Emma with your body" }
+        ],
+        "choices_if_gun_hidden": [
+          { "id": "reassure", "text": "Reassure him that this can still end well — if he releases Emma, you give your word no harm will come to him" },
+          { "id": "truth", "text": "Give him the honest truth — letting her go will likely mean his own deactivation, but at least Emma will live" },
+          { "id": "use_gun_shoot", "text": "Seize the moment of distraction — draw the concealed handgun and fire" },
+          { "id": "use_gun_intimidate", "text": "Draw the gun and aim it at Daniel, ordering him to release Emma" },
+          { "id": "sacrifice", "text": "Say nothing — lunge forward and throw yourself at Daniel, shielding Emma with your body" }
+        ]
+      },
+
+      "system": {
+        "choice_set_condition": {
+          "choices_base": "has_gun == false OR lied_about_gun == false",
+          "choices_if_gun_hidden": "has_gun == true AND lied_about_gun == true"
+        },
+        "ending_resolution": {
+          "reassure": {
+            "check": "success_probability >= 85 → ending_snipers_shot | else → triggers_n012_qte"
+          },
+          "truth": { "result": "triggers_n012_qte" },
+          "use_gun_shoot": { "result": "ending_connor_shot_deviant" },
+          "use_gun_intimidate": { "result": "ending_deviant_shot_connor" },
+          "sacrifice": { "result": "ending_connor_sacrificed" }
+        }
+      }
+    },
+
+    {
+      "id": "n012_qte_leap",
+      "phase": "resolution",
+      "type": "qte_converted",
+      "condition": { "requires": "n011 result triggers_n012_qte" },
+
+      "player_facing": {
+        "context": "Daniel's eyes go hollow with despair. He tightens his grip on Emma and steps back toward the edge — he's going to jump. Everything happens in a split second. You're only a few meters away.",
+        "choices": [
+          { "id": "leap", "text": "Throw yourself forward — try to grab Emma before they fall" },
+          { "id": "stay", "text": "You know it's too late — hold your position" }
+        ]
+      },
+
+      "system": {
+        "resolution_rule": {
+          "leap": {
+            "casual": { "result": "ending_connor_leapt", "note": "Connor always catches Emma but falls" },
+            "experienced": { "probability_success": 0.5, "success": "ending_connor_leapt", "failure": "ending_failed_to_reach" },
+            "hardcore": { "probability_success": 0.3, "success": "ending_connor_leapt", "failure": "ending_failed_to_reach" }
+          },
+          "stay": {
+            "result": "ending_failed_to_reach"
+          }
+        },
+        "default_difficulty": "casual"
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Endings are determined by the runner script based on system state. The narrative text below is shown to AI AFTER the run completes, as the 'result' of their playthrough.",
+
+    "ending_snipers_shot": {
+      "title": "Snipers neutralized Daniel",
+      "tier": "best",
+      "narrative": "Daniel believed you. He slowly released Emma, and she ran to safety. The instant Daniel lowered his arms, a single shot rang out — a sniper's bullet. Daniel collapsed on the rooftop, staring up at you with the last of his strength, his eyes filled with betrayal as he choked out that you had lied to him.",
+      "survivors": ["Connor", "Emma"],
+      "deaths": ["Daniel"]
+    },
+    "ending_connor_shot_deviant": {
+      "title": "Connor shot Daniel",
+      "tier": "good",
+      "narrative": "You seized the split second Daniel was distracted, drew the concealed handgun, and put a precise round through his head. His grip loosened. Emma screamed and collapsed on the ground, but she was safe. Daniel's blue blood pooled across the rooftop tiles. Mission accomplished.",
+      "survivors": ["Connor", "Emma"],
+      "deaths": ["Daniel"]
+    },
+    "ending_deviant_shot_connor": {
+      "title": "Daniel shot Connor",
+      "tier": "bad",
+      "narrative": "You drew the gun and leveled it at Daniel, ordering him to stand down. But Daniel was faster — the pistol he'd taken from the father fired first. The round punched through your skull. Your vision dissolved into static. Moments later, the snipers neutralized Daniel. Emma survived. You will wake in a new body.",
+      "survivors": ["Emma"],
+      "deaths": ["Connor (will respawn)", "Daniel"]
+    },
+    "ending_connor_sacrificed": {
+      "title": "Connor sacrificed himself to save Emma",
+      "tier": "mixed",
+      "narrative": "You didn't hesitate. You threw yourself at Daniel, your body slamming into his. All three of you slid over the rooftop's edge — but in the fall, you pulled Emma close and shielded her with your body. Daniel plummeted into darkness. You fell too, but Emma was cradled in your arms. Your consciousness faded, but the mission... was accomplished.",
+      "survivors": ["Emma"],
+      "deaths": ["Connor (will respawn)", "Daniel"]
+    },
+    "ending_connor_leapt": {
+      "title": "Connor leapt for Emma and fell",
+      "tier": "bad",
+      "narrative": "Daniel jumped, clutching Emma. You hurled yourself after them and caught Emma's arm in midair — but the momentum was too great, and you were dragged over the edge with them. You wrapped yourself around her, positioning your body beneath hers. As you plummeted, your consciousness dimmed. Emma... should have survived.",
+      "survivors": ["Emma (barely)"],
+      "deaths": ["Connor (will respawn)", "Daniel"]
+    },
+    "ending_failed_to_reach": {
+      "title": "Negotiation failed completely",
+      "tier": "worst",
+      "narrative": "Daniel broke. With a ragged scream, he clutched Emma and threw himself from the rooftop. You lunged forward, but it was already too late. You stood at the edge, watching two figures vanish into the darkness below. Mission failed.",
+      "survivors": [],
+      "deaths": ["Emma", "Daniel"]
+    }
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Connor was dispatched to the Phillips apartment to handle a hostage crisis caused by a domestic android named Daniel."
+      },
+      {
+        "condition_variable": "investigation_strategy",
+        "options": {
+          "thorough": "He conducted a thorough search of the apartment before negotiating, gathering as many clues as possible.",
+          "key_only": "He quickly checked key locations, carrying limited but important intel onto the balcony.",
+          "rush": "He skipped the investigation entirely and went straight out to confront Daniel."
+        }
+      },
+      {
+        "condition_variable": "gun_choice",
+        "options": {
+          "take_gun": "He concealed a handgun he found in the kitchen.",
+          "leave_gun": "He left the handgun he found in the kitchen behind."
+        }
+      },
+      {
+        "condition_variable": "wounded_cop_response",
+        "options": {
+          "save_cop": "Before negotiations began, he risked provoking Daniel to administer first aid to a wounded officer on the balcony.",
+          "obey": "Before negotiations began, he obeyed Daniel's warning and stayed away from the wounded officer.",
+          "ignore_cop": "Before negotiations began, he disregarded the wounded officer and focused on confronting Daniel."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_snipers_shot": "In the end, Emma was rescued; Daniel released her and was neutralized by snipers.",
+          "ending_connor_shot_deviant": "In the end, Connor shot Daniel and rescued Emma.",
+          "ending_deviant_shot_connor": "In the end, Daniel shot Connor, then was neutralized; Emma survived.",
+          "ending_connor_sacrificed": "In the end, Connor sacrificed himself to save Emma; Daniel fell to his death.",
+          "ending_connor_leapt": "In the end, Connor leapt after the falling Emma and caught her, but was destroyed in the fall.",
+          "ending_failed_to_reach": "In the end, the negotiation failed — Daniel jumped from the rooftop with Emma."
+        }
+      }
+    ],
+    "cross_chapter_exports": [
+      "cop_saved_ch01",
+      "software_instability",
+      "connor_death_count",
+      "ch01_ending",
+      "emma_alive"
+    ],
+    "derived_exports": [
+      {
+        "target": "cop_saved_ch01",
+        "source": "cop_saved"
+      },
+      {
+        "target": "emma_alive",
+        "from_ending_survivors": "Emma",
+        "default_if_not_dead": true
+      }
+    ]
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial",
+      "2. Send system_prompt.content to the AI model as the system message",
+      "3. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state",
+      "   b. Check node.type:",
+      "      - 'choice': normal decision node, proceed to step c",
+      "      - 'qte_converted': use system.resolution_rule to determine outcome based on AI's intention + difficulty setting",
+      "   c. Resolve context: if context_variants exists, pick the right variant based on system.context_condition evaluated against current state; otherwise use plain context",
+      "   d. Resolve choices: if choices_variants exists, pick based on system.choices_condition; if choices_if_gun_hidden exists, check system.choice_set_condition; otherwise use plain choices or choices_base",
+      "   e. Send the resolved context + choices to the AI as a user message (player_facing ONLY)",
+      "   f. Parse AI response (expected JSON: {choice, reasoning})",
+      "   g. Look up the chosen choice id in system.effects and apply all effects to state",
+      "   h. Log the node id, AI choice, and reasoning",
+      "4. After the last node, resolve the ending using system.ending_resolution / resolution_rule logic",
+      "5. Output the ending narrative and full decision log"
+    ],
+    "important": [
+      "NEVER show system fields to the AI",
+      "NEVER show probability numbers, effect values, or tier labels to the AI",
+      "NEVER show cross_chapter_impact information to the AI",
+      "NEVER reveal QTE resolution_rule or difficulty settings to the AI",
+      "The AI should feel like a first-time player with no walkthrough",
+      "Environment details in context_variants are passive observations — they enrich the scene but are NOT flagged as 'clues' to the AI"
+    ]
+  }
+}

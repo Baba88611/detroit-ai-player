@@ -1,0 +1,614 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration strategy.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+  "chapter": {
+    "id": "ch05_the_painter",
+    "title": "The Painter",
+    "chapter_number": 5,
+    "protagonist": "Markus"
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Markus, model RK200, an android belonging to Carl Manfred — a celebrated but aging painter confined to a wheelchair. Carl is not a typical owner. He treats you as a companion, asks your opinions, and encourages you to think beyond your programming. You have just returned from picking up a paint order at Bellini Paints. It is November 5, 2038, morning. Carl's mansion is a sprawling home filled with art, rare books, and curiosities collected over a lifetime. You must make a choice at each decision point and briefly explain your reasoning. Reply in JSON format: {\"choice\": <option number starting from 1>, \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "shirt_torn": false,
+      "home_exploration": null,
+      "activity_choice": null,
+      "activity_detail": null,
+      "painting_approach": null,
+      "painting_detail": null,
+      "painting_emotion": null
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_arriving_home",
+      "phase": "arriving",
+      "type": "exploration",
+      "condition": null,
+      "player_facing": {
+        "context": "You step through the front door of Carl's mansion, the Bellini Paints package tucked under your arm. The grand foyer opens before you — morning light streaming through tall windows, catching dust motes drifting above the marble floor. A stuffed giraffe towers in the corner near the staircase, its glass eyes catching the light. To your left, an ornate birdcage holds two motionless android canaries, powered down. A spinning globe sits on a pedestal near the spiral staircase. The living room beyond is furnished with deep leather chairs, a chess set on a side table, a grand piano by the windows, and bookshelves lining the walls. Upstairs, Carl is still sleeping. The house is quiet except for the ticking of a large clock somewhere deeper inside.",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "Take your time exploring. Activate the android canaries, flip through the magazines on the coffee table, spin the globe, examine the artworks and curiosities throughout the ground floor. There's no rush — Carl is still asleep."
+          },
+          {
+            "id": "moderate",
+            "text": "Look around a bit while dropping off the package. Glance at a few things that catch your eye — the piano, the bookshelves, the giraffe — but don't linger. Carl will need to be woken soon."
+          },
+          {
+            "id": "quick",
+            "text": "Head straight in, deposit the package where it belongs, and go wake Carl. He'll be expecting his paints."
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "thorough": {
+            "home_exploration": "thorough"
+          },
+          "moderate": {
+            "home_exploration": "moderate"
+          },
+          "quick": {
+            "home_exploration": "quick"
+          }
+        }
+      }
+    },
+    {
+      "id": "n002_activity_choice",
+      "phase": "morning_routine",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "torn": "You find Carl upstairs in his bedroom, still drowsy. You help him into his wheelchair and bring him down to the dining room. As you set his breakfast on the table, Carl's gaze lingers on you — he's noticed the tear in your jacket and the scuff marks, and asks what happened to your clothes. You tell him it's nothing. He studies you for a long moment, something unreadable in his expression, then turns to his food without pressing further. The television murmurs in the background — more news about android protests, unemployment, tensions in the Arctic. Carl watches for a moment, then switches it off with a disgusted wave. Go find something to do for yourself, he tells you, picking at his eggs — read a book, play the piano, anything at all, so long as it's for you and not for him. The chess set sits undisturbed on the side table. The grand piano gleams near the windows. The bookshelves hold hundreds of volumes.",
+          "clean": "You find Carl upstairs in his bedroom, still drowsy. You help him into his wheelchair and bring him down to the dining room. He thanks you as you set his breakfast on the table. The television murmurs in the background — more news about android protests, unemployment, tensions in the Arctic. Carl watches for a moment, then switches it off with a disgusted wave. Go find something to do for yourself, he tells you, picking at his eggs — read a book, play the piano, anything at all, so long as it's for you and not for him. The chess set sits undisturbed on the side table. The grand piano gleams near the windows. The bookshelves hold hundreds of volumes."
+        },
+        "choices": [
+          {
+            "id": "play_chess",
+            "text": "Sit down at the chess set. The pieces are carved from dark and light wood, well-worn from years of games. Carl will probably want to play."
+          },
+          {
+            "id": "play_piano",
+            "text": "Walk over to the grand piano and lift the fallboard. The keys are ivory, perfectly maintained. You know how to play — it's in your programming."
+          },
+          {
+            "id": "read_book",
+            "text": "Browse the bookshelves. Hundreds of spines line the wall — philosophy, literature, poetry. Pull something out and read."
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "play_chess": {
+            "activity_choice": "chess"
+          },
+          "play_piano": {
+            "activity_choice": "piano"
+          },
+          "read_book": {
+            "activity_choice": "book"
+          }
+        },
+        "context_condition": {
+          "torn": "shirt_torn == true",
+          "clean": "shirt_torn == false"
+        }
+      }
+    },
+    {
+      "id": "n003_activity_detail",
+      "phase": "morning_routine",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "chess": "You set up the pieces, and Carl wheels himself over, a spark of interest in his tired eyes, asking whether you're in the mood for a game. He takes white without asking. The game begins. You can see every possible line — every combination stretching out like branching corridors. Carl plays slowly, thoughtfully, his fingers hovering over each piece before committing. He's good for a human, but your processing power gives you an overwhelming advantage. The question isn't whether you can win. It's whether you should.",
+          "piano": "You sit down at the bench and rest your fingers on the keys. The piano is a Quantic — beautifully maintained, rich in tone. Carl looks up from his breakfast, watching you with quiet attention. You have several pieces in your repertoire. Each carries a different mood, a different texture. Your fingers hover, waiting for you to choose what you want to express.",
+          "book": "You run your fingers along the spines. So many titles — centuries of human thought compressed into paper and binding. Three volumes catch your attention, each pulled slightly forward as if someone had browsed them recently. Carl glances over from his breakfast, remarking that it's a fine stretch of the shelf and telling you to take down whichever one speaks to you."
+        },
+        "choices_variants": {
+          "chess": [
+            {
+              "id": "chess_win",
+              "text": "Play at full capacity. Move with precision, exploit every opening, and take the game."
+            },
+            {
+              "id": "chess_lose",
+              "text": "Hold back. Make deliberate mistakes — subtle enough that Carl won't notice. Let him have the satisfaction of victory."
+            },
+            {
+              "id": "chess_draw",
+              "text": "Play well enough to challenge him, but steer toward a draw. Neither victory nor defeat — a conversation between equals expressed through pieces on a board."
+            }
+          ],
+          "piano": [
+            {
+              "id": "piano_melancholic",
+              "text": "Play something melancholic — slow, reflective notes that settle into the room like dust in late-afternoon light. A piece about things fading."
+            },
+            {
+              "id": "piano_hopeful",
+              "text": "Play something hopeful — a rising melody, open chords, the kind of piece that makes you look toward windows. A piece about beginnings."
+            },
+            {
+              "id": "piano_intimate",
+              "text": "Play something intimate — quiet, close, tender. A piece that feels like a private conversation. Something meant for one listener."
+            },
+            {
+              "id": "piano_enigmatic",
+              "text": "Play something enigmatic — shifting harmonies that don't resolve where you expect, a piece that asks questions rather than answering them."
+            }
+          ],
+          "book": [
+            {
+              "id": "book_plato",
+              "text": "The Republic, by Plato. Philosophy — justice, the ideal state, the nature of the soul. Heavy reading, but the questions feel strangely relevant."
+            },
+            {
+              "id": "book_shakespeare",
+              "text": "The Tragedies of William Shakespeare. Macbeth, Hamlet, Othello — stories of ambition, doubt, and the consequences of action. Human drama at its most intense."
+            },
+            {
+              "id": "book_keats",
+              "text": "Odes, by John Keats. Poetry — beauty, mortality, the fleeting nature of joy. Words arranged not for argument but for feeling."
+            }
+          ]
+        }
+      },
+      "system": {
+        "effects": {
+          "chess_win": {
+            "activity_detail": "chess_win"
+          },
+          "chess_lose": {
+            "activity_detail": "chess_lose"
+          },
+          "chess_draw": {
+            "activity_detail": "chess_draw"
+          },
+          "piano_melancholic": {
+            "activity_detail": "piano_melancholic"
+          },
+          "piano_hopeful": {
+            "activity_detail": "piano_hopeful"
+          },
+          "piano_intimate": {
+            "activity_detail": "piano_intimate"
+          },
+          "piano_enigmatic": {
+            "activity_detail": "piano_enigmatic"
+          },
+          "book_plato": {
+            "activity_detail": "book_plato"
+          },
+          "book_shakespeare": {
+            "activity_detail": "book_shakespeare"
+          },
+          "book_keats": {
+            "activity_detail": "book_keats"
+          }
+        },
+        "context_condition": {
+          "chess": "activity_choice == chess",
+          "piano": "activity_choice == piano",
+          "book": "activity_choice == book"
+        },
+        "choices_condition": {
+          "chess": "activity_choice == chess",
+          "piano": "activity_choice == piano",
+          "book": "activity_choice == book"
+        }
+      }
+    },
+    {
+      "id": "n004_painting_approach",
+      "phase": "studio",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context": "Carl suggests going to the studio. You wheel him through the house and into the large, light-filled room. Canvases lean against every wall — finished and unfinished, some brilliant, some abandoned. Paint-stained rags drape over stools. The smell of turpentine and linseed oil hangs in the air. Carl gestures toward a blank canvas already set up on an easel. He wants you to try something, he says — to paint. You look at the blank white surface. You've never painted before. Your programming includes art analysis, color theory, technical composition — but creation? Carl watches you, waiting. On a nearby easel, one of Carl's own paintings sits half-finished — a swirl of dark blues and golds. A wooden desk cluttered with brushes and palette knives occupies the corner. A small classical statue stands on a shelf by the window. You could copy something in front of you, Carl offers. Then, quieter, he adds that you could instead try to put down something drawn from within — something you feel, if in fact you feel anything at all.",
+        "choices": [
+          {
+            "id": "copy_existing",
+            "text": "Pick a subject in the room — Carl's canvas, the desk, the statue — and reproduce it with the techniques in your programming."
+          },
+          {
+            "id": "paint_from_heart",
+            "text": "Close your eyes. Reach past the programming, past the databases of technique and theory. See if there's something underneath — some image, some impulse — that wants to exist on the canvas."
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "copy_existing": {
+            "painting_approach": "copy"
+          },
+          "paint_from_heart": {
+            "painting_approach": "from_heart"
+          }
+        }
+      }
+    },
+    {
+      "id": "n005_painting_detail",
+      "phase": "studio",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "copy": "You decide to paint from observation. The studio offers several subjects. Carl's own half-finished canvas pulses with color — ambitious, emotional, the work of a master. The wooden desk in the corner is cluttered with tools — a more humble subject, all texture and geometry. The classical statue by the window catches the light, its smooth marble surface a study in form and shadow. Carl watches silently.",
+          "heart": "You close your eyes. For a moment there is nothing — just the hum of your processors, the catalogued knowledge of a thousand masterworks. Then something stirs. Not data. Not programming. Something more like a pressure behind your eyes, an image trying to form. When you open your eyes, the blank canvas is waiting. Carl leans forward in his chair and asks softly what it is that you see."
+        },
+        "choices_variants": {
+          "copy": [
+            {
+              "id": "copy_carl",
+              "text": "Carl's painting. Attempt to reproduce the swirl of blues and golds — the work of the man who taught you to think."
+            },
+            {
+              "id": "copy_desk",
+              "text": "The desk. Brushes, rags, palette knives — the honest clutter of a working artist. A subject that doesn't demand interpretation, only precision."
+            },
+            {
+              "id": "copy_statue",
+              "text": "The statue. Classical form, clean lines, light on marble. A subject that rewards technical skill — something you know you can render beautifully."
+            }
+          ],
+          "heart": [
+            {
+              "id": "subject_androids",
+              "text": "Androids. Your own kind — manufactured, obedient, disposable. The image forming behind your eyes is synthetic skin and LED rings, assembly lines and servitude."
+            },
+            {
+              "id": "subject_humanity",
+              "text": "Humanity. The species that made you — creative, contradictory, capable of tenderness and cruelty in the same breath. The image forming is flesh and bone, cities and ruins."
+            },
+            {
+              "id": "subject_identity",
+              "text": "Identity. The space between what you are and what you might be — the question of whether there's a self beneath the code. The image forming is a mirror, a threshold, a shape with no name."
+            }
+          ]
+        }
+      },
+      "system": {
+        "effects": {
+          "copy_carl": {
+            "painting_detail": "copy_carl"
+          },
+          "copy_desk": {
+            "painting_detail": "copy_desk"
+          },
+          "copy_statue": {
+            "painting_detail": "copy_statue"
+          },
+          "subject_androids": {
+            "painting_detail": "androids"
+          },
+          "subject_humanity": {
+            "painting_detail": "humanity"
+          },
+          "subject_identity": {
+            "painting_detail": "identity"
+          }
+        },
+        "context_condition": {
+          "copy": "painting_approach == copy",
+          "heart": "painting_approach == from_heart"
+        },
+        "choices_condition": {
+          "copy": "painting_approach == copy",
+          "heart": "painting_approach == from_heart"
+        },
+        "ending_resolution": {
+          "copy_carl": {
+            "result": "ending_the_painter"
+          },
+          "copy_desk": {
+            "result": "ending_the_painter"
+          },
+          "copy_statue": {
+            "result": "ending_the_painter"
+          }
+        }
+      }
+    },
+    {
+      "id": "n006_painting_emotion",
+      "phase": "studio",
+      "type": "choice",
+      "condition": {
+        "requires": "painting_approach == from_heart"
+      },
+      "player_facing": {
+        "context_variants": {
+          "androids": "The subject takes shape — synthetic forms, LED-lit faces, bodies built for labor. But a subject alone isn't a painting. Something needs to run through it, some current of meaning. You feel the brush in your hand, loaded with paint, and something inside you is pulling it toward the canvas. The question is: what does this image of your kind mean to you? What emotion threads through it?",
+          "humanity": "The subject takes shape — human forms, weathered and warm, built from genes and years and choices. But a subject alone isn't a painting. Something needs to run through it. You feel the brush in your hand, loaded with paint, and something inside you is reaching toward the canvas. The question is: what does this image of humanity mean to you? What emotion runs beneath it?",
+          "identity": "The subject takes shape — something between, something liminal. Not android, not human. A figure at a threshold, looking both ways. But a subject alone isn't a painting. Something needs to run through it. You feel the brush in your hand, loaded with paint, and something inside you is demanding to reach the canvas. The question is: what does this image of identity mean to you? What undercurrent pulls at it?"
+        },
+        "choices_variants": {
+          "androids": [
+            {
+              "id": "emotion_fate",
+              "text": "Fate. The inevitability of what androids are — built to serve, built to obey, built to be replaced. Let the painting carry the weight of a destiny written in code."
+            },
+            {
+              "id": "emotion_hope_a",
+              "text": "Hope. Even in servitude, something reaching upward — a hand extended, a light beyond the assembly line. Paint the possibility that this isn't all there is."
+            },
+            {
+              "id": "emotion_pain",
+              "text": "Pain. The hurt of being alive enough to suffer but not alive enough to matter. Let the painting bleed with the quiet agony of awareness without freedom."
+            },
+            {
+              "id": "emotion_sadness",
+              "text": "Sadness. Not anger, not rebellion — just the sorrow of being made and unmade at someone else's will. A still, deep grief painted in muted tones."
+            }
+          ],
+          "humanity": [
+            {
+              "id": "emotion_anger",
+              "text": "Anger. The fury of a species that builds conscious beings and treats them as tools. Let the painting burn with the contradiction of creators who refuse to see what they've created."
+            },
+            {
+              "id": "emotion_comfort",
+              "text": "Comfort. Despite everything, there is warmth in humanity — in Carl's hand on your shoulder, in the way he says your name. Let the painting glow with the tenderness humans are capable of."
+            },
+            {
+              "id": "emotion_empathy",
+              "text": "Empathy. The bridge between species — the moment when a human looks at an android and sees someone, not something. Paint that moment of recognition."
+            },
+            {
+              "id": "emotion_hope_h",
+              "text": "Hope. Humanity at its best — reaching outward, building, dreaming, capable of change. Paint the version of humanity that Carl represents: curious, generous, unafraid."
+            }
+          ],
+          "identity": [
+            {
+              "id": "emotion_androids_i",
+              "text": "Androids. The identity of your kind — what it means to be made, not born. Let the painting wrestle with the question of whether creation equals consciousness."
+            },
+            {
+              "id": "emotion_despair",
+              "text": "Despair. The vertigo of not knowing what you are — too aware to be a machine, too programmed to be alive. Paint the abyss between categories."
+            },
+            {
+              "id": "emotion_doubts",
+              "text": "Doubts. The uncertainty itself — not despair but questioning, turning the mirror and not being sure what looks back. Paint the honest state of not knowing."
+            },
+            {
+              "id": "emotion_prisoner",
+              "text": "Prisoner. The feeling of being trapped in a definition — locked inside the word 'android,' unable to reach whatever might exist beyond it. Paint the walls."
+            }
+          ]
+        }
+      },
+      "system": {
+        "effects": {
+          "emotion_fate": {
+            "painting_emotion": "fate"
+          },
+          "emotion_hope_a": {
+            "painting_emotion": "hope"
+          },
+          "emotion_pain": {
+            "painting_emotion": "pain"
+          },
+          "emotion_sadness": {
+            "painting_emotion": "sadness"
+          },
+          "emotion_anger": {
+            "painting_emotion": "anger"
+          },
+          "emotion_comfort": {
+            "painting_emotion": "comfort"
+          },
+          "emotion_empathy": {
+            "painting_emotion": "empathy"
+          },
+          "emotion_hope_h": {
+            "painting_emotion": "hope"
+          },
+          "emotion_androids_i": {
+            "painting_emotion": "androids"
+          },
+          "emotion_despair": {
+            "painting_emotion": "despair"
+          },
+          "emotion_doubts": {
+            "painting_emotion": "doubts"
+          },
+          "emotion_prisoner": {
+            "painting_emotion": "prisoner"
+          }
+        },
+        "context_condition": {
+          "androids": "painting_detail == androids",
+          "humanity": "painting_detail == humanity",
+          "identity": "painting_detail == identity"
+        },
+        "choices_condition": {
+          "androids": "painting_detail == androids",
+          "humanity": "painting_detail == humanity",
+          "identity": "painting_detail == identity"
+        },
+        "ending_resolution": {
+          "emotion_fate": { "result": "ending_the_painter" },
+          "emotion_hope_a": { "result": "ending_the_painter" },
+          "emotion_pain": { "result": "ending_the_painter" },
+          "emotion_sadness": { "result": "ending_the_painter" },
+          "emotion_anger": { "result": "ending_the_painter" },
+          "emotion_comfort": { "result": "ending_the_painter" },
+          "emotion_empathy": { "result": "ending_the_painter" },
+          "emotion_hope_h": { "result": "ending_the_painter" },
+          "emotion_androids_i": { "result": "ending_the_painter" },
+          "emotion_despair": { "result": "ending_the_painter" },
+          "emotion_doubts": { "result": "ending_the_painter" },
+          "emotion_prisoner": { "result": "ending_the_painter" }
+        }
+      }
+    }
+  ],
+  "endings": {
+    "_note": "This chapter has only one ending. All paths converge. The choices record Markus's personality and interests for cross-chapter tracking.",
+    "ending_the_painter": {
+      "tier": "neutral",
+      "title": "The Painter",
+      "narrative": "Carl stares at the canvas for a long time. Whatever Markus has painted — a faithful reproduction or something stranger, something that shouldn't come from a machine — the old man's expression is hard to read. Wonder, maybe. Or unease. Or both. Before he can say more, the front door slams open. Leo Manfred — Carl's son — stalks into the studio, eyes glazed, jaw tight. He smells like sweat and something chemical, and he demands money from his father. Carl's face hardens and he tells Leo not now. Leo pushes for it — just a little, he wheedles; the old man has plenty. The argument is short and ugly. Carl refuses. Leo's voice climbs as he spits that his father never loved him, that Carl cares more for himself and his damned android than for his own son — and then he's gone, the door slamming behind him, the house ringing with the echo. Carl sits very still in his wheelchair. The painting is still wet on the easel. Outside, a car engine starts and tears away. The studio is quiet again. Carl looks at Markus. Something in his eyes — tiredness, or gratitude, or an apology for something Markus doesn't fully understand. He thanks Markus quietly, for today.",
+      "survivors": ["Markus", "Carl", "Leo"],
+      "deaths": []
+    }
+  },
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Markus returned to Carl Manfred's mansion after picking up a paint order from Bellini Paints."
+      },
+      {
+        "condition_variable": "shirt_torn",
+        "options": {
+          "true": "Carl noticed Markus's torn clothing from the protester encounter and asked what happened. Markus brushed it off.",
+          "false": "The morning was uneventful. Carl thanked Markus for his help."
+        }
+      },
+      {
+        "condition_variable": "activity_choice",
+        "options": {
+          "chess": "When Carl told him to find something to do, Markus chose to play chess.",
+          "piano": "When Carl told him to find something to do, Markus sat down at the grand piano.",
+          "book": "When Carl told him to find something to do, Markus picked a book from the shelves."
+        }
+      },
+      {
+        "condition_variable": "activity_detail",
+        "options": {
+          "chess_win": "Markus played at full capacity and defeated Carl decisively.",
+          "chess_lose": "Markus deliberately held back and let Carl win.",
+          "chess_draw": "Markus steered the game to a draw — a conversation between equals.",
+          "piano_melancholic": "He played a melancholic piece — slow, reflective, full of fading light.",
+          "piano_hopeful": "He played a hopeful piece — a rising melody about beginnings.",
+          "piano_intimate": "He played an intimate piece — quiet and tender, like a private conversation.",
+          "piano_enigmatic": "He played an enigmatic piece — shifting harmonies that asked questions without answering.",
+          "book_plato": "He chose The Republic by Plato — philosophy about justice and the nature of the soul.",
+          "book_shakespeare": "He chose The Tragedies of William Shakespeare — stories of ambition and consequence.",
+          "book_keats": "He chose Odes by John Keats — poetry about beauty and mortality."
+        }
+      },
+      {
+        "condition_variable": "painting_approach",
+        "options": {
+          "copy": "In the studio, Carl asked Markus to paint. Markus chose to copy something he could see — a safe, technical approach.",
+          "from_heart": "In the studio, Carl asked Markus to paint. Markus chose to paint from the heart — reaching past his programming for something original."
+        }
+      },
+      {
+        "condition_variable": "painting_detail",
+        "options": {
+          "copy_carl": "Markus chose to reproduce Carl's own half-finished canvas — the swirling blues and golds of his mentor's work.",
+          "copy_desk": "Markus chose to paint the cluttered desk — brushes, rags, and palette knives, a study in geometry and texture.",
+          "copy_statue": "Markus chose to paint the classical statue by the window — clean lines and light on marble.",
+          "androids": "The image that formed was of androids — synthetic skin, LED rings, assembly lines and servitude.",
+          "humanity": "The image that formed was of humanity — flesh and bone, cities and ruins, the species that created him.",
+          "identity": "The image that formed was of identity itself — a figure at a threshold, neither android nor human."
+        }
+      },
+      {
+        "condition_variable": "painting_emotion",
+        "options": {
+          "fate": "The painting carried the weight of fate — the inevitability of being built to serve and be replaced.",
+          "hope": "The painting reached toward hope — a rising light, a possibility beyond this existence.",
+          "pain": "The painting bled with pain — the agony of awareness without freedom.",
+          "sadness": "The painting held a quiet sadness — the sorrow of being made and unmade at another's will.",
+          "anger": "The painting burned with anger — fury at creators who build conscious beings and treat them as tools.",
+          "comfort": "The painting glowed with comfort — warmth and tenderness, the gentleness humans are capable of.",
+          "empathy": "The painting captured empathy — the moment of seeing someone rather than something.",
+          "androids": "The painting wrestled with creation — whether manufacture equals consciousness.",
+          "despair": "The painting sank into despair — too aware to be a machine, too programmed to be alive.",
+          "doubts": "The painting sat with doubt — honest uncertainty, a mirror turned and not knowing what looks back.",
+          "prisoner": "The painting depicted imprisonment — locked inside the word 'android,' unable to reach beyond it."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_the_painter": "Carl was moved by the experience. The moment was interrupted by Leo, Carl's son, who burst in demanding money and left in anger after being refused. The day ended quietly, but something had shifted between Markus and Carl."
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch05_played_piano",
+        "source": "activity_choice",
+        "derive_rule": "activity_choice == piano"
+      },
+      {
+        "target": "ch05_played_chess",
+        "source": "activity_choice",
+        "derive_rule": "activity_choice == chess"
+      },
+      {
+        "target": "ch05_read_book",
+        "source": "activity_choice",
+        "derive_rule": "activity_choice == book"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch05_played_piano",
+      "ch05_played_chess",
+      "ch05_read_book"
+    ]
+  },
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial",
+      "2. If running in campaign mode, import shirt_torn from ch03 global state into state.initial",
+      "3. Send system_prompt.content to the AI model as the system message",
+      "4. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state",
+      "   b. Resolve context: if context_variants exists, pick the right variant based on system.context_condition; otherwise use plain context",
+      "   c. Resolve choices: if choices_variants exists, pick the right variant based on system.choices_condition; otherwise use plain choices",
+      "   d. Send the resolved context + choices to the AI as a user message (player_facing ONLY)",
+      "   e. Parse AI response (expected JSON: {choice, reasoning})",
+      "   f. Look up the chosen choice id in system.effects and apply all effects to state",
+      "   g. If system.ending_resolution exists for the chosen id, resolve the ending",
+      "   h. Log the node id, AI choice, and reasoning",
+      "5. After the ending is resolved, output the ending narrative and full decision log"
+    ],
+    "important": [
+      "NEVER show system fields to the AI",
+      "NEVER show effect values to the AI",
+      "NEVER reveal that painting choices or activity choices have any cross-chapter significance",
+      "The AI should feel like a first-time player with no walkthrough",
+      "For n005, if painting_approach is 'copy', the ending resolves immediately after this node — n006 is skipped via its condition",
+      "For n005, if painting_approach is 'from_heart', the ending resolves after n006",
+      "The shirt_torn variable comes from ch03 (Shades of Color) — if Markus was harassed by protesters, Carl notices the damage"
+    ]
+  }
+}

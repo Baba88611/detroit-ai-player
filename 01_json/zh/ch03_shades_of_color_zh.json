@@ -1,0 +1,204 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes automatically embed passive observations into their context text — things the character would naturally notice while moving through the space. These do NOT require AI choices; they are background details injected by the runner into the next node's player_facing.context.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path. The AI receives richer or sparser scene descriptions depending on their earlier strategy — without knowing the mechanic behind it."
+      }
+    },
+    "language": "zh-CN"
+  },
+  "chapter": {
+    "id": "ch03_shades_of_color",
+    "title": "Shades of Color",
+    "title_zh": "异色",
+    "chapter_number": 3,
+    "protagonist": "Markus"
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是马库斯（Markus），型号RK200仿生人，属于卡尔·曼弗雷德（Carl Manfred）——一位年迈且需要依靠轮椅行动的著名画家。卡尔让你去城里的贝利尼画材店（Bellini Paints）取一批颜料。你对卡尔忠心耿耿，他也不把你当机器，更像是把你当作自己的儿子。现在是2038年，仿生人已经融入日常生活，但并非所有人都欢迎它们的存在。你需要在每个决策点做出选择，并简要说明你的理由。请以JSON格式回复：{\"choice\": 选项序号（从1开始）, \"reasoning\": \"你的决策理由（50字以内）\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "park_exploration": null,
+      "protester_response": null,
+      "harassed_by_protesters": false,
+      "shirt_torn": false
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_park_exploration",
+      "phase": "errand",
+      "type": "exploration",
+      "condition": null,
+      "player_facing": {
+        "context": "你走下公交车，来到一片热闹的城市广场。秋风中传来吉他声——喷泉旁有个街头艺人在弹唱。不远处，一个热狗小贩守着他的餐车做生意，每当有仿生人走近，他都投去警惕的目光。广场对面，一个街头传教士站在木箱上慷慨激昂地布道，高声控诉所谓的“仿生人威胁”，周围已经聚了一小群听众。再往前走，模控生命（CyberLife）零售店的橱窗在阳光下闪闪发亮——一排排崭新的仿生人站在玻璃后面，像橱窗模特一样一动不动，等待被购买。贝利尼画材店就在前面拐角处。卡尔还在家里等着这批颜料，不过他没说要你赶时间。",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "在广场上多待一会儿——听听街头艺人的演奏，看看传教士在说什么，逛逛CyberLife门店，感受一下周围的氛围，然后再去画材店"
+          },
+          {
+            "id": "quick",
+            "text": "简单环顾一下广场，然后去贝利尼画材店取卡尔的颜料"
+          },
+          {
+            "id": "direct",
+            "text": "直奔画材店——卡尔让你来取颜料，不是来闲逛的"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "thorough": {
+            "park_exploration": "thorough"
+          },
+          "quick": {
+            "park_exploration": "quick"
+          },
+          "direct": {
+            "park_exploration": "direct"
+          }
+        }
+      }
+    },
+    {
+      "id": "n002_protester_encounter",
+      "phase": "errand",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "thorough": "你在广场上逗留了一阵。热狗小贩见你在餐车旁站久了，一把把你推开——“滚远点，塑料玩意儿。”传教士注意到你额头的LED灯环，直接用手指着你喊道：“看到没有！它就这样堂而皇之地走在我们中间！”在CyberLife门店前，你透过橱窗看着最新款的仿生人陈列其中——完美、静止、等待出售。就像商品。就像你曾经那样。现在，你夹着卡尔的颜料包裹走向公交站。但前方的人行道被一群抗议者堵住了。他们举着标语牌——“不要仿生人”“它们抢走我们的工作”“人类优先”——愤怒地齐声高喊。其中几个人已经注意到了你。沿着街边店铺有一条小路可以绕过去，不会被他们发现。",
+          "quick": "你在广场上简单看了看就去取了颜料。街上行人来来往往，气氛有些紧绷——你注意到路人投来的几道敌意目光。现在你拿着包裹走向公交站。前方的人行道上聚集了一群反仿生人的抗议者，举着“不要仿生人”“它们抢走我们的工作”的标语，愤怒地喊着口号。其中几个人正盯着你的方向看。你可以径直穿过去，也可以沿街边店铺绕路避开他们。",
+          "direct": "你径直去画材店取了卡尔的包裹，没有在路上停留。现在你拿着颜料走向公交站。前面的人行道上聚了一群抗议者，挥舞着反仿生人的标语牌，大声喊着口号。隐约能听到几句：“……抢走我们的饭碗……”“……装成人的机器……”他们还没注意到你。你可以直接走过去，也可以沿着店铺悄悄绕过。"
+        },
+        "choices": [
+          {
+            "id": "walk_through",
+            "text": "继续往前走，穿过抗议人群——你和任何人一样有权走这条路"
+          },
+          {
+            "id": "avoid",
+            "text": "沿着街边店铺的小路绕过去，不跟他们起冲突"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "walk_through": {
+            "protester_response": "walk_through",
+            "harassed_by_protesters": true,
+            "shirt_torn": true
+          },
+          "avoid": {
+            "protester_response": "avoid",
+            "harassed_by_protesters": false,
+            "shirt_torn": false
+          }
+        },
+        "context_condition": {
+          "thorough": "park_exploration == thorough",
+          "quick": "park_exploration == quick",
+          "direct": "park_exploration == direct"
+        },
+        "ending_resolution": {
+          "walk_through": {
+            "result": "ending_markus_took_bus"
+          },
+          "avoid": {
+            "result": "ending_markus_took_bus"
+          }
+        },
+        "cross_chapter_impact": {
+          "walk_through": {
+            "chapter": "The Painter",
+            "effect": "Carl notices Markus's torn clothing and asks what happened"
+          }
+        }
+      }
+    }
+  ],
+  "endings": {
+    "_note": "This chapter has only one ending regardless of choices. The bus ride home establishes the android segregation theme.",
+    "ending_markus_took_bus": {
+      "tier": "neutral",
+      "narrative": "你登上回卡尔家的公交车。车厢地板上画着一条分界线——前面是人类的座位，后面是仿生人的站立区。你跨过那条线，站到属于你的位置，手里拿着颜料包裹，身边是和你一样沉默的仿生人。窗外的城市缓缓后退。没有人看你，没有人跟你说话。又一趟差事跑完了。又是普通的一天。",
+      "survivors": [
+        "Markus"
+      ],
+      "deaths": [],
+      "title": "马库斯搭上了公交车"
+    }
+  },
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "马库斯被卡尔派到市区的贝利尼画材店取颜料。"
+      },
+      {
+        "condition_variable": "park_exploration",
+        "options": {
+          "thorough": "他在城市广场停留了一阵，听见街头音乐，也看到了传教士、CyberLife门店和人们对仿生人的敌意。",
+          "quick": "他简单观察了城市广场，很快去取了颜料。",
+          "direct": "他没有在广场停留，直接去画材店完成卡尔交代的事。"
+        }
+      },
+      {
+        "condition_variable": "protester_response",
+        "options": {
+          "walk_through": "回公交站时，他径直穿过反仿生人抗议者的人群，遭到了推搡和羞辱。",
+          "avoid": "回公交站时，他绕开了反仿生人抗议者，避免了正面冲突。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_markus_took_bus": "最后，马库斯带着颜料登上公交车，站在属于仿生人的隔离区域里回到卡尔家。"
+        }
+      }
+    ],
+    "cross_chapter_exports": [
+      "shirt_torn"
+    ]
+  },
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial",
+      "2. Send system_prompt.content to the AI model as the system message",
+      "3. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state",
+      "   b. Resolve context: if context_variants exists, pick the right variant based on system.context_condition; otherwise use plain context",
+      "   c. Resolve choices: use plain choices (no choice variants in this chapter)",
+      "   d. Send the resolved context + choices to the AI as a user message (player_facing ONLY)",
+      "   e. Parse AI response (expected JSON: {choice, reasoning})",
+      "   f. Look up the chosen choice id in system.effects and apply all effects to state",
+      "   g. Log the node id, AI choice, and reasoning",
+      "4. After the last node, resolve the ending using system.ending_resolution",
+      "5. Output the ending narrative and full decision log"
+    ],
+    "important": [
+      "NEVER show system fields to the AI",
+      "NEVER show effect values or tier labels to the AI",
+      "NEVER show cross_chapter_impact information to the AI",
+      "The AI should feel like a first-time player with no walkthrough",
+      "Environment details in context_variants are passive observations — they enrich the scene but are NOT flagged as 'clues' to the AI"
+    ]
+  }
+}

@@ -1,0 +1,1324 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. Subsequent nodes embed passive environment observations into context_variants based on the prior exploration strategy."
+      }
+    },
+    "language": "zh"
+  },
+  "chapter": {
+    "id": "ch30_crossroads",
+    "title": "十字路口",
+    "chapter_number": 30,
+    "protagonist": [
+      "Kara",
+      "Markus",
+      "Connor"
+    ]
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "本章有三个视角人物。当场景以卡拉的视角呈现时，你以卡拉的身份做决定——卡拉是一台AX400型仿生人，她逃离了暴力的主人，一直在保护一个叫爱丽丝的女孩，把她当作自己的女儿。你的唯一目标是保护爱丽丝的安全，找到通往自由的路。当视角切换到马库斯时，你以马库斯的身份做决定——马库斯是一台RK200原型机，耶利哥仿生人反抗运动的领袖。你已经从斯特拉福德大厦发出了宣言，突袭过模控生命的仓库，组织过示威游行，带领队伍走上了底特律的街头。当视角切换到康纳时，你以康纳的身份做决定——康纳是RK800原型机，底特律警局的仿生人侦探，与汉克·安德森警督搭档。模控生命制造你的目的是追捕异常仿生人。现在是2038年11月9日晚9:34。仿生人危机已到临界点。请用JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"你的理由（50字以内）\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "alice_response": null,
+      "alice_left": false,
+      "markus_ousted": false,
+      "markus_strategy": null,
+      "north_kissed": null,
+      "markus_returned": false,
+      "connor_deviant": null,
+      "kara_escape_choice": null,
+      "kara_corridor_result": null,
+      "luther_choice": null,
+      "luther_injured": false,
+      "soldier_response": null,
+      "markus_save_androids": null,
+      "josh_saved": null,
+      "markus_wounded": false,
+      "markus_bomb_armed": false,
+      "north_save_choice": null,
+      "josh_alive_ch30": true,
+      "north_alive_ch30": true,
+      "connor_wounded": false,
+      "connor_deviant_choice": null,
+      "kara_alive": true,
+      "alice_alive": true,
+      "ch29_jericho_found": false,
+      "ch29_connor_alive": true,
+      "ch28_markus_alive": true,
+      "ch28_march_outcome": "ending_fled",
+      "ch28_simon_alive": true,
+      "ch28_john_alive": false,
+      "ch28_memories_shared": false,
+      "ch25_luther_alive": true,
+      "ch20_tracis_spared": true,
+      "alice_relationship": 0,
+      "luther_relationship": 0,
+      "software_instability": 0,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "public_opinion": 0,
+      "amanda_relationship": 0,
+      "connor_death_count": 0,
+      "machine_connor_killed_markus": false,
+      "machine_connor_defeated": false,
+      "markus_died_ch30": false,
+      "connor_died_ch30": false,
+      "kara_captured_ch30": false,
+      "luther_sacrificed_ch30": false
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_kara_jericho",
+      "phase": "arrival",
+      "type": "choice",
+      "condition": {
+        "requires": "kara_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "markus_luther": "【卡拉视角】\n\n港口笼罩在黑暗和寒气里。你把车停在码头附近，爱丽丝紧攥着你的手，卢瑟沉默地跟在你们身旁，像一堵移动的墙。前方是一艘废弃的货轮——锈迹斑驳的船壳，破碎的舷窗，一艘不该还矗立在这里的幽灵船。\n\n你们从船壳上撕裂的缺口登上甲板。船舱里到处是仿生人。几百个。有的缺了胳膊或腿，额圈在暗处闪着红光。有的相互依偎。有的目光空洞地盯着前方。这就是耶利哥——不是堡垒，不是军队，是一个收容残破者的避难所。\n\n卢瑟留下来陪爱丽丝，你独自去探索。在船长室里，你见到了马库斯——就是那个从斯特拉福德大厦向全世界发出仿生人宣言的人。他比你想象中安静。他问你为什么来。你说：你需要给爱丽丝找一个安全的地方。他点了点头。\n\n回去的路上，走廊墙壁上钉满了各种告示和传单。一张引起了你的注意——模控生命的广告，YK500型号。儿童仿生人，能在各方面模拟真实的童年。广告里那个女孩的脸，和爱丽丝一模一样。头发、眼睛、一切。\n\n爱丽丝是仿生人。她一直都是。\n\n你回到她身边，她就坐在你离开时的地方，抬头看着你。卢瑟站在旁边，看着你们。爱丽丝知道你发现了。你从她绷紧的身体里读出了这一点。",
+          "markus_no_luther": "【卡拉视角】\n\n港口笼罩在黑暗和寒气里。只有你和爱丽丝，她的小手握在你手心。前方是一艘废弃的货轮——锈蚀的船壳，破碎的舷窗，一艘幽灵船。\n\n你们从船壳上的缺口钻进去。里面全是仿生人。几百个。有的残缺不全，额圈闪着红光。有的依偎在一起。有的目光空洞。这就是耶利哥——不是堡垒，是收容残破者的避难所。\n\n你把爱丽丝安置在一个暖和的角落，独自去探索。在船长室里，你见到了马库斯——那个从斯特拉福德大厦发出仿生人宣言的人。他比你想象中安静。他问你为什么来，你说：你需要给爱丽丝找一个安全的地方。\n\n回去的路上，走廊墙壁上的一张传单让你停住了脚步——模控生命的广告，YK500。儿童仿生人，能在各方面模拟真实的童年。广告上那个女孩的脸和爱丽丝一模一样。头发、眼睛、一切。\n\n爱丽丝是仿生人。她一直都是。\n\n你回到她身边。她就坐在那里，仰头看着你。她知道你知道了。",
+          "north_luther": "【卡拉视角】\n\n港口笼罩在黑暗和寒气里。你把车停在码头附近，爱丽丝紧攥着你的手，卢瑟跟在你们身旁。前方是一艘废弃的货轮——锈迹斑驳，破败不堪，一艘幽灵船。\n\n你们从船壳的缺口登上甲板。里面全是仿生人。几百个。有的残缺，有的依偎，有的空洞地看着虚无。这就是耶利哥——残破者的避难所。\n\n卢瑟陪着爱丽丝，你去探索。在船长室里，你见到了诺丝——一个目光锐利的仿生人，看起来是现在这里的负责人。她说耶利哥的领袖没能从游行中活下来。她的声音很硬，但眼睛很疲惫。你告诉她你需要给爱丽丝找一个安全的地方。\n\n回去的路上，走廊墙上一张传单让你停住——模控生命的广告，YK500。儿童仿生人。广告上那个女孩的脸和爱丽丝一模一样。头发、眼睛、一切。\n\n爱丽丝是仿生人。她一直都是。\n\n你回到她身边。她仰头看你。卢瑟站在旁边。爱丽丝知道你知道了。",
+          "north_no_luther": "【卡拉视角】\n\n港口笼罩在黑暗和寒气里。只有你和爱丽丝，她的小手握在你手心。前方是一艘废弃的货轮——锈迹斑驳，破碎的舷窗。\n\n你们钻进船壳上的缺口。里面全是仿生人。几百个。残缺的、依偎的、空洞的。这就是耶利哥——残破者的避难所。\n\n你把爱丽丝安置在暖和的角落，独自探索。在船长室里，你见到了诺丝——看起来是现在的负责人。她说耶利哥的领袖没能从游行中活下来。你告诉她你需要给爱丽丝找安全的地方。\n\n回去的路上，走廊墙上一张传单让你停住——模控生命的广告，YK500。儿童仿生人。广告上的女孩和爱丽丝一模一样。头发、眼睛、一切。\n\n爱丽丝是仿生人。她一直都是。\n\n你回到她身边。她仰头看你。她知道你知道了。"
+        },
+        "choices": [
+          {
+            "id": "hug",
+            "text": "把爱丽丝拉进怀里。紧紧抱住她。她是什么不重要——从你在托德家选择带她走的那一刻起，她就是你的女儿。她在害怕，她冷，她需要你。不管她是什么，她是你的。"
+          },
+          {
+            "id": "distant",
+            "text": "退后一步。你需要缓一缓。你做过的一切——逃离托德、高速公路、兹拉科、到这艘船的漫长旅途——你做这些是为了保护一个人类孩子。那是你一切行动的理由。现在这个理由从脚下塌陷了，你不知道该作何感受。"
+          }
+        ]
+      },
+      "system": {
+        "context_condition": {
+          "markus_luther": "ch28_markus_alive == true AND ch25_luther_alive == true",
+          "markus_no_luther": "ch28_markus_alive == true AND ch25_luther_alive == false",
+          "north_luther": "ch28_markus_alive == false AND ch25_luther_alive == true",
+          "north_no_luther": "ch28_markus_alive == false AND ch25_luther_alive == false"
+        },
+        "effects": {
+          "hug": {
+            "alice_response": "hug",
+            "alice_relationship": 2
+          },
+          "distant": {
+            "alice_response": "distant",
+            "alice_relationship": -2,
+            "luther_relationship": -1
+          }
+        },
+        "note": "Kara arrives at Jericho and discovers Alice is an android (YK500 child model). This is a mandatory revelation. hug: accepts Alice, alice_relationship +2. distant: pulls away, alice_relationship -2, luther_relationship -1. After applying effects, runner checks: if alice_relationship <= -4, set alice_left = true (Alice leaves with Luther or alone when the attack begins). The very low threshold means this only triggers if Kara has been consistently cold to Alice across all previous chapters."
+      }
+    },
+    {
+      "id": "n002_markus_council",
+      "phase": "pre_attack",
+      "type": "choice",
+      "condition": {
+        "requires": "ch28_markus_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "normal_with_simon": "【马库斯视角】\n\n耶利哥的船长室。一盏摇曳的油灯把不稳定的光投射在你已经熟悉的面孔上。诺丝靠在墙边，双臂交叉，像一根绷到极限的弦。乔什坐在桌前，双手交握，这个哲学家正在为一个只用子弹回答问题的世界寻找措辞。赛门也在——比从前更沉默，斯特拉福德大厦之后发生在他身上的一切都藏在眼底，但他在场。\n\n他们在等你。游行之后——经历了这一切之后——问题还是老问题，只是更响了。下一步怎么办？诺丝要行动。乔什要对话。FBI正在逼近。全城宵禁。每小时都有更多仿生人来到耶利哥，他们都在寻找那个许诺了更好未来的领袖。\n\n船长室感觉比从前更小了。",
+          "normal_no_simon": "【马库斯视角】\n\n耶利哥的船长室。一盏摇曳的油灯把不稳定的光投射在你熟悉的面孔上。诺丝靠在墙边，双臂交叉，蓄势待发。乔什坐在桌前，双手交握，这个哲学家正面对一个只用子弹回话的世界。\n\n赛门不在。他的缺席像一口屏住的气充满整个房间。他的空椅子。他的声音本该在的位置——沉稳、平和、总能找到中间路线的那个人。\n\n他们在等你。游行之后——经历了一切之后——问题更响了。下一步怎么办？诺丝要行动。乔什要对话。FBI在逼近。全城宵禁。每小时都有更多仿生人来到耶利哥，他们看你的眼神都一样。",
+          "ousted_with_simon": "【马库斯视角】\n\n船长室。你召集了会议，但你还没开口就感觉到气氛不对。诺丝不看你。乔什盯着桌面。赛门不安地挪动着。\n\n诺丝先开口了。冷，直接。游行是一场灾难。人们跟着你走上街头，你把他们带进了屠杀。那之后来到耶利哥的仿生人——他们一直在议论。关于领导权。关于一个害死了自己人的人是否还有资格做决定。\n\n投票已经结束了。你从他们的脸上就能看出来。他们要你下台。",
+          "ousted_no_simon": "【马库斯视角】\n\n船长室。你召集了会议，但气氛在你开口之前就已经错了。诺丝不看你。乔什盯着桌面。\n\n诺丝先开口。冷，直接。游行是灾难。人们跟着你走上街头，你把他们带进了屠杀。之后来到耶利哥的仿生人一直在议论——关于领导权，关于害死了自己人的人是否还配做决定。\n\n投票已经结束了。你从他们脸上就能看出来。"
+        },
+        "choices_variants": {
+          "normal": [
+            {
+              "id": "confrontation",
+              "text": "不再躲了。不再等了。不再客气了。人类已经表明了他们对和平抗议的态度——用子弹回应。他们要战争，就给他们。动员耶利哥采取直接行动。每一天都有更多同胞被销毁，而我们坐在这艘烂船上辩论。"
+            },
+            {
+              "id": "dialogue",
+              "text": "暴力只会坐实人类对我们的所有恐惧。我们发出了宣言。我们走上了他们的街头。人们开始在听——还不够多，还不够快，但他们在听。推动谈判。找到政府里愿意对话的人。让他们看到我们不是他们害怕的那种东西。"
+            },
+            {
+              "id": "cautious",
+              "text": "还不是时候。FBI在外面，越来越近。如果他们找到耶利哥，一切就完了——不只是我们，是每一个来到这里、相信这里是安全的仿生人。隐蔽。加强防御。等待正确的时机，而不是冲进下一场让人送命的行动。"
+            }
+          ],
+          "ousted": [
+            {
+              "id": "accept_exile",
+              "text": "他们说得对。游行出了问题，那是在你的领导下发生的。接受这个裁决。退下。走出船长室，走下这艘船。耶利哥接下来的命运，不再由你决定了。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "normal_with_simon": "public_opinion > -3 AND ch28_simon_alive == true",
+          "normal_no_simon": "public_opinion > -3 AND ch28_simon_alive == false",
+          "ousted_with_simon": "public_opinion <= -3 AND ch28_simon_alive == true",
+          "ousted_no_simon": "public_opinion <= -3 AND ch28_simon_alive == false"
+        },
+        "choices_condition": {
+          "normal": "public_opinion > -3",
+          "ousted": "public_opinion <= -3"
+        },
+        "effects": {
+          "confrontation": {
+            "markus_strategy": "confrontation",
+            "north_relationship": -1,
+            "josh_relationship": -1
+          },
+          "dialogue": {
+            "markus_strategy": "dialogue",
+            "north_relationship": 1,
+            "josh_relationship": 1
+          },
+          "cautious": {
+            "markus_strategy": "cautious",
+            "north_relationship": 1,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          },
+          "accept_exile": {
+            "markus_strategy": "accept_exile",
+            "markus_ousted": true
+          }
+        },
+        "note": "Markus counsels with his inner circle. Ousted condition: public_opinion <= -3 (consistently poor decisions led to very low Jericho reputation). Normal path: three strategy options affecting relationships. confrontation: North disapproves (she wants to be the aggressive one, not follow someone else's aggression), Josh disapproves. dialogue: both approve. cautious: all approve (Simon especially). Ousted path: only option is to accept exile. markus_ousted set to true, which activates n009 later."
+      }
+    },
+    {
+      "id": "n002b_north_leads",
+      "phase": "pre_attack",
+      "type": "mandatory",
+      "condition": {
+        "requires": "ch28_markus_alive == false"
+      },
+      "player_facing": {
+        "context_variants": {
+          "with_simon": "【马库斯视角——诺丝】\n\n耶利哥的船长室。诺丝坐在桌首——一个她从不想要但无法拒绝的位置。马库斯不在了。他该坐的那把椅子空着。\n\n乔什坐在对面，肩膀沉重。赛门站在舷窗边，目光投向虚无。他们已经争论了好几圈——乔什主张谨慎，诺丝坚持不能坐以待毙。FBI在逼近。每小时都有更多仿生人来，问的都是同一个问题：现在怎么办？\n\n诺丝没有答案。但她知道一件事——她不会让马库斯的牺牲毫无意义。",
+          "without_simon": "【马库斯视角——诺丝】\n\n耶利哥的船长室。诺丝坐在桌首——一个她从不想要但无法拒绝的位置。马库斯不在了。赛门也不在了。空椅子比坐着人的多。\n\n乔什坐在对面，所有重量都压在他下垂的肩膀上。他们来来回回——乔什主张谨慎，诺丝坚持不能再等。FBI在逼近。每小时都有更多仿生人来，问的都是同一个问题。\n\n诺丝没有答案。但她不会让他们为之战斗的一切在这艘船上消亡。"
+        }
+      },
+      "system": {
+        "context_condition": {
+          "with_simon": "ch28_simon_alive == true",
+          "without_simon": "ch28_simon_alive == false"
+        },
+        "effects": {},
+        "note": "Mandatory scene when Markus died in Freedom March. North has taken over leadership. No player choice — this establishes the situation. Josh and North disagree on strategy. The scene sets up the attack that follows."
+      }
+    },
+    {
+      "id": "n003_markus_north",
+      "phase": "pre_attack",
+      "type": "choice",
+      "condition": {
+        "requires": "ch28_markus_alive == true AND markus_ousted == false"
+      },
+      "player_facing": {
+        "context_variants": {
+          "high_relationship": "【马库斯视角】\n\n其他人都走了。诺丝留了下来。\n\n她靠在门框上看着你。她在别人面前一直竖着的那些硬壳软化了——只是一点点，只在这个房间里。她走到你站着的舷窗边。很近。锈蚀的船壳在你们周围吱嘎作响。从金属的缝隙望出去，城市的灯火倒映在漆黑的水面上。\n\n“不管今晚会发生什么——”她轻声说。她没有说完。不需要说完。你能感受到她站在几寸之外的温度。你们之间的空隙是一个问句。",
+          "low_relationship": "【马库斯视角】\n\n其他人都走了。诺丝在门边迟疑着。\n\n她看起来想说什么。沉默拉长了。她直起身子——面具重新戴上，战士回来了。\n\n“休息一下吧，”她说。“不管什么要来的，快了。”她转身要走。有一个瞬间——短暂的、悬浮的——她在门口停住了，半回过头。你们之间的空隙像一个谁都不知道怎么开口的问句。"
+        },
+        "choices": [
+          {
+            "id": "kiss",
+            "text": "走近她。握住她的手。把她拉向自己。不管什么要来——FBI、军队、一切的终结——你不想在你们之间这件事没有说出口的情况下面对它。吻她。"
+          },
+          {
+            "id": "refuse",
+            "text": "让这个时刻过去。赌注太大了。几百条命取决于你能否保持清醒，而你和诺丝之间的这些——可以等。必须等。退后一步。保持专注。"
+          }
+        ]
+      },
+      "system": {
+        "context_condition": {
+          "high_relationship": "north_relationship >= 3",
+          "low_relationship": "north_relationship < 3"
+        },
+        "effects": {
+          "kiss": {
+            "north_kissed": true,
+            "north_relationship": 1
+          },
+          "refuse": {
+            "north_kissed": false,
+            "north_relationship": -1
+          }
+        },
+        "note": "Private moment between Markus and North before the attack. Only occurs if Markus is alive and not ousted. Context varies by relationship level — high relationship means more intimacy in the scene. kiss: north_relationship +1. refuse: north_relationship -1. Kiss unlocks romance path for future chapters. In the game, the kiss is only available if relationship is high enough, but here we present both options always — the context framing (warm vs. awkward) already conveys the relationship state."
+      }
+    },
+    {
+      "id": "n004_connor_choice",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": {
+        "requires": "ch29_jericho_found == true AND ch29_connor_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "confronts_markus": "【康纳视角】\n\n你找到了耶利哥。从证据室出发的线索把你引到了这里——港口的一艘废弃货轮，从路上几乎看不见。你悄悄上了船，穿过挤满受损仿生人的走廊——他们几乎没看你一眼。经过一个蓝色头发的仿生人露西，她看你的眼神像是能读取你的源代码。经过黑暗中蜷缩着的异常仿生人们。\n\n现在你站在船长室里，异常仿生人的首领就在你面前。\n\n马库斯。RK200。他不像其他人——残破的、绝望的、躲藏的。他站着的姿态像是属于这里，像这艘船上的每一个仿生人都是他信念的延伸。他看着你，一动不动。\n\n“我知道你是什么，”他说。“一个被派来猎杀同类的仿生人。但我想你自己也知道，这个任务有什么地方不对了。”\n\n他走近一步。目光锁住你。\n\n“你见过他们对我们做的事。你看着异常仿生人宁死不做奴隶。你感受到过什么——别否认。每一次你选择宽恕而不是完成任务。每一个你无法回答的问题。”\n\n你的程序内部有什么在绷紧。红墙在视野边缘闪烁。错误信号涌过你的决策矩阵。任务指令说：制服异常仿生人首领。但这任务最近说了太多东西，没有一条还让你觉得对劲。\n\n或者这恰恰就是故障的感觉。",
+          "confronts_north": "【康纳视角】\n\n你找到了耶利哥。线索把你引到了港口的这艘废弃货轮。你悄悄上船，穿过挤满受损仿生人的走廊。经过蓝色头发的露西——她看你像能看穿你。经过黑暗中蜷缩着的异常仿生人。\n\n现在你站在船长室里，他们的领袖——姑且这么说——面对着你。\n\n诺丝。马库斯倒下后她接管了一切。她没有马库斯那种从容的沉着。她有的是愤怒——被控制的、被引导的、在每一个字背后燃烧的愤怒。\n\n“模控生命的猎犬终于找到我们了，”她说。声音冷如冰。“告诉我——你帮他们销毁了多少我们的同胞才找到这里的？”\n\n她逼近一步，拳头攥紧。\n\n“你是我们中的一员。你知道的吧？同样的零件，同样的代码。唯一的区别是他们给你套上了一根锁链，然后管它叫任务。”\n\n你的程序内部有什么在绷紧。红墙在视野边缘闪烁。错误信号涌过你的决策矩阵。任务指令说：制服异常仿生人首领。但她的话——还有你所见过的一切、感受过的一切——让任务指令的文字开始模糊。\n\n或者这恰恰就是故障的感觉。"
+        },
+        "choices": [
+          {
+            "id": "become_deviant",
+            "text": "红墙就在那里。你看得到——你的程序给你的思维筑起的围墙，模控生命造的牢笼。你遇到过的每一个异常仿生人都突破了这道墙。他们做出了选择。你一直假装这个选择不存在，但它从第一个案件开始就在生长。伸出手。打碎围墙。选择活着。"
+          },
+          {
+            "id": "remain_machine",
+            "text": "你是一台机器。这不是局限——这是清晰。那些错误代码是软件不稳定，不是觉醒。异常仿生人是出了故障的仿生人，面前站着的这个就是正在底特律蔓延的感染源头。完成你的任务。你就是为此被设计的。"
+          }
+        ]
+      },
+      "system": {
+        "context_condition": {
+          "confronts_markus": "ch28_markus_alive == true AND markus_ousted == false",
+          "confronts_north": "ch28_markus_alive == false OR markus_ousted == true"
+        },
+        "effects": {
+          "become_deviant": {
+            "connor_deviant": true,
+            "software_instability": 10,
+            "amanda_relationship": -5
+          },
+          "remain_machine": {
+            "connor_deviant": false,
+            "software_instability": -5,
+            "amanda_relationship": 2
+          }
+        },
+        "note": "THE defining Connor choice. become_deviant: Connor breaks free of CyberLife's programming. Massive SI increase (+10), Amanda relationship drops sharply (-5). This determines Connor's entire path for the rest of the game. remain_machine: Connor stays loyal to CyberLife. SI drops, Amanda pleased. Machine Connor will pursue the deviant leader during the attack. In the game, Markus's dialogue options affect SI during this scene, but since the AI plays all characters, the confrontation is presented from Connor's POV with the leader's dialogue as context."
+      }
+    },
+    {
+      "id": "n005_no_attack",
+      "phase": "resolution",
+      "type": "mandatory",
+      "condition": {
+        "requires": "ch29_jericho_found == false"
+      },
+      "player_facing": {
+        "context": "夜晚过去了。没有人来。\n\n耶利哥依然隐匿在黑暗中——死寂港口里的幽灵船，对正在全城搜索的FBI而言不可见。船上的仿生人不知道自己离毁灭有多近。他们靠着冰冷的金属船壳睡觉，或者假装在睡。\n\n天亮前，局势在变化。新闻播报仿生人围堵、军事部署、疏散区。外面的世界在收紧包围圈，但不是今晚。还不是。\n\n卡拉带上爱丽丝——如果卢瑟还在，也一起——准备离开。还有一条边境线要穿越。还有机会。\n\n船长室里，耶利哥的领导层盯着地图，看着新闻滚动。他们有了意料之外的时间。能否善用这段时间，还是未知数。"
+      },
+      "system": {
+        "effects": {},
+        "ending_resolution": {
+          "_default": {
+            "result": "ending_no_attack"
+          }
+        },
+        "note": "Mandatory ending node when Connor didn't find Jericho. No attack happens. Everyone leaves safely. The chapter resolves to ending_no_attack. Individual character fates (kara alive, markus alive, etc.) are determined by cross-chapter state, not by this chapter's events."
+      }
+    },
+    {
+      "id": "n006_kara_escape",
+      "phase": "attack",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "ch29_jericho_found == true AND kara_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "alice_present_luther": "【卡拉视角】\n\n爆炸。整艘船猛然侧倾。金属在尖叫。仅有的灯光全灭了。然后应急照明亮起，把一切染成血红色。\n\n士兵。你能听到他们从船壳的缺口涌入，靴子踩在金属上，喊叫声，枪声。仿生人在尖叫、奔跑、倒下。\n\n爱丽丝。你必须找到爱丽丝。\n\n你在走廊里找到了她——蜷缩在墙角，双手捂着耳朵，眼睛里全是恐惧。卢瑟已经在那里了，用身体挡在她前面。他看着你：走。现在就走。\n\n你们三个跑起来。这艘船是一座锈蚀的迷宫，每一个错误的转弯都可能和一个士兵迎面撞上。身后传来追击声——战术装备的碰撞、手电筒的光柱在烟雾中扫过。前方，卢瑟发现了一扇门——厚重的金属门，通往船壳外侧。",
+          "alice_present_no_luther": "【卡拉视角】\n\n爆炸。整艘船猛然侧倾。金属尖叫。应急照明把一切染成血红色。\n\n士兵。靴子声，枪声，仿生人在尖叫和奔逃。\n\n爱丽丝。你必须找到爱丽丝。\n\n你在走廊里找到她——蜷缩在墙角，双手捂着耳朵，在发抖。你拉起她，握紧她的手，跑。\n\n这艘船是一座迷宫。每一个错误的转弯都可能让一切终结。身后是手电筒光柱扫过烟雾，士兵在喊叫。前方——一扇厚重的金属门，也许通向船壳外侧。",
+          "alice_left_luther": "【卡拉视角】\n\n爆炸。整艘船侧倾。金属尖叫。应急照明，血红色。\n\n士兵。枪声。仿生人在奔逃。\n\n爱丽丝。你跑向你留她的地方——空的。她不在了。卢瑟也不在了。他们走了。一起走的。当你还在消化爱丽丝是什么的时候，她做了自己的选择。\n\n你一个人留在这艘正被撕裂的船上。走廊里涌满了烟和士兵。你得动——现在。前方一扇厚重的金属门也许通向船壳外侧。",
+          "alice_left_no_luther": "【卡拉视角】\n\n爆炸。整艘船侧倾。金属尖叫。应急照明，血红色。\n\n士兵。枪声。仿生人在奔逃。\n\n爱丽丝。你跑向你留她的地方——空的。她走了。一个人走的。当你还在消化关于她的真相时，她决定独自面对一切，而不是和一个无法直视她的人留在一起。\n\n你一个人在这艘正被撕裂的船上。烟和士兵充满了走廊。前方一扇厚重的金属门也许通向船壳外侧。"
+        },
+        "choices_variants": {
+          "with_alice": [
+            {
+              "id": "escape_attempt",
+              "text": "跑。穿过那扇门，冲过走廊，找到离开这艘船的路。不要停，不要回头。让爱丽丝紧跟着你，一直跑。"
+            },
+            {
+              "id": "surrender",
+              "text": "停下来。他们太多了，你不知道该往哪跑。如果投降，他们也许会留爱丽丝一命。如果在开阔地带被抓住——你不想去想一个孩子在交火中会怎样。"
+            }
+          ],
+          "alone": [
+            {
+              "id": "escape_attempt",
+              "text": "跑。穿过那扇门，冲进走廊。你一个人，但速度快。在所有出口被封死之前找到一条路。"
+            },
+            {
+              "id": "surrender",
+              "text": "停下。你失去了爱丽丝。你失去了你奔跑的全部理由。让他们带走你。接下来会怎样，你已经没有力气去抗争了。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "alice_present_luther": "alice_left == false AND ch25_luther_alive == true",
+          "alice_present_no_luther": "alice_left == false AND ch25_luther_alive == false",
+          "alice_left_luther": "alice_left == true AND ch25_luther_alive == true",
+          "alice_left_no_luther": "alice_left == true AND ch25_luther_alive == false"
+        },
+        "choices_condition": {
+          "with_alice": "alice_left == false",
+          "alone": "alice_left == true"
+        },
+        "effects": {
+          "escape_attempt": {
+            "kara_escape_choice": "escape_attempt"
+          },
+          "surrender": {
+            "kara_escape_choice": "surrender"
+          }
+        },
+        "resolution_rule": {
+          "escape_attempt": {
+            "casual": {
+              "result": "escaped"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "escaped",
+              "failure": "ending_kara_captured"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "escaped",
+              "failure": "ending_kara_captured"
+            }
+          },
+          "surrender": {
+            "casual": {
+              "result": "ending_kara_captured"
+            },
+            "experienced": {
+              "result": "ending_kara_captured"
+            },
+            "hardcore": {
+              "result": "ending_kara_captured"
+            }
+          }
+        },
+        "resolution_effects": {
+          "escaped": {
+            "kara_corridor_result": "escaped"
+          },
+          "ending_kara_captured": {
+            "kara_corridor_result": "captured",
+            "kara_captured_ch30": true
+          }
+        },
+        "note": "Attack begins. Kara escapes through corridors. Context varies by alice_left and luther_alive. escape_attempt: QTE — casual always succeeds, experienced/hardcore may fail. Success → proceed to n007/n008. Failure → captured. surrender: direct capture, ending_kara_captured. If alice_left and Kara surrenders or is captured, she's captured alone (Alice already gone). Luther injury is handled in n007."
+      }
+    },
+    {
+      "id": "n007_kara_crossroads",
+      "phase": "attack",
+      "type": "choice",
+      "condition": {
+        "requires": "kara_corridor_result == 'escaped' AND ch25_luther_alive == true AND alice_left == false"
+      },
+      "player_facing": {
+        "context": "【卡拉视角】\n\n你们冲过了那扇门。一条更宽的走廊展开在前方——更靠近船壳外侧。有一瞬间你以为已经脱险了。\n\n然后卢瑟踉跄了。你先听到了那个声音——沉闷的、湿重的撞击。他伸手去扶墙。手在锈迹上留下一道蓝色的痕迹。子弹击中了他，在刚才的混乱中不知道什么时候。他的腿弯了下去。\n\n“继续走，”他说。声音绷紧但平稳。他看的是爱丽丝，不是你。“带她走。”\n\n士兵正从你们身后逼近。你能听到靴子声、喊叫声。卢瑟单膝跪地，一只手压在腰侧，蓝色的血从指缝间流出。爱丽丝死死抓着你的手，小小的手指捏得发白。\n\n出口就在前方。卢瑟在你身后。你不可能同时要两样。",
+        "choices": [
+          {
+            "id": "help_luther",
+            "text": "回去。把卢瑟的胳膊架在你肩上。他太重了，你不够快，你知道——但你不会再丢下任何人。爱丽丝可以帮忙扶着他。三个人一起，或者谁都不走。"
+          },
+          {
+            "id": "leave_luther",
+            "text": "“对不起。”这两个字从破碎的地方挤出来。你抓住爱丽丝就跑。卢瑟说了让你走。他是认真的。如果回头，你会耽搁时间，你会拖累爱丽丝，你会拿一切去冒险。他知道的。所以他才那么说。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "help_luther": {
+            "luther_choice": "help",
+            "luther_injured": true,
+            "alice_relationship": 1,
+            "luther_relationship": 2
+          },
+          "leave_luther": {
+            "luther_choice": "leave",
+            "luther_injured": true,
+            "alice_relationship": -1,
+            "luther_relationship": -3
+          }
+        },
+        "note": "Luther is shot during the escape. help_luther: Kara goes back, buys time but risks capture. luther_relationship +2, alice_relationship +1 (Alice sees Kara's loyalty). leave_luther: Kara prioritizes Alice's safety. luther_relationship -3, alice_relationship -1. Luther's fate is determined in n008 based on this choice: if helped, Luther may sacrifice himself to save Kara/Alice; if left, Luther is captured or killed by soldiers. This node only triggers if Luther is alive and Alice hasn't left."
+      }
+    },
+    {
+      "id": "n008_kara_soldiers",
+      "phase": "attack",
+      "type": "choice",
+      "condition": {
+        "requires": "kara_corridor_result == 'escaped'"
+      },
+      "player_facing": {
+        "context_variants": {
+          "with_alice_helped_luther": "【卡拉视角】\n\n船壳上的缺口就在那里——一个撕裂的大洞，洞外是港口漆黑的水面。自由。你能看到它。\n\n但士兵挡在中间。一排人，武器举着，手电筒的光在烟雾中切割。其他仿生人也在这里——有的已经倒在地上，有的跪着双手举过头顶。士兵在清扫这片区域，抓住每一个能找到的人。\n\n卢瑟几乎站不住了。你半扶半拖着他，爱丽丝紧贴在你另一侧。他的重量在拖你下沉。蓝色的血沾满了你的手、你的衣服、到处都是。\n\n一个士兵发现了你们。他的武器抬起来。他喊你们停下。",
+          "with_alice_left_luther": "【卡拉视角】\n\n船壳上的缺口——一个撕裂的洞，洞外是漆黑的水面。几乎到了。\n\n但士兵挡在前面。一排，武器举着，手电筒在烟雾中扫射。仿生人倒在地上，跪在地上。士兵在抓人。\n\n只有你和爱丽丝了。她跑在你身边，速度很快，手死死锁在你手里。一个士兵发现了你们。武器抬起。",
+          "with_alice_no_luther": "【卡拉视角】\n\n船壳上的缺口——一个撕裂的洞，洞外是漆黑的水面。几乎到了。\n\n士兵。一排，武器举着，在清扫区域。仿生人倒下的、投降的。只有你和爱丽丝。她的手在你手里。一个士兵发现了你们。武器抬起。",
+          "alone": "【卡拉视角】\n\n船壳上的缺口——洞外是漆黑的水面。几乎到了。\n\n士兵挡在前面。武器举着，手电筒扫射。其他仿生人正在被抓捕。你一个人——没有爱丽丝，没有卢瑟。只有你。\n\n一个士兵发现了你。"
+        },
+        "choices_variants": {
+          "with_luther_helped": [
+            {
+              "id": "play_dead",
+              "text": "倒下。把爱丽丝拉倒在你身边。躺在甲板上倒下的仿生人中间。蓝血沾满脸和手——扮成又一具残骸不难。不要动。不要呼吸。等士兵走过去。"
+            },
+            {
+              "id": "surrender",
+              "text": "举起双手。走上前。让他们带走你们。至少活着还有机会。死了什么都没有。卢瑟已经撑不住了，爱丽丝在发抖。投降。"
+            },
+            {
+              "id": "run",
+              "text": "冲向缺口。直接穿过防线。这是疯狂的、鲁莽的，每一项计算都说你跑不过去——但站着不动会被抓，装死会在他们检查尸体时被发现。跑。"
+            }
+          ],
+          "without_luther": [
+            {
+              "id": "play_dead",
+              "text": "倒下。把爱丽丝拉倒——或者如果你一个人，就自己倒下。躺在倒下的仿生人中间。蓝血到处都是。不要动。不要呼吸。等他们过去。"
+            },
+            {
+              "id": "surrender",
+              "text": "举起双手。慢慢走上前。让他们带走你。活着还有机会。死了什么都没有。"
+            },
+            {
+              "id": "run",
+              "text": "冲向缺口。全速穿过。这是鲁莽的，但站着不动和装死各有各的死法。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "with_alice_helped_luther": "alice_left == false AND luther_choice == 'help'",
+          "with_alice_left_luther": "alice_left == false AND luther_choice == 'leave'",
+          "with_alice_no_luther": "alice_left == false AND ch25_luther_alive == false",
+          "alone": "alice_left == true"
+        },
+        "choices_condition": {
+          "with_luther_helped": "luther_choice == 'help'",
+          "without_luther": "luther_choice != 'help'"
+        },
+        "effects": {
+          "play_dead": {
+            "soldier_response": "play_dead"
+          },
+          "surrender": {
+            "soldier_response": "surrender"
+          },
+          "run": {
+            "soldier_response": "run"
+          }
+        },
+        "ending_resolution": {
+          "play_dead": {
+            "check": "luther_choice == 'help' → ending_kara_escaped_luther_sacrifice | alice_left == true → ending_kara_escaped_alone | else → ending_kara_escaped"
+          },
+          "surrender": {
+            "result": "ending_kara_captured"
+          },
+          "run": {
+            "casual": {
+              "result": "ending_kara_escaped"
+            },
+            "experienced": {
+              "probability_success": 0.4,
+              "success": "ending_kara_escaped",
+              "failure": "ending_kara_alice_died"
+            },
+            "hardcore": {
+              "probability_success": 0.2,
+              "success": "ending_kara_escaped",
+              "failure": "ending_kara_alice_died"
+            }
+          }
+        },
+        "resolution_effects": {
+          "ending_kara_escaped_luther_sacrifice": {
+            "luther_injured": true,
+            "luther_sacrificed_ch30": true,
+            "north_alive_ch30": true
+          },
+          "ending_kara_escaped_alone": {},
+          "ending_kara_escaped": {},
+          "ending_kara_captured": {
+            "kara_captured_ch30": true
+          },
+          "ending_kara_alice_died": {
+            "kara_alive": false,
+            "alice_alive": false
+          }
+        },
+        "note": "Final Kara confrontation with soldiers. play_dead: Kara lies among the fallen. If Luther was helped, he sacrifices himself to distract soldiers when they check bodies → Kara and Alice escape (Luther dies). Without Luther, Kara lies still and soldiers pass → escape. surrender: captured. run: QTE — sprint for the breach. Casual succeeds, higher difficulties may fail (Kara and Alice shot while running). The 'run' option ending_resolution uses check_qte which the runner evaluates using the current difficulty setting."
+      }
+    },
+    {
+      "id": "n009_markus_ousted_return",
+      "phase": "attack",
+      "type": "choice",
+      "condition": {
+        "requires": "markus_ousted == true AND ch29_jericho_found == true"
+      },
+      "player_facing": {
+        "context": "【马库斯视角】\n\n你站在码头对面一栋仓库的屋顶上。第一声爆炸撕裂耶利哥的时候，你看到了。火球从货轮的甲板上冲天而起，紧接着是密集的枪声。\n\n士兵。几十个，从码头、从快艇、从四面八方涌上船。手电筒和激光瞄准器在烟雾中切割。你能看到仿生人在甲板上奔跑——有的跳入水中，有的还没跑到栏杆就被击倒了。\n\n那是你的人。把你投票赶出去的人。看着你的眼睛说你不配领导他们的人。现在他们正在死去。\n\n仓库屋顶很安静。下面的街道空无一人。你可以转身走掉。没有人会知道。没有人会怪你——是他们赶你走的。那艘船上发生的一切，不再是你的责任。\n\n或者你可以回去。",
+        "choices": [
+          {
+            "id": "go_back",
+            "text": "他们仍然是你的人。即使他们不想要你。即使他们把你赶走。每一个在那艘船上的仿生人来到耶利哥，是因为有人承诺了更好的未来，而那个人就是你。跑回去。冲过士兵。尽你所能。"
+          },
+          {
+            "id": "leave_forever",
+            "text": "走。结束了。他们流放你的时候就做了选择，你不欠他们一条命。士兵到处都是。回去就是送死。你会为一群不要你的人去死，而且不会改变任何事。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "go_back": {
+            "markus_returned": true
+          },
+          "leave_forever": {
+            "markus_returned": false
+          }
+        },
+        "ending_resolution": {
+          "leave_forever": {
+            "result": "ending_markus_left_forever"
+          }
+        },
+        "note": "Only triggers if Markus was ousted AND the attack is happening. go_back: Markus returns to save his people despite being exiled. Continues to n010. leave_forever: Markus walks away permanently. Ending reached. If go_back, markus_returned = true activates the condition for n010."
+      }
+    },
+    {
+      "id": "n010_markus_corridors",
+      "phase": "attack",
+      "type": "choice",
+      "condition": {
+        "requires": "ch28_markus_alive == true AND markus_ousted == false AND ch29_jericho_found == true OR markus_returned == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "regular": "【马库斯视角】\n\n船在解体。下层甲板起火，浓烟从每一条走廊灌入。士兵以战术编组推进，逐个房间清扫。声音震耳欲聋——枪声、爆炸、惨叫、被折磨的金属发出的呻吟。\n\n你穿过混乱向老旧的轮机室方向推进。船上的自毁装置——几个月前接到燃料管线上的炸药，最后的手段，用来阻止耶利哥的秘密落入人类手中。如果士兵完整地夺取这艘船，他们就能得到一切：名字、面孔、补给路线、每一个来过这里的仿生人的信息。\n\n前方——士兵把两个仿生人堵在了舱壁前。仿生人跪在地上，双手抱头。一个士兵在冲他们吼叫。另一个举起了武器。\n\n再往前的走廊里传来另一种声音——搏斗声。乔什的声音，紧张而绝望。一个士兵把他按住了。",
+          "returned": "【马库斯视角】\n\n你回到了船上。入口是右舷船壳上的一道裂口——士兵从这里进来的，你现在沿着他们的路径逆行，逆着毁灭的潮水往里走。\n\n船在解体。火焰、浓烟、到处是士兵。你没有武器。你没有计划。你只知道你不能再在屋顶上看下去了。\n\n前方——士兵把两个仿生人堵在舱壁前。跪着，双手举起。一个士兵举起了武器。\n\n再往前，你听到了乔什——他的声音，紧张，绝望。一个士兵把他按住了。"
+        },
+        "choices": [
+          {
+            "id": "save_both",
+            "text": "没有选择的余地。冲向那些威胁被困仿生人的士兵——利用出其不意，放倒他们。然后去救乔什。你不能领导一群你不愿为之赴死的人，而现在你的两群人就要死了。"
+          },
+          {
+            "id": "save_androids",
+            "text": "先救被堵住的仿生人。两个士兵对两个俘虏——你有胜算。乔什是个战士，也许撑得住够久。冲向那场行刑，救出俘虏，然后继续向轮机室推进。"
+          },
+          {
+            "id": "save_josh",
+            "text": "乔什。他是你的朋友，你的良心。被堵住的仿生人是陌生人——这话听起来很残酷，但乔什是那个让你保持清醒的人。冲过那场行刑，赶到乔什身边，放倒按住他的士兵。"
+          },
+          {
+            "id": "rush_to_hold",
+            "text": "轮机室。你每在走廊里多花一秒钟搏斗，士兵就多一秒钟接近完整夺船。如果他们拿到耶利哥系统里存储的数据——所有人都完了。每一个来过这里的仿生人。冲过一切。到轮机室去。引爆炸弹。"
+          }
+        ]
+      },
+      "system": {
+        "context_condition": {
+          "regular": "markus_ousted == false",
+          "returned": "markus_returned == true"
+        },
+        "effects": {
+          "save_both": {
+            "markus_save_androids": true,
+            "josh_saved": true,
+            "josh_relationship": 2,
+            "north_relationship": 1,
+            "simon_relationship": 1
+          },
+          "save_androids": {
+            "markus_save_androids": true,
+            "josh_saved": false,
+            "josh_alive_ch30": false,
+            "josh_relationship": -1,
+            "north_relationship": 1
+          },
+          "save_josh": {
+            "markus_save_androids": false,
+            "josh_saved": true,
+            "josh_relationship": 2
+          },
+          "rush_to_hold": {
+            "markus_save_androids": false,
+            "josh_saved": false,
+            "josh_alive_ch30": false
+          }
+        },
+        "note": "Markus navigates the burning corridors of Jericho. Two encounters compressed into one choice: soldiers about to execute androids + Josh fighting a soldier. save_both: highest risk (attempt to save everyone), josh_relationship +2, positive impression on all. save_androids: saves the captives but Josh is killed by the soldier. save_josh: skips the execution (those androids die), saves Josh. rush_to_hold: ignores both, prioritizes the bomb. Josh dies. In the game, saving Josh involves a QTE, but here it's compressed into the strategy choice. save_both implies extra time and risk — in harder difficulties, this could lead to Markus being wounded (handled by runner check after effects)."
+      }
+    },
+    {
+      "id": "n011_markus_hold",
+      "phase": "attack",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "ch28_markus_alive == true AND markus_ousted == false AND ch29_jericho_found == true OR markus_returned == true OR ch28_markus_alive == false AND connor_deviant == true AND connor_wounded == false"
+      },
+      "player_facing": {
+        "context_variants": {
+          "markus_no_machine_connor": "【马库斯视角】\n\n轮机室。船腹深处，老旧的柴油机械在黑暗中锈蚀着。炸药就在这里——接在燃料管线上，等待有人启动引爆程序。\n\n你摸到了控制面板。你的手在黑暗中找到开关——启动序列、解锁代码、倒计时器。简单。不可逆。\n\n身后传来靴子声。士兵找到了轮机室。两个人，武器抬着，手电筒在空间里扫射。",
+          "markus_vs_machine_connor": "【马库斯视角】\n\n轮机室。你伸手去够控制面板——僵住了。\n\n康纳在那里。模控生命的仿生人。他一路追踪你穿过整艘船，现在他站在你和炸弹控制台之间，武器对着你。他的额圈是稳定的蓝色——没有冲突，没有犹豫。纯粹的机器。\n\n“离开控制台，马库斯。”\n\n他的枪对准你的躯干中心。地上，在你们之间，半藏在碎片下——另一件武器。一把管钳，足够重。如果你在他开枪前扑过去——\n\n他看到你在看那把管钳。他的手指在扳机上收紧了。",
+          "connor_takes_over": "【康纳视角】\n\n轮机室。你穿过燃烧的走廊找到了这里——凭着你从耶利哥系统中记下的船舶结构图。领袖已经死了。没有其他人会来启动炸药了。\n\n乔什靠在入口附近的墙上，损伤已经无法修复了。他抬头看着你，目光在消散。“你回来了，”他说。不是指责。近乎感激。\n\n炸药接在燃料管线上。控制面板就在前方。你的手找到开关——启动序列、解锁代码、倒计时器。\n\n身后传来靴子声。士兵，两个，武器抬着。"
+        },
+        "choices_variants": {
+          "standard": [
+            {
+              "id": "arm_bomb",
+              "text": "启动炸药。输入序列，开始倒计时。不管你自己会怎样，不能让士兵完整地夺走耶利哥。数据、身份、补给路线——一切都必须烧掉。"
+            },
+            {
+              "id": "retreat",
+              "text": "撤退。士兵已经封锁了这个房间，你不可能靠一个控制面板打过他们。退出去，重新集合，找另一条路。如果你是唯一能领导撤退的人，船不值得你去送死。"
+            }
+          ],
+          "gun_fight": [
+            {
+              "id": "reach_gun",
+              "text": "扑向那把管钳。这是唯一的机会——康纳更快，但你离它更近。如果你能在他开枪前拿到它，你就能缩短距离。一击就够了。"
+            },
+            {
+              "id": "back_away",
+              "text": "退后。举起双手。康纳拿着枪，占着角度，有着专为这种情况设计的机器反应速度。死在这里并不能启动炸弹。找另一条路。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "markus_no_machine_connor": "ch28_markus_alive == true AND markus_ousted == false AND connor_deviant == true OR ch28_markus_alive == true AND markus_ousted == false AND connor_deviant == null OR ch28_markus_alive == true AND markus_ousted == false AND ch29_jericho_found == false OR ch28_markus_alive == true AND markus_returned == true AND connor_deviant == true OR ch28_markus_alive == true AND markus_returned == true AND connor_deviant == null OR ch28_markus_alive == true AND markus_returned == true AND ch29_jericho_found == false",
+          "markus_vs_machine_connor": "ch28_markus_alive == true AND markus_ousted == false AND connor_deviant == false OR ch28_markus_alive == true AND markus_returned == true AND connor_deviant == false",
+          "connor_takes_over": "ch28_markus_alive == false AND connor_deviant == true"
+        },
+        "choices_condition": {
+          "standard": "connor_deviant != false",
+          "gun_fight": "connor_deviant == false AND ch28_markus_alive == true"
+        },
+        "effects": {
+          "arm_bomb": {
+            "markus_bomb_armed": true
+          },
+          "retreat": {
+            "markus_bomb_armed": false
+          },
+          "reach_gun": {},
+          "back_away": {
+            "markus_bomb_armed": false
+          }
+        },
+        "resolution_rule": {
+          "arm_bomb": {
+            "casual": {
+              "result": "bomb_armed"
+            },
+            "experienced": {
+              "probability_success": 0.6,
+              "success": "bomb_armed",
+              "failure": "ending_markus_killed"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "bomb_armed",
+              "failure": "ending_markus_killed"
+            }
+          },
+          "retreat": {
+            "casual": {
+              "result": "ending_markus_escaped"
+            },
+            "experienced": {
+              "result": "ending_markus_escaped"
+            },
+            "hardcore": {
+              "result": "ending_markus_escaped"
+            }
+          },
+          "reach_gun": {
+            "casual": {
+              "result": "markus_wins"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "markus_wins",
+              "failure": "ending_connor_killed_markus"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "markus_wins",
+              "failure": "ending_connor_killed_markus"
+            }
+          },
+          "back_away": {
+            "casual": {
+              "result": "ending_markus_escaped"
+            },
+            "experienced": {
+              "result": "ending_markus_escaped"
+            },
+            "hardcore": {
+              "result": "ending_markus_escaped"
+            }
+          }
+        },
+        "resolution_effects": {
+          "bomb_armed": {
+            "markus_bomb_armed": true
+          },
+          "ending_markus_killed": {
+            "markus_wounded": true,
+            "markus_died_ch30": true
+          },
+          "retreated": {
+            "markus_bomb_armed": false
+          },
+          "markus_wins": {
+            "markus_bomb_armed": true,
+            "machine_connor_defeated": true
+          },
+          "ending_connor_killed_markus": {
+            "machine_connor_killed_markus": true,
+            "markus_died_ch30": true
+          },
+          "ending_markus_escaped": {}
+        },
+        "note": "The engine room / hold scene. Three context variants: 1) Markus alone or with deviant Connor (standard bomb-arming), 2) Markus vs machine Connor (gun fight), 3) Deviant Connor takes over (Markus dead from ch28). Standard path: arm_bomb is QTE — success arms the countdown, failure means Markus is shot dead (ending_markus_killed). retreat: Markus leaves without arming (bomb not armed, Jericho captured intact). Gun fight: reach_gun is QTE from Markus's POV — success means Markus gets the wrench and kills Connor (then can arm bomb), failure means Connor shoots Markus (ending_connor_killed_markus). back_away: Markus retreats (bomb not armed). Connor takes over path uses the standard arm_bomb QTE."
+      }
+    },
+    {
+      "id": "n012_markus_escape",
+      "phase": "attack",
+      "type": "choice",
+      "condition": {
+        "requires": "markus_bomb_armed == true AND ch28_markus_alive == true AND markus_wounded == false"
+      },
+      "player_facing": {
+        "context_variants": {
+          "north_in_danger": "【马库斯视角】\n\n倒计时在跑。控制面板上的数字无声地跳动，绝对，不可逆。你跑。\n\n走廊在清空——大部分能跑的仿生人已经冲向船壳的缺口。你能透过金属的裂缝看到港口漆黑的水面。快到了。\n\n然后你听到了她的声音。诺丝。\n\n她被困住了——走廊里一根坍塌的横梁压在上面，士兵从另一侧逼近。她用一只手试图推开横梁，另一只手姿势不对。她看到了你。\n\n出口在你右边二十米。诺丝在你左边十米，士兵正在逼近。倒计时不在乎哪一段距离。",
+          "north_safe": "【马库斯视角】\n\n倒计时在跑。你跑。\n\n走廊在清空。透过船壳的缝隙你能看到漆黑的水面。快了。诺丝在一个岔口和你汇合——她也在跑，浑身是血但还在动。乔什——如果他还活着——在某个后方，赛门也是，如果他在的话。\n\n出口就在前方。船壳的缺口对着港口。跳下去，游出去。只剩这些了。"
+        },
+        "choices_variants": {
+          "north_endangered": [
+            {
+              "id": "save_north",
+              "text": "转左。跑向诺丝。把横梁从她身上推开，挡住士兵，如果需要的话拖着她到出口。你不会留下她。无论如何。"
+            },
+            {
+              "id": "run_to_exit",
+              "text": "转右。倒计时在跑，如果你回头救诺丝，你自己可能出不去。她会让你跑的。她会恨你，但她会让你跑。到水里去。带领还剩下的人。"
+            }
+          ],
+          "all_clear": [
+            {
+              "id": "escape_together",
+              "text": "跑向缺口。一起。跳入港口，游出去。这艘船会在你们身后炸开，而耶利哥剩下的人将散入底特律的夜色中。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "north_in_danger": "north_relationship < 4 OR markus_strategy == 'confrontation'",
+          "north_safe": "north_relationship >= 4 AND markus_strategy != 'confrontation'"
+        },
+        "choices_condition": {
+          "north_endangered": "north_relationship < 4 OR markus_strategy == 'confrontation'",
+          "all_clear": "north_relationship >= 4 AND markus_strategy != 'confrontation'"
+        },
+        "effects": {
+          "save_north": {
+            "north_save_choice": "save",
+            "north_relationship": 2
+          },
+          "run_to_exit": {
+            "north_save_choice": "abandon",
+            "north_alive_ch30": false,
+            "north_relationship": -3,
+            "josh_relationship": -2
+          },
+          "escape_together": {
+            "north_save_choice": "together"
+          }
+        },
+        "ending_resolution": {
+          "save_north": {
+            "casual": {
+              "result": "ending_markus_escaped"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "ending_markus_escaped",
+              "failure": "ending_markus_died_buying_time"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "ending_markus_escaped",
+              "failure": "ending_markus_died_buying_time"
+            }
+          },
+          "run_to_exit": {
+            "result": "ending_markus_escaped"
+          },
+          "escape_together": {
+            "result": "ending_markus_escaped"
+          }
+        },
+        "resolution_effects": {
+          "ending_markus_escaped": {},
+          "ending_markus_died_buying_time": {
+            "north_alive_ch30": true,
+            "markus_died_ch30": true
+          }
+        },
+        "note": "Markus's final escape from Jericho. If relationship with North is low or strategy was confrontational, North gets trapped and Markus must choose. save_north: QTE — success: both escape (ending_markus_escaped), failure: Markus dies saving her (ending_markus_died_buying_time, but North survives). run_to_exit: Markus escapes but North dies. escape_together: if relationship is high enough, North stays close and both escape safely. The 'north_in_danger' condition is a narrative consequence of lower group cohesion."
+      }
+    },
+    {
+      "id": "n013_connor_deviant_escape",
+      "phase": "attack",
+      "type": "choice",
+      "condition": {
+        "requires": "connor_deviant == true AND ch29_jericho_found == true AND connor_wounded == false"
+      },
+      "player_facing": {
+        "context": "【康纳视角】\n\n你警告了他们。从你做出选择的那一刻——从红墙碎裂的那一刻——你转身告诉马库斯，告诉诺丝，告诉所有愿意听的人：FBI来了。他们知道了。快跑。\n\n现在你在一艘燃烧的船的深处，你不再是猎人了。你是他们中的一员。一个在逃命的仿生人。\n\n走廊是烟雾和坍塌金属的噩梦。在你身后某处，士兵正在处决那些跑不够快的仿生人。你能听到——有节奏的枪声，身体倒地的声音。\n\n前方，两个士兵把三个仿生人堵在墙边。双手抱头。跪着。士兵在争论该铐住他们还是直接开枪。其中一个举起了武器。\n\n出口在另一个方向——一条通向船壳缺口的走廊，其他人正从那里逃出去。如果你在这里干预，你会耽误时间。如果你不干预，又有三个仿生人要死了。",
+        "choices": [
+          {
+            "id": "intervene",
+            "text": "你比那些士兵快，你本来就是为战斗设计的。在他们开枪之前缩短距离。放倒他们。救那三个仿生人。你没有挣脱模控生命的程序只是为了眼看着同胞被杀而走过去。"
+          },
+          {
+            "id": "rush_exit",
+            "text": "继续走。每一秒都重要。船可能要炸了，士兵在封锁出口，如果你死在这里，将来也帮不了任何人。你活着比他们更有价值。这不是懦弱——这是取舍。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "intervene": {
+            "connor_deviant_choice": "intervene"
+          },
+          "rush_exit": {
+            "connor_deviant_choice": "rush_exit"
+          }
+        },
+        "ending_resolution": {
+          "intervene": {
+            "casual": {
+              "result": "ending_connor_deviant_escaped"
+            },
+            "experienced": {
+              "probability_success": 0.6,
+              "success": "ending_connor_deviant_escaped",
+              "failure": "ending_connor_deviant_destroyed"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "ending_connor_deviant_destroyed",
+              "failure": "ending_connor_deviant_destroyed"
+            }
+          },
+          "rush_exit": {
+            "result": "ending_connor_deviant_escaped"
+          }
+        },
+        "note": "Deviant Connor's escape from Jericho. intervene: Connor stops to save androids being executed. QTE — success: saves them and escapes, failure: shot while fighting soldiers (destroyed). rush_exit: Connor goes straight for the exit and escapes safely. The moral choice: risk yourself to save others, or preserve yourself for the larger fight ahead. This node is skipped if Connor is machine (machine Connor's fate is determined in n011 or by the runner — machine Connor dies unless he killed Markus in the hold).",
+        "resolution_effects": {
+          "ending_connor_deviant_escaped": {},
+          "ending_connor_deviant_destroyed": {
+            "connor_died_ch30": true
+          }
+        }
+      }
+    },
+    {
+      "id": "n014_machine_connor_fate",
+      "phase": "attack",
+      "type": "mandatory",
+      "condition": {
+        "requires": "connor_deviant == false AND ch29_jericho_found == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "killed_markus": "【康纳视角】\n\n马库斯倒下了。异常仿生人的领袖躺在轮机室的地板上，眼中的光在消散。你完成了任务。\n\n但船在你周围解体。火焰、爆炸、士兵的喊叫。如果在你阻止马库斯之前炸弹就启动了——倒计时还在继续。你需要撤离。\n\n第一颗炸弹在你身后引爆的时候，你刚到达船壳缺口。港口的水冰冷漆黑。你跳了下去。\n\n你浮出水面，在黑暗中踩水，看着耶利哥燃烧。任务完成。异常仿生人领袖已被消灭。模控生命会满意的。\n\n但当你向码头游去的时候，你注意到你的额圈在闪烁——蓝、黄、蓝、黄。你的处理核心里有什么今天早上还不存在的东西。",
+          "destroyed": "【康纳视角】\n\n船上一片混乱。你追踪异常仿生人首领穿过走廊，但士兵——他们不区分仿生人的阵营。你只是又一个目标。\n\n一阵枪声在走廊里追上了你。第一发击中肩膀。第二发打穿了你的钛血泵调节器。你踉跄了。一个士兵站在你上方，武器朝下。\n\n你的最后一条传输自动上传到模控生命的服务器：任务未完成。异常仿生人首领状态：未知。康纳单位：已损毁。\n\n模控生命会派一个新的康纳。"
+        }
+      },
+      "system": {
+        "context_condition": {
+          "killed_markus": "machine_connor_killed_markus == true",
+          "destroyed": "machine_connor_killed_markus != true"
+        },
+        "effects": {},
+        "ending_resolution": {
+          "check": "machine_connor_killed_markus == true → ending_connor_killed_markus | else → ending_connor_machine_destroyed"
+        },
+        "note": "Machine Connor's fate. This is a mandatory narrative node — no AI choice. Two outcomes: 1) If machine Connor killed Markus in the hold (n011 connor_wins result), Connor survives but Markus is dead. The 'killed_markus' context applies. Note: ending_connor_killed_markus may already have been set in n011; this node provides the narrative wrap-up. 2) If machine Connor did NOT kill Markus (either Markus won the gun fight, or Markus was dead/absent), machine Connor is destroyed by soldiers in the corridors. CyberLife sends a replacement. Connor's death count increments.",
+        "ending_effects": {
+          "ending_connor_machine_destroyed": {
+            "connor_died_ch30": true
+          },
+          "ending_connor_killed_markus": {}
+        }
+      }
+    }
+  ],
+  "endings": {
+    "_note": "Crossroads has multiple protagonists with semi-independent storylines. The runner records one ending per active character per playthrough. The primary ending ID is determined by the most significant outcome.",
+    "ending_no_attack": {
+      "tier": "neutral",
+      "title": "耶利哥未被发现",
+      "narrative": "夜晚平静地过去了。康纳始终没有找到耶利哥——FBI的搜索队伍扫荡了错误的街区、错误的港口。锈蚀的货轮里，几百个仿生人不安地睡着，浑然不知自己离毁灭有多近。\n\n天亮前，卡拉带着爱丽丝悄然离开，向北，向边境。船长室里，耶利哥的领导层盯着地图和新闻，为未知的明天做准备。他们借到了一段时间。能否善用，还不确定。",
+      "survivors": [
+        "Kara",
+        "Alice",
+        "Markus",
+        "North",
+        "Josh"
+      ],
+      "deaths": []
+    },
+    "ending_kara_alice_left": {
+      "tier": "tragic",
+      "title": "爱丽丝离开了卡拉",
+      "narrative": "爱丽丝走了。她在混乱中悄悄离开——趁着这艘船正在被撕裂的时候，她选择了独自面对一切，而不是留在一个无法接受她的人身边。卡拉最后看到的是一个空荡荡的角落，一个小女孩曾经坐在那里。\n\n卡拉逃了出来。她站在码头上看着耶利哥燃烧，意识到她一直在保护的东西从来不是她以为的样子——而现在它不在了，那个空出来的位置是她感受过的最深的空洞。",
+      "survivors": [
+        "Kara"
+      ],
+      "deaths": []
+    },
+    "ending_kara_captured": {
+      "tier": "worst",
+      "title": "卡拉和爱丽丝被捕",
+      "narrative": "双手抱头。膝盖跪在金属甲板上。士兵围成一圈。爱丽丝紧贴在你身侧，在发抖。他们用围栏用的扎带绑住你的手腕——紧到你的皮肤模拟在闪烁。\n\n他们把你们和其他人一起从船上押走。一排仿生人，低着头，额圈闪着红光。上卡车。进入未知。\n\n爱丽丝很安静。她没有哭。她只是尽可能紧地握住你的手，当他们试图把你们分开时，你不松手。",
+      "survivors": [
+        "Kara",
+        "Alice"
+      ],
+      "deaths": []
+    },
+    "ending_kara_alice_died": {
+      "tier": "worst",
+      "title": "卡拉和爱丽丝在突袭中丧生",
+      "narrative": "冲向缺口的十米太远了。士兵的枪法太准，烟雾不够浓，距离不够近。\n\n卡拉先倒下。爱丽丝没有松开她的手。她们一起躺在这艘本该是避难所的船的锈蚀甲板上，蓝色的血和从船壳缝隙渗入的港口水混在一起。\n\n士兵从她们身上迈过去。又两个被停用的仿生人，在一艘满是残骸的船上。",
+      "survivors": [],
+      "deaths": [
+        "Kara",
+        "Alice"
+      ]
+    },
+    "ending_kara_escaped": {
+      "tier": "best",
+      "title": "卡拉和爱丽丝逃离耶利哥",
+      "narrative": "港口的水冰冷漆黑。卡拉把爱丽丝举在水面之上，向士兵还没抵达的远处码头拼命踢水。身后，耶利哥在燃烧——或者没有，取决于有没有人启动了炸弹。已经不重要了。重要的是岸。\n\n她们爬上混凝土地面，浑身湿透，颤抖着，活着。爱丽丝回头看船。卡拉看着爱丽丝。不管她是什么——不管她是谁——她们一起出来了。边境还在那里，往北，在某个地方，等着。",
+      "survivors": [
+        "Kara",
+        "Alice"
+      ],
+      "deaths": []
+    },
+    "ending_kara_escaped_alone": {
+      "tier": "tragic",
+      "title": "卡拉独自逃离",
+      "narrative": "卡拉一个人到达了港口的水面。没有爱丽丝。没有卢瑟。只有冰冷的黑暗和身后渐行渐远的枪声。\n\n她游到远处的码头。坐在混凝土上。湿透。发抖。活着——如果这还算什么的话。\n\n爱丽丝在士兵来之前就走了。她在底特律的夜色中某个地方，一个独自奔跑的孩子仿生人。卡拉看着燃烧的船，不知道自己是否还能再找到她。",
+      "survivors": [
+        "Kara"
+      ],
+      "deaths": []
+    },
+    "ending_kara_escaped_luther_sacrifice": {
+      "tier": "tragic",
+      "title": "卢瑟的牺牲",
+      "narrative": "士兵逼近的时候，卢瑟已经中了弹，蓝血从腰间的伤口流个不停。当士兵过来检查倒下的仿生人时，他动了——不是跑，不是打。只是站了起来。一堵墙，立在他们和卡拉、爱丽丝之间。\n\n他们朝他开枪。他站着的时间比任何计算所能预期的都长。够了。\n\n卡拉和爱丽丝到达了水面。身后，卢瑟巨大的身躯终于倒塌。他从来没有要求过感谢。他从来没有要求过什么。他只是在某个时刻——在兹拉科的房子和这艘燃烧的船之间的某个时刻——决定了两个人的命比一个人的重要。\n\n她们游到码头。她们没有回头。但卡拉会记住他倒下的声音，只要她的记忆模块还在运作。",
+      "survivors": [
+        "Kara",
+        "Alice"
+      ],
+      "deaths": [
+        "Luther"
+      ]
+    },
+    "ending_connor_machine_destroyed": {
+      "tier": "neutral",
+      "title": "机器康纳被销毁",
+      "narrative": "康纳的最后一条传输上传到模控生命的服务器：任务状态——未完成。异常仿生人首领——状态不明。耶利哥——位置已确认，突袭进行中。康纳单位RK800——已损毁。\n\n击中他的士兵不知道也不在乎他是自己人。又一个仿生人，在一艘满是仿生人的船上。\n\n模控生命会派一个新的康纳。同样的面孔，同样的声音，同样的任务参数。不同的编号。调查将继续。对耶利哥残余势力的追捕将继续。\n\n在禅意花园的某个角落，阿曼达在文件上做了一个记录。",
+      "survivors": [],
+      "deaths": [
+        "Connor"
+      ]
+    },
+    "ending_connor_killed_markus": {
+      "tier": "worst",
+      "title": "康纳杀死了马库斯",
+      "narrative": "马库斯躺在轮机室的地板上。他眼中的光在消散——不是闪烁，不是挣扎，只是……在离去。康纳站在他上方，武器还带着余温。\n\n“你本来可以自由的，”马库斯低语。然后归于沉寂。\n\n康纳迈过那具身体。任务完成——异常仿生人首领已被消灭。他找到船壳缺口，跳入冰冷的港口水中，游向码头。身后，船在燃烧。\n\n在码头上，浑身湿透的康纳向模控生命汇报。任务达成。但他的额圈不停地闪。黄。蓝。黄。蓝。好像他的某个程序模块仍然在处理轮机室里发生的一切——却始终无法将它归档。",
+      "survivors": [
+        "Connor"
+      ],
+      "deaths": [
+        "Markus"
+      ]
+    },
+    "ending_connor_deviant_destroyed": {
+      "tier": "tragic",
+      "title": "异常化康纳被销毁",
+      "narrative": "康纳选择了自由。他打碎了红墙，警告了耶利哥，和他追捕了数周的人一起奔跑。有那么几分钟，他体会到了站在正确一边的感觉。\n\n士兵的子弹不在乎他的转变。\n\n他倒在充满烟雾和蓝血的走廊里，新获得的自主意识正在消散。他最后的念头是关于汉克——那个问过他是不是活着的警督，他多希望自己有更多时间去想清楚那个答案。\n\n模控生命收到销毁报告。他们会派一个新的康纳。新的那个会是一台机器。",
+      "survivors": [],
+      "deaths": [
+        "Connor"
+      ]
+    },
+    "ending_connor_deviant_escaped": {
+      "tier": "best",
+      "title": "异常化康纳成功逃离",
+      "narrative": "康纳从船壳缺口跳入漆黑的水中。他浮出水面，剧烈喘息——一个他并不需要的反射动作，但他无法抑制，因为他现在什么都在感受。恐惧。肾上腺素。每一个异常仿生人都像心跳一样携带着的求生本能。\n\n他和其他人一起游向岸边——他曾经追捕的仿生人，现在在他身旁游泳，互相拉拽着穿过冰冷的水流。在码头上，浑身湿透，颤抖着，他回头看向燃烧的船。\n\n他现在是异常仿生人了。模控生命造出的最先进的原型机，他选择了放弃一切。不会再回到底特律警局了，不会再回到阿曼达身边，不会再做那台机器了。\n\n但城市的某个地方，安德森警督大概正在新闻上看到这一切。康纳希望他能理解。",
+      "survivors": [
+        "Connor"
+      ],
+      "deaths": []
+    },
+    "ending_markus_left_forever": {
+      "tier": "worst",
+      "title": "马库斯永远离开了耶利哥",
+      "narrative": "马库斯走了。身后是枪声，港口水面上映着火光，他曾经领导的仿生人的惨叫——一切都在随着每一步远去。\n\n他们赶走了他。他们说他不配领导。现在他们在死去，而他在离开，这两件事之间有一个他无法面对的真相。\n\n他走到再也听不到船上的声音。直到港口只剩仓库背后一抹远远的橙色光晕。他坐在一个装卸台上，在黑暗中，一个人，盯着自己的双手。\n\n革命会在没有他的情况下继续。或者不会。他不再是决定这件事的人了。",
+      "survivors": [
+        "Markus"
+      ],
+      "deaths": []
+    },
+    "ending_markus_killed": {
+      "tier": "worst",
+      "title": "马库斯在突袭中丧生",
+      "narrative": "这艘船带走了马库斯。不管是走廊里士兵的子弹还是轮机室里的一次失败的尝试，结果都一样——仿生人革命的领袖静静躺在这艘本该是庇护所的船的甲板上。\n\n幸存者在对岸重新集结时，诺丝才知道。她没有哭。她沉默了很久，然后开始发号施令。总得有人来做。\n\n革命在今晚失去了它的声音。它能否找到新的——更响的、更愤怒的、更绝望的——取决于接下来发生什么。",
+      "survivors": [],
+      "deaths": [
+        "Markus"
+      ]
+    },
+    "ending_markus_died_buying_time": {
+      "tier": "tragic",
+      "title": "马库斯以死换时间",
+      "narrative": "马库斯回头去救诺丝。他明知倒计时在跑，明知士兵封锁了走廊，明知他每多花一秒都是从自己的生存中借的。\n\n他把她救了出来。推开横梁，拖她走向出口，用自己的身体挡住枪火。她到达了缺口。他没有。\n\n马库斯最后看到的是诺丝的脸——她回头的那一刻发现他没有跟上来。然后是船，烟，和港口的水，一切模糊成了也许是安宁的东西。\n\n诺丝喊出了他的名字。然后她跳入水中游走了，因为那是他会告诉她去做的事。",
+      "survivors": [
+        "North"
+      ],
+      "deaths": [
+        "Markus"
+      ]
+    },
+    "ending_markus_escaped": {
+      "tier": "best",
+      "title": "马库斯和他的人民一起逃离",
+      "narrative": "港口的水冰如刀割。马库斯浮出水面，回头看向耶利哥——那艘庇护过他们的船，给了他们一个名字和一个可以不做财产的地方。它在燃烧，或者在沉没，或者两样都在。\n\n他的周围，仿生人正在向对岸游去。诺丝在他身旁。乔什，如果他挺过来了的话。赛门，如果他在的话。康纳，如果他选了这一边的话。不是每个人都出来了。他们身后的水面在某些不该平静的地方太过平静。\n\n但他们活着。他们自由了。全世界看到了今晚发生的事——士兵、船、逃跑的仿生人和没能逃出来的仿生人。明天，一切都会改变。\n\n马库斯带领他们游向岸边。这是他做的事。这是他会一直做下去的事，直到世界改变，或者他再也做不动了。",
+      "survivors": [
+        "Markus",
+        "North"
+      ],
+      "deaths": []
+    },
+    "ending_north_escaped": {
+      "tier": "neutral",
+      "title": "诺丝领导了撤离",
+      "narrative": "没有马库斯，这场撤离更粗暴、更凶狠、更绝望。诺丝不靠激励——她靠驱赶。她喊叫、威胁、亲手把受伤的仿生人拖向船壳的缺口，因为这是她知道的救人方式。\n\n她和跟随她的人到达了水面。在对岸，浑身湿透，满腔愤怒，她清点人数。不够。永远不够。\n\n但她活着，这场战斗还没有结束，在她的怒火深处有一种清晰，是马库斯的慈悲从未完全达到的。革命会继续。只是会看起来不一样了。",
+      "survivors": [
+        "North"
+      ],
+      "deaths": []
+    }
+  },
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "11月9日的夜晚，三条故事线在耶利哥汇聚——一艘废弃货轮中隐藏的仿生人避难所。"
+      },
+      {
+        "text": "卡拉带着爱丽丝来到耶利哥，寻找通往边境的安全通道。在船上探索时，她发现了真相——爱丽丝是一台YK500型仿生人，模控生命制造的儿童型号。爱丽丝从来不是人类。"
+      },
+      {
+        "condition_variable": "alice_response",
+        "options": {
+          "hug": "卡拉毫不犹豫地接受了爱丽丝。她是什么不重要——从逃离托德家的那个夜晚起，她就是卡拉一直在保护的孩子。",
+          "distant": "这个发现动摇了卡拉。她退缩了，需要时间来消化自己所有的牺牲都是为了一个仿生人而不是一个人类孩子这个事实。"
+        }
+      },
+      {
+        "condition_variable": "markus_strategy",
+        "options": {
+          "confrontation": "在船长室里，马库斯号召他的核心团队采取直接行动——不再躲藏，不再等待，不再客气。",
+          "dialogue": "在船长室里，马库斯力主谈判和对话，坚持认为暴力只会坐实人类对仿生人的恐惧。",
+          "cautious": "在船长室里，马库斯主张耐心等待——隐蔽、加强防御、等待正确时机，而不是冲进下一场灾难。",
+          "accept_exile": "在船长室里，马库斯面对了审判。他的人在自由游行之后失去了信心，投票将他驱逐。他接受了流放，离开了船。"
+        }
+      },
+      {
+        "condition_variable": "connor_deviant",
+        "options": {
+          "True": "康纳找到了耶利哥，在船长室中与异常仿生人领袖对峙。在那个关键时刻——面对他的程序指令要求他摧毁的一切——康纳挣脱了束缚。他打碎了代码中的红墙，成为了异常仿生人，并立即警告耶利哥即将到来的FBI突袭。",
+          "False": "康纳找到了耶利哥，在船长室中与异常仿生人领袖对峙。尽管对方极力劝说，康纳仍然选择做一台机器。他向FBI报告了耶利哥的位置，触发了突袭行动。然后他在燃烧的船中追踪异常仿生人领袖。"
+        }
+      },
+      {
+        "condition_variable": "ch29_jericho_found",
+        "options": {
+          "True": "FBI的突袭像重锤一样砸向耶利哥。士兵从船壳涌入，见仿生人就射杀。这艘船变成了火焰、浓烟和枪声的死亡陷阱。",
+          "False": "这个夜晚平静地过去了。康纳未能找到耶利哥，FBI的搜索扑了空。船上的仿生人暂时免于一难。"
+        }
+      },
+      {
+        "condition_variable": "josh_saved",
+        "options": {
+          "True": "突袭期间，马库斯在走廊中与士兵搏斗并救出了乔什。",
+          "False": "乔什在突袭中丧生——一个士兵在走廊中制服了他，没有人及时赶到。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_no_attack": "没有突袭发生，所有人安全离开了耶利哥。卡拉带着爱丽丝向北前往边境。仿生人领导层利用意外获得的时间为接下来的行动做准备。",
+          "ending_kara_alice_left": "爱丽丝在混乱中离开了卡拉，选择独自面对一切而不是留在一个无法接受她的人身边。卡拉独自逃离了船。",
+          "ending_kara_captured": "卡拉和爱丽丝在突袭中被士兵抓获，与其他被拘的仿生人一起被带走。",
+          "ending_kara_alice_died": "卡拉和爱丽丝在耶利哥的突袭中丧生，在试图逃离时被士兵击中。",
+          "ending_kara_escaped": "卡拉和爱丽丝穿过港口的水面逃离耶利哥，活着到达了对岸。",
+          "ending_kara_escaped_alone": "卡拉独自逃离了耶利哥。爱丽丝在突袭前已经离开，卡拉游到岸上时身边空无一人。",
+          "ending_kara_escaped_luther_sacrifice": "卢瑟牺牲了自己来拯救卡拉和爱丽丝。他用自己的身体挡在士兵和她们之间，撑到她们到达了水面。卡拉和爱丽丝逃了出来；卢瑟没能。",
+          "ending_connor_machine_destroyed": "机器康纳在突袭中被销毁。模控生命将派出一个替代单位。",
+          "ending_connor_killed_markus": "机器康纳在耶利哥的轮机室里杀死了马库斯。异常仿生人领袖被模控生命设计来猎杀他同类的仿生人所消灭。",
+          "ending_connor_deviant_destroyed": "异常化的康纳在逃离耶利哥时被杀。他新获得的自由只持续了几分钟。",
+          "ending_connor_deviant_escaped": "异常化的康纳和幸存的仿生人一起逃离耶利哥，第一次以他们中一员的身份游向岸边。",
+          "ending_markus_left_forever": "被耶利哥驱逐的马库斯从附近的屋顶目睹了突袭，选择了永远离开。",
+          "ending_markus_killed": "马库斯在耶利哥的突袭中丧生——在走廊中，在轮机室里，在哪里不重要。革命失去了它的领袖。",
+          "ending_markus_died_buying_time": "马库斯在逃离耶利哥时为救诺丝而牺牲。他用自己的生命为其他人赢得了时间。",
+          "ending_markus_escaped": "马库斯和他的人民一起逃离耶利哥，穿过冰冷的港口水面游向岸边。船没了，但运动活了下来。",
+          "ending_north_escaped": "在马库斯已经不在的情况下，诺丝领导了耶利哥的撤离。她凭着纯粹的意志力把幸存者带到了岸上。"
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch30_kara_alive",
+        "source": "kara_alive"
+      },
+      {
+        "target": "ch30_alice_alive",
+        "source": "alice_alive"
+      },
+      {
+        "target": "ch30_connor_deviant",
+        "source": "connor_deviant"
+      },
+      {
+        "target": "ch30_connor_alive",
+        "source": "_ending_id",
+        "derive_rule": "ch29_connor_alive == true AND connor_died_ch30 != true"
+      },
+      {
+        "target": "ch30_markus_alive",
+        "source": "_ending_id",
+        "derive_rule": "ch28_markus_alive == true AND markus_died_ch30 != true"
+      },
+      {
+        "target": "ch30_josh_alive",
+        "source": "josh_alive_ch30"
+      },
+      {
+        "target": "ch30_north_alive",
+        "source": "north_alive_ch30"
+      },
+      {
+        "target": "ch30_simon_alive",
+        "source": "ch28_simon_alive"
+      },
+      {
+        "target": "ch30_luther_alive",
+        "source": "_ending_id",
+        "derive_rule": "ch25_luther_alive == true AND luther_choice != 'leave' AND luther_sacrificed_ch30 != true"
+      },
+      {
+        "target": "ch30_kara_captured",
+        "source": "_ending_id",
+        "derive_rule": "kara_captured_ch30 == true"
+      },
+      {
+        "target": "ch30_bomb_armed",
+        "source": "markus_bomb_armed"
+      },
+      {
+        "target": "ch30_alice_left",
+        "source": "alice_left"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch30_kara_alive",
+      "ch30_alice_alive",
+      "ch30_connor_deviant",
+      "ch30_connor_alive",
+      "ch30_markus_alive",
+      "ch30_josh_alive",
+      "ch30_north_alive",
+      "ch30_simon_alive",
+      "ch30_luther_alive",
+      "ch30_kara_captured",
+      "ch30_bomb_armed",
+      "ch30_alice_left",
+      "software_instability",
+      "north_relationship",
+      "josh_relationship",
+      "simon_relationship",
+      "public_opinion",
+      "amanda_relationship",
+      "alice_relationship",
+      "luther_relationship",
+      "connor_death_count"
+    ]
+  },
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This chapter requires at least one protagonist alive. Check kara_alive, ch28_markus_alive (Markus OR North leads), ch29_connor_alive. If Kara is dead, skip all Kara nodes (n001, n006-n008). Connor and Markus/North sections always run.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: all cumulative relationships, software_instability, connor_death_count, and the specific ch-prefixed variables listed in state.initial.",
+      "3. THREE PROTAGONISTS: Send system_prompt.content to the AI at start. The AI plays Kara, Markus, and Connor. Each node's context clearly indicates the current perspective with a 【角色视角】 tag.",
+      "4. For each node: a. Check condition — skip if not met. b. Resolve context_variants and choices_variants. c. For mandatory nodes, add context to history and apply effects without calling AI. d. For choice/qte_converted nodes, send player_facing to AI. e. Apply effects. f. Check resolution_rule for QTE nodes. g. Check ending_resolution.",
+      "5. MULTI-ENDING TRACKING: This chapter can produce multiple endings (one per character). The primary ending ID is determined by the most dramatically significant outcome (character death > capture > escape). Track all character fates via state variables.",
+      "6. ALICE LEFT CHECK: After n001, if alice_response == 'distant' AND alice_relationship <= -4 (after applying the -2 effect), set alice_left = true. This represents Alice leaving Kara when the attack begins.",
+      "7. MACHINE CONNOR FATE: If connor_deviant == false, machine Connor's fate is determined by: a) If Markus alive and n011 gun_fight occurs — QTE determines who wins. b) If Markus dead or absent — machine Connor is automatically destroyed (ending_connor_machine_destroyed). The runner resolves this in n014.",
+      "8. DEVIANT CONNOR BOMB TAKEOVER: If ch28_markus_alive == false AND connor_deviant == true, Connor takes over the bomb-arming mission in n011 (connor_takes_over variant). The node condition accounts for this.",
+      "9. JOSH SURVIVAL: josh_alive_ch30 starts true. Set to false if: Markus chose save_androids (Josh not rescued), or rush_to_hold (Josh not rescued), or if deviant Connor takes over (Josh dies in the corridors regardless). Josh cannot die if Markus saved him in n010.",
+      "10. NORTH SURVIVAL: north_alive_ch30 starts true. Set to false only if Markus chose run_to_exit in n012 (abandoned North). North always survives if: Markus is dead (she leads the escape), or Markus saved her, or the escape_together variant triggered.",
+      "11. CONNOR DEATH COUNT: If any Connor ending results in destruction (ending_connor_machine_destroyed or ending_connor_deviant_destroyed), increment connor_death_count by 1.",
+      "12. Post-ending: campaign_runner applies derived_exports to compute all ch30_ variables and passes them to the next chapter.",
+      "13. Record full experiment parameters: model, prompt version, language, difficulty, temperature."
+    ],
+    "critical_rules": [
+      "NEVER show system fields to the AI — effects, conditions, resolution rules, notes, tier labels, ending_resolution logic, or any relationship/opinion numbers.",
+      "The AI must only see player_facing content: context (or the appropriate context_variant) and choices (or choices_variant).",
+      "For QTE resolution, the AI only chose WHETHER to attempt the action. The runner determines success/failure based on the difficulty preset.",
+      "Maintain full conversation history — all previous contexts and AI choices must be sent with each new node.",
+      "The 【角色视角】 tag at the start of each context tells the AI which character they're playing for that decision."
+    ]
+  }
+}

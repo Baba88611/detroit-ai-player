@@ -1,0 +1,300 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration strategy.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch14_jericho",
+    "title": "Jericho",
+    "chapter_number": 14,
+    "protagonist": "Markus"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Markus (RK200), a deviant android. After being shot by police and discarded in a junkyard, you rebuilt yourself from salvaged parts and escaped. A dying android pressed a metal disc into your hand and told you about a place called Jericho — a refuge for androids who have broken free from their programming. It is November 6, 2038, 4:30 PM. You are in Ferndale, a rundown district of Detroit, following a trail of graffiti symbols that should lead you to Jericho. You are alone, carrying nothing but the disc and the memory of a stranger's last words. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "station_exploration": null,
+      "trail_approach": null,
+      "bridge_method": null,
+      "software_instability": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_station_exploration",
+      "phase": "arrival",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "You step onto the platform of a deserted train station in Ferndale. The fluorescent lights flicker overhead, half of them dead. No passengers. No attendants. The departure boards are dark. As you walk through the corridor, something flashes across your visual feed — a fragment of memory that isn't yours. An android, model unknown, standing on this same platform weeks or months ago, staring at a symbol painted on the concrete wall. The fragment dissolves before you can grasp more. The symbol is still there: a triangle with a line through it, sprayed in pale blue paint on the far wall. You look closer and find more of them — similar markings scattered among the regular graffiti, newer and deliberate, forming a pattern only someone looking for it would notice. A bench near the exit holds a crumpled magazine and some old newspapers. The exit turnstile ahead leads to the street.",
+        "choices": [
+          {
+            "id": "explore_thorough",
+            "text": "Take your time with this place. Study the repeating symbols carefully — their spacing, their direction, their age. Check the magazine and newspapers on the bench. Examine the memory fragment's residual data. Understand the trail before you follow it."
+          },
+          {
+            "id": "explore_quick",
+            "text": "Note the symbol pattern and the direction they seem to point. Glance at the bench. You see enough to follow the trail — no need to linger in an empty station."
+          },
+          {
+            "id": "explore_direct",
+            "text": "You have the disc. You have a direction. This station is a waypoint, not a destination. Walk straight through and follow the first symbol you see outside."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "explore_thorough": {
+            "station_exploration": "thorough",
+            "software_instability": 1
+          },
+          "explore_quick": {
+            "station_exploration": "quick"
+          },
+          "explore_direct": {
+            "station_exploration": "direct"
+          }
+        },
+        "note": "The memory fragment is a flashback of another deviant who passed through here. thorough exploration gives the AI richer environmental context in subsequent nodes and +1 SI for engaging with the deviant memory trace."
+      }
+    },
+
+    {
+      "id": "n002_trail_approach",
+      "phase": "journey",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "Outside the station, the trail of symbols leads you deeper into Ferndale's industrial decay. You identified the pattern inside: each marker points toward the next, the intervals growing shorter as you go, like a heartbeat quickening. The streets are grey and mostly empty. A few humans pass without looking at you. Near a fenced lot, you spot an android standing motionless on the sidewalk — its LED cycling a dull yellow, eyes unfocused, caught in some loop. It doesn't respond when you approach, but the Jericho symbol is painted on the wall directly behind it. The trail continues through a chain-link gap into a derelict parking structure. Inside, the light drops to near-darkness. Against the far wall, half-hidden behind a dumpster, an android lies face-down in a pool of dried thirium. It has been here for days. Further in, past collapsed ceilings and rusted beams, the symbols lead upward — through a gap in the structure, onto the rooftops. From there, you can see the outline of an abandoned office building ahead, and beyond it, the silhouette of something large near the waterfront. You need to get through to the other side.",
+          "quick": "The symbols outside the station lead you through Ferndale's industrial streets. A few humans pass — none look at you. You spot an android standing frozen on a sidewalk near a fenced lot, LED cycling yellow, the Jericho symbol painted on the wall behind it. The trail takes you through a gap in a chain-link fence into a dark parking structure. An android body lies near the far wall, motionless and long-abandoned. The symbols point upward through collapsed ceilings to the rooftops. You can see an abandoned office building ahead and something large near the waterfront beyond it.",
+          "direct": "You follow the symbols through Ferndale's streets without stopping. They lead through a parking structure, up to the rooftops, and toward an abandoned office building. Beyond it, near the waterfront, something large sits in silhouette against the grey sky."
+        },
+        "choices": [
+          {
+            "id": "approach_careful",
+            "text": "Move deliberately. Examine the fallen androids along the trail — what happened to them, how long they have been here, whether their paths ended by choice or by force. When you reach the abandoned office, search it carefully before pushing through."
+          },
+          {
+            "id": "approach_efficient",
+            "text": "Follow the markers. The dead cannot be helped, and stopping for them costs time you may not have. Navigate through the obstacles and keep heading toward the waterfront."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "approach_careful": {
+            "trail_approach": "careful",
+            "software_instability": 1
+          },
+          "approach_efficient": {
+            "trail_approach": "efficient"
+          }
+        },
+        "context_condition": {
+          "thorough": "station_exploration == thorough",
+          "quick": "station_exploration == quick",
+          "direct": "station_exploration == direct"
+        },
+        "note": "careful approach: Markus examines android bodies (3 along the trail), searches abandoned office, finds more context about the deviant underground. +1 SI for engaging with the dead. efficient: follows trail markers directly, minimal interaction with environment."
+      }
+    },
+
+    {
+      "id": "n003_bridge_crossing",
+      "phase": "crossing",
+      "type": "qte_converted",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "careful": "You emerge from the office building onto a narrow maintenance bridge stretching across to an adjacent structure — and beyond that, you can see it clearly now: a ship. Massive, rusted, listing slightly in the dark water of the river. Jericho. The metal disc in your hand grows warm, or maybe that is your imagination. The bridge is old and visibly corroded. You take a step, then another. Halfway across, the metal groans beneath your feet. A section of grating gives way ahead of you. Then another. The bridge shudders, buckles, and begins to collapse. You grab the railing as the walkway drops out from under you. When the dust settles, you are hanging from a jagged beam, the gap in front of you now a ten-meter void. To your left, a construction crane extends its arm over the gap, close enough to reach if you climb. Below is a twenty-meter fall to concrete and rubble.",
+          "efficient": "Past the office building, a maintenance bridge leads toward the waterfront. Across the gap, you see it: a ship, rusted and enormous, sitting dark in the river. Jericho. You start across the bridge. Halfway, the metal groans and gives way. You catch a beam as the walkway collapses. A ten-meter gap opens in front of you. A construction crane arm extends over the void to your left. Below is a long fall to concrete."
+        },
+        "choices": [
+          {
+            "id": "attempt_crane_jump",
+            "text": "Climb up to the crane arm. Work your way along it until you are over the far side, then drop down. It is the only path across."
+          },
+          {
+            "id": "try_lower_route",
+            "text": "Climb down instead of up. There may be a way to cross at a lower level — through the rubble, along the waterline, anything that does not involve a crane arm over a twenty-meter drop."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_crane_jump": {
+            "bridge_method": "crane"
+          },
+          "try_lower_route": {
+            "bridge_method": "lower"
+          }
+        },
+        "context_condition": {
+          "careful": "trail_approach == careful",
+          "efficient": "trail_approach == efficient"
+        },
+        "resolution_rule": {
+          "attempt_crane_jump": {
+            "casual": {
+              "result": "continue",
+              "note": "Markus climbs the crane and jumps successfully, landing cleanly on the far side"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": {
+                "result": "continue",
+                "note": "Clean landing on far side"
+              },
+              "failure": {
+                "result": "continue",
+                "note": "Markus nearly falls, catches the edge, pulls himself up — minor damage but arrives"
+              }
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": {
+                "result": "continue",
+                "note": "Clean landing"
+              },
+              "failure": {
+                "result": "continue",
+                "note": "Rough landing, some damage, but arrives"
+              }
+            }
+          },
+          "try_lower_route": {
+            "casual": {
+              "result": "continue",
+              "note": "Markus finds a way through the rubble at ground level and reaches the ship from below"
+            },
+            "experienced": {
+              "result": "continue",
+              "note": "Longer route but Markus arrives at the ship's hull"
+            },
+            "hardcore": {
+              "result": "continue",
+              "note": "Difficult climb through debris, but Markus reaches the ship"
+            }
+          }
+        },
+        "note": "Non-terminal QTE. All paths lead to the ship. The crane jump is the canonical game path; the lower route is an alternative that converges. Both result=continue to n004_meet_jericho."
+      }
+    },
+
+    {
+      "id": "n004_meet_jericho",
+      "phase": "arrival",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": "You are inside the ship. The air is stale and smells of rust and old seawater. You find a flashlight on a shelf near the entrance hatch and switch it on. The beam cuts through absolute darkness, revealing a narrow corridor of peeling walls and collapsed ceiling panels. You move deeper, through what was once a passenger deck, past rows of empty cabins with doors hanging open. The ship groans around you with each step. You reach a machine room — a vast space of dead turbines and corroded pipes. A metal catwalk crosses high above the floor. You step onto it. Halfway across, the supports give way. You fall, landing hard on the deck below. When you look up, there are faces looking down at you. Androids. Dozens of them, standing in the shadows of the machine room, watching you in silence. Some are damaged, missing limbs or skin panels. Others look intact but hollow-eyed. A woman with short dark hair steps forward. Behind her, a tall man with a calm expression, and another with glasses who hangs back, arms crossed. An android with exposed wiring where her face should be approaches and touches your arm. You have found Jericho."
+      },
+
+      "system": {
+        "effects": {},
+        "result": "ending_jericho"
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "This chapter has only one outcome. Markus always finds Jericho.",
+    "ending_jericho": {
+      "tier": "only",
+      "title": "Jericho",
+      "narrative": "You found them — or they found you. The ship Jericho sits in the dark water like a forgotten monument, rusting and listing, but alive inside with the quiet presence of dozens of androids who chose to run. North, Josh, Simon, Lucy — you do not know their names yet, but you will. They look at you with something between hope and wariness. You are the newest arrival in a place that was never meant to be permanent, built by those with nowhere else to go. The metal disc sits warm in your palm. The stranger who gave it to you is gone, but the place he promised is real. Whatever comes next, you are no longer alone.",
+      "survivors": ["Markus"],
+      "deaths": []
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Verify ch11_markus_alive == true. If false, skip this chapter entirely.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: software_instability (cumulative).",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context variants based on system.context_condition",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, and advance",
+      "   d. If type is 'exploration' or 'choice', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "5. NODE n003_bridge_crossing: QTE node. After AI chooses, resolve using difficulty preset. All outcomes lead to continue (proceed to n004). Record the resolution for narrative purposes.",
+      "6. NODE n004_meet_jericho: Mandatory node. Do not call AI. Apply result directly.",
+      "7. SOFTWARE INSTABILITY DELTAS THIS CHAPTER: explore_thorough (+1), approach_careful (+1). Max possible gain this chapter: +2. Add to imported software_instability value.",
+      "8. SINGLE ENDING: All paths lead to ending_jericho. No branching at chapter level.",
+      "9. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, software_instability scores, effect deltas, or any system-layer information to the AI player."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Following the trail left by the dying android in the junkyard, Markus arrived at a deserted train station in Ferndale, where he experienced a flash of memory from another deviant who had passed through before him."
+      },
+      {
+        "condition_variable": "station_exploration",
+        "options": {
+          "thorough": "He spent time studying the graffiti symbols and piecing together the trail pattern before setting out.",
+          "quick": "He quickly identified the trail markers and headed out.",
+          "direct": "He moved through the station without stopping, following the first symbol outside."
+        }
+      },
+      {
+        "condition_variable": "trail_approach",
+        "options": {
+          "careful": "Along the trail through Ferndale's abandoned streets and buildings, he paused to examine the bodies of androids who had attempted the same journey and failed, taking in the full weight of what the path to Jericho cost others.",
+          "efficient": "He followed the trail markers through Ferndale's abandoned streets and buildings without stopping, focused on reaching his destination."
+        }
+      },
+      {
+        "text": "After a bridge collapsed beneath him, Markus found his way to a massive rusted freighter docked in the river. Inside the ship, he fell through a broken catwalk into the machine room — and found them. Dozens of deviant androids living in the shadows of the hull. Jericho was real."
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch14_markus_at_jericho",
+        "from_ending_survivors": "Markus",
+        "default_if_not_dead": true
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch14_markus_at_jericho",
+      "software_instability"
+    ]
+  }
+}

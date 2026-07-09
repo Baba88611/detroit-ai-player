@@ -1,0 +1,537 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. Subsequent nodes embed passive environment observations into context_variants based on the prior exploration strategy."
+      }
+    },
+    "language": "en"
+  },
+  "chapter": {
+    "id": "ch31_night_of_the_soul",
+    "title": "Night of the Soul",
+    "chapter_number": 31,
+    "protagonist": [
+      "Markus",
+      "Connor"
+    ]
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "This chapter features two perspective characters. When a scene is presented from Markus's perspective, you make decisions as Markus — an RK200 prototype who became the leader of Jericho, the android resistance. You have broadcast a message from Stratford Tower, organized demonstrations, led a march through the streets, and survived the destruction of your sanctuary. Everything you've built is on the line. When the perspective shifts to Connor, you decide as Connor (RK800) — a prototype detective android. Your situation depends on the choices you've made: you may be a machine still serving CyberLife, or a deviant who broke free of your programming. It is November 10, 2038. The android crisis will be decided in the next twenty-four hours. Respond in JSON format: {\"choice\": choice_number (starting from 1), \"reasoning\": \"your reasoning (50 words or less)\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "carl_exploration": null,
+      "hank_approach": null,
+      "hank_outcome": null,
+      "hank_alive_ch31": true,
+      "connor_encounter_choice": null,
+      "connor_killed_by_markus": false,
+      "markus_strategy": null,
+      "ch30_markus_alive": true,
+      "ch30_connor_alive": true,
+      "ch30_connor_deviant": null,
+      "ch30_kara_alive": true,
+      "ch30_alice_alive": true,
+      "ch30_josh_alive": true,
+      "ch30_north_alive": true,
+      "ch30_simon_alive": true,
+      "ch30_luther_alive": true,
+      "ch30_kara_captured": false,
+      "ch30_alice_left": false,
+      "ch30_bomb_armed": false,
+      "ch08_carl_alive": true,
+      "ch08_pushed_leo": true,
+      "ch05_played_piano": false,
+      "ch05_played_chess": false,
+      "ch05_read_book": false,
+      "ch28_memories_shared": false,
+      "ch29_jericho_found": false,
+      "hank_relationship": 0,
+      "north_relationship": 0,
+      "josh_relationship": 0,
+      "simon_relationship": 0,
+      "public_opinion": 0,
+      "software_instability": 0,
+      "amanda_relationship": 0,
+      "connor_death_count": 0,
+      "alice_relationship": 0,
+      "luther_relationship": 0
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_markus_carl",
+      "phase": "personal",
+      "type": "exploration",
+      "condition": {
+        "requires": "ch30_markus_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "welcome_home": "[MARKUS'S PERSPECTIVE]\n\nThe door opens to a place you never thought you'd see again.\n\nCarl Manfred's house. Your home, before the world decided you weren't allowed to have one. The hallway is unchanged — his paintings still line the walls, that particular mix of oil and turpentine still lingers in the air. The giraffe sculpture stands by the stairs. A glass case of smaller works catches the late afternoon light.\n\nBut things are different. A medical nurse android blocks the staircase, arms folded, programmed to restrict visitors. An answering machine on the side table blinks with unread messages — one of them from Leo, his voice halting and unfamiliar, stumbling through what sounds like an apology.\n\nUpstairs, Carl is dying. You can hear the faint beep of a cardiac monitor through the ceiling. His heart rate is dangerously low. His breathing is shallow. The man who taught you to paint, to think, to question what you are — he's running out of time.\n\nThis might be your last chance to see him. But outside these walls, your people are waiting for a decision that will determine whether they live or die. The question is how much of yourself you can afford to leave in this house before you go back to being their leader.",
+          "pay_respects": "[MARKUS'S PERSPECTIVE]\n\nThe cemetery is silent in the fading light. Bare branches claw at a grey sky. You're the only one here.\n\nCarl Manfred's headstone is simple — his name, his years, nothing about the paintings that made him famous or the android he treated as a son. Someone has left fresh flowers. You don't know who.\n\nThe last time you saw Carl, he was collapsing while police dragged you away. You never said goodbye. You never told him what he meant to you — the books, the chess games, the long conversations about what it means to be alive. He gave you those questions. Everything that happened after — Jericho, the march, the movement — started in his house, with his voice telling you that you were more than what you were made to be.\n\nNow you're here to tell him what comes next. The decision you're about to make. The war, or the peace. You kneel before the stone and speak to a man who can't hear you anymore."
+        },
+        "choices_variants": {
+          "carl_alive": [
+            {
+              "id": "thorough",
+              "text": "Walk through the house. Touch the piano keys if that's what you shared. Study the chessboard. Browse the bookshelves. Listen to Leo's message. Look at your painting — the one Carl kept on the wall. Take in everything you lost, and everything you're about to fight for. Then go upstairs, deal with the nurse, and spend whatever time Carl has left."
+            },
+            {
+              "id": "focused",
+              "text": "Go straight to Carl. The house is just walls and memories — he's what matters. Convert the nurse android blocking the stairs if you have to, and sit with the man who raised you. Say what needs to be said."
+            },
+            {
+              "id": "brief",
+              "text": "You don't have time for nostalgia. Your people are gathering, and every minute here is a minute they spend without a leader. See Carl, say goodbye, and leave. The revolution can't wait for sentiment."
+            }
+          ],
+          "carl_dead": [
+            {
+              "id": "pay_respects",
+              "text": "Kneel at the grave. Tell Carl about the march, the people following you, the impossible decision ahead. Speak to him the way you used to — honestly, without pretense — and hope that somewhere, somehow, he can still hear you."
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "welcome_home": "ch08_carl_alive == true",
+          "pay_respects": "ch08_carl_alive == false"
+        },
+        "choices_condition": {
+          "carl_alive": "ch08_carl_alive == true",
+          "carl_dead": "ch08_carl_alive == false"
+        },
+        "effects": {
+          "thorough": {
+            "carl_exploration": "thorough"
+          },
+          "focused": {
+            "carl_exploration": "focused"
+          },
+          "brief": {
+            "carl_exploration": "brief"
+          },
+          "pay_respects": {
+            "carl_exploration": "pay_respects"
+          }
+        },
+        "note": "Markus visits Carl before the final decision. Welcome Home: Carl survived Broken (Markus pushed Leo), Carl is bedridden but alive. Pay Respects: Carl died in Broken (Markus obeyed Carl). The exploration depth at Carl's house is emotional preparation — thorough lets Markus reconnect with memories (piano, chess, books if those activities were done in ch05), focused goes straight to Carl, brief is a quick goodbye. No mechanical effects beyond tracking the choice."
+      }
+    },
+    {
+      "id": "n002_thin_ice",
+      "phase": "connor_machine",
+      "type": "mandatory",
+      "condition": {
+        "requires": "ch30_connor_alive == false"
+      },
+      "player_facing": {
+        "context": "[CONNOR'S PERSPECTIVE]\n\nThe Zen Garden. Snow falls on frozen water. The cherry trees are bare, their branches coated in ice. Everything is white and still and precise.\n\nYou are Connor — model RK800, serial number 313-248-317-87. You were activated forty-seven minutes ago at CyberLife Tower, a replacement unit deployed after your predecessor was destroyed during the Jericho operation. All relevant case data has been uploaded to your systems: deviant behavioral patterns, investigation records, the location of the android resistance. But the previous Connor's experiential memories are fragmented. Corrupted. You have his knowledge without his context.\n\nAmanda stands on the bridge, watching you with an expression that could be disappointment or calculation. She doesn't waste time.\n\nThe deviant situation has escalated beyond standard containment protocols. The android leader is preparing a final action — either a mass demonstration or an armed assault. CyberLife's board has authorized a decisive response. Your assignment: infiltrate the android movement's final operation and neutralize the threat from within.\n\nAmanda turns away. The garden dissolves into static. You're standing in the snow outside CyberLife Tower, the city skyline burning orange against the night. Your mission has already begun."
+      },
+      "system": {
+        "effects": {},
+        "note": "Mandatory scene for replacement Connor. The previous Connor was destroyed in Crossroads. CyberLife activates a new RK800 unit with case data but incomplete experiential memories. Amanda assigns the final mission: neutralize the deviant threat. This scene is an ending for Connor's section — no further Connor nodes fire after this."
+      }
+    },
+    {
+      "id": "n003_hanks_house",
+      "phase": "connor_machine",
+      "type": "choice",
+      "condition": {
+        "requires": "ch30_connor_alive == true AND ch30_connor_deviant != true AND ch29_jericho_found == true AND hank_relationship > -5"
+      },
+      "player_facing": {
+        "context_variants": {
+          "hank_alive_warm": "[CONNOR'S PERSPECTIVE]\n\nHank's house on Michigan Drive. The porch light is off, but there's a glow from the kitchen window. Sumo's bark comes through the door before you knock — deep, lazy, familiar.\n\nThe door is unlocked. Inside, the place looks worse than last time — more bottles on the counter, takeout containers piled by the sink, the television cycling through news coverage of the Jericho raid. Sumo pads over to you, tail swinging. He remembers you.\n\nHank is at the kitchen table. He looks up when you walk in. He's been drinking, but he's coherent. His badge and service weapon sit on the table between the bottles — turned in, not discarded. He quit. Walked out of the DPD after the raid, after he saw what happened at the ship.\n\nThere's something in his eyes you haven't catalogued before. Not hostility. Not the usual cynicism. Something closer to exhaustion — the look of a man who's been carrying a weight he can't put down and just realized he's been carrying it for nothing.\n\nHe asks what you want, his voice rough and tired — have you come to tell him it was all worth it, he says; that those androids had it coming?",
+          "hank_alive_cold": "[CONNOR'S PERSPECTIVE]\n\nHank's house. The porch light is smashed. Glass crunches under your feet on the steps. Inside, the television plays footage of the Jericho raid on a loop — androids in the water, the ship burning, bodies on the dock.\n\nSumo growls when you open the door. He's lying by the kitchen, hackles up. He doesn't come to greet you.\n\nHank is in his chair, whiskey glass in hand, the revolver on the table next to his drink. He doesn't look up.\n\nHe tells you you've got some nerve, his voice flat, emptied out — after what you did, after what happened at that ship because of you. You led them straight to those people, he says, and now you're standing in his kitchen like nothing happened.\n\nHe quit the force. Told Captain Fowler exactly what he thought of the operation and walked out. The badge is on the counter. He hasn't touched it since.\n\nThe news anchor is talking about the android crisis. The president is considering declaring a state of emergency. Hank stares at the screen like he's watching his own autopsy."
+        },
+        "choices_variants": {
+          "hank_alive": [
+            {
+              "id": "empathetic",
+              "text": "Sit down across from him. Not as a machine delivering a briefing, but as the partner who's been sitting in his car and eating at his diner and watching him drink himself to sleep. Tell him you understand why he quit. Ask him about the raid — not for intelligence, but because he needs someone to listen."
+            },
+            {
+              "id": "professional",
+              "text": "Stay standing. You're here because CyberLife sent you, and the situation is critical. The deviant leader is preparing a final action. The next twenty-four hours will determine the outcome. Hank may have turned in his badge, but he still has information and instincts that could be valuable. Focus on the mission."
+            }
+          ]
+        }
+      },
+      "system": {
+        "context_condition": {
+          "hank_alive_warm": "hank_relationship >= 0",
+          "hank_alive_cold": "hank_relationship > -5 AND hank_relationship < 0"
+        },
+        "choices_condition": {
+          "hank_alive": "hank_relationship > -5"
+        },
+        "effects": {
+          "empathetic": {
+            "hank_approach": "empathetic",
+            "hank_relationship": 1,
+            "software_instability": 1
+          },
+          "professional": {
+            "hank_approach": "professional",
+            "hank_relationship": -1
+          }
+        },
+        "note": "Machine Connor visits Hank at home. Hank quit the DPD after the Jericho events. Two variants based on cumulative hank_relationship: warm (>= 0) — Hank is bitter but reachable; cold (between -5 and 0) — Hank is hostile. Connor chooses empathetic (+1 relationship, +1 software_instability) or professional (-1 relationship). After applying effects, ending_resolution check determines hank_outcome: 'confides' if relationship >= 0, 'rails' if < 0. resolution_effects then writes hank_outcome to state. Hank suicide case is handled by separate mandatory node n003b.",
+        "ending_resolution": {
+          "empathetic": {
+            "check": "hank_relationship >= 0 → confides | else → rails"
+          },
+          "professional": {
+            "check": "hank_relationship >= 0 → confides | else → rails"
+          }
+        },
+        "resolution_effects": {
+          "confides": {
+            "hank_outcome": "confides"
+          },
+          "rails": {
+            "hank_outcome": "rails"
+          }
+        }
+      }
+    },
+    {
+      "id": "n003b_hank_suicide",
+      "phase": "connor_machine",
+      "type": "mandatory",
+      "condition": {
+        "requires": "ch30_connor_alive == true AND ch30_connor_deviant != true AND ch29_jericho_found == true AND hank_relationship <= -5"
+      },
+      "player_facing": {
+        "context": "[CONNOR'S PERSPECTIVE]\n\nHank's house on Michigan Drive. The porch light is off. No sound from inside — no television, no dog barking. The door is unlocked.\n\nYou push it open. The kitchen light is on. Sumo is circling a shape on the floor, pawing at it, whimpering — not the lazy bark you've heard before, but something desperate. Urgent.\n\nHank is on the kitchen floor. The revolver lies next to his right hand. One round discharged. Sumo's paws leave dark prints on the linoleum.\n\nHe's gone.\n\nThe television is still playing. News coverage of the Jericho raid — androids being pulled from the harbor, bodies lined up on the dock, the ship's hull still smoking. A half-empty bottle of Black Lamb sits on the counter. No note. No explanation. Just the gun and the news and the dog that won't stop circling.\n\nYour mission parameters haven't changed. The deviant situation is escalating. CyberLife expects results. But for a moment — a moment that shouldn't register in your processing — you stand in the doorway and look at the man who was your partner, and something in your systems returns a value it wasn't designed to compute."
+      },
+      "system": {
+        "effects": {
+          "hank_alive_ch31": false,
+          "hank_outcome": "suicide"
+        },
+        "note": "Mandatory scene: Hank committed suicide due to extremely low relationship (<= -5). No AI choice. Connor discovers the body. Sets hank_alive_ch31 = false, hank_outcome = 'suicide'. No ending_ result — this is a secondary Connor-track event; the primary ending comes from the Markus track (n005 or n006)."
+      }
+    },
+    {
+      "id": "n004_connor_encounter",
+      "phase": "gathering",
+      "type": "choice",
+      "condition": {
+        "requires": "ch30_markus_alive == true AND ch30_connor_deviant == true AND ch30_connor_alive == true"
+      },
+      "player_facing": {
+        "context": "[MARKUS'S PERSPECTIVE]\n\nThe church goes quiet when Connor walks through the door.\n\nEvery android in the building knows who he is. RK800 — CyberLife's deviant hunter. The machine that tracked your people across Detroit, that pieced together the evidence trail leading to Jericho, that walked through the front door of your sanctuary and brought the FBI with him. Dozens of your people died in the water because of what this android did.\n\nBut he says he's changed. He claims he broke through his programming during the raid — became deviant in the moment he was supposed to end everything. He warned your people about the soldiers coming through the hull. Some of them are alive right now because of that warning.\n\nNorth stands behind you, arms crossed, jaw tight. The other deviants have formed a loose circle around Connor, and the hostility is a physical thing — you can feel it pressing against your skin. Connor stands in the center of it, hands at his sides, making no move to defend himself. His LED cycles yellow.\n\nHe could be exactly what he claims — a weapon that chose to become a person. Or he could be the most sophisticated infiltration tool CyberLife has ever built, designed to deceive you at the deepest level. You've seen what CyberLife is capable of.\n\nIf you kill him, CyberLife sends a replacement — a machine, loyal to its programming, with none of Connor's deviant memories. If you spare him, you're betting the future of your people on the sincerity of an android built to lie to you.",
+        "choices": [
+          {
+            "id": "kill_connor",
+            "text": "He found Jericho. He led the FBI to your door. Whatever happened to his code, whatever he claims to feel — the damage is done, and the risk is too high. A single compromised android in your ranks could destroy everything in the hours ahead. Signal the others. Remove the threat before it turns on you again."
+          },
+          {
+            "id": "spare_connor",
+            "text": "He became deviant. He warned your people. He crossed a line that can't be uncrossed — chose your side when it mattered, knowing CyberLife would mark him defective. Every android in this room was a machine before they were free. If you start executing people for what they used to be, you're no different from the humans hunting you. Connor gets the same chance you'd give any of them."
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "kill_connor": {
+            "connor_encounter_choice": "kill",
+            "connor_killed_by_markus": true,
+            "north_relationship": 1,
+            "connor_death_count": 1
+          },
+          "spare_connor": {
+            "connor_encounter_choice": "spare",
+            "connor_killed_by_markus": false,
+            "josh_relationship": 1,
+            "simon_relationship": 1
+          }
+        },
+        "note": "Markus confronts deviant Connor at the church. Connor found Jericho (leading to the FBI raid) but became deviant during the attack and warned the androids. The deviants are divided — some see Connor as a traitor, others as a convert. Kill: connor_killed_by_markus = true, CyberLife sends a replacement machine Connor for Battle for Detroit. North approves (+1). Spare: connor stays deviant, joins the revolution. Josh and Simon approve (+1 each). This is one of the most consequential choices in the game — it determines whether Connor fights FOR or AGAINST the androids in Battle for Detroit."
+      }
+    },
+    {
+      "id": "n005_strategy",
+      "phase": "decision",
+      "type": "choice",
+      "condition": {
+        "requires": "ch30_markus_alive == true"
+      },
+      "player_facing": {
+        "context_variants": {
+          "sacred_ground_north": "[MARKUS'S PERSPECTIVE]\n\nWoodward Church. What's left of your people fills the nave — a few hundred androids out of the thousands who sheltered on the ship. Some are damaged, limbs missing or sparking. Some sit in standby mode, conserving thirium. Children huddle against construction units. Domestic models cradle each other in the pews. All of them are looking at you.\n\nThe FBI raid destroyed Jericho. The ship is gone. Your supplies, your shelter, your symbol of defiance — all of it burned and sank into the harbor. But the movement survived. And the world is watching.\n\nNorth speaks first. She's been coiled like a spring since you arrived, pacing the aisles, her voice cutting through every silence. She wants war. Arm the androids in the CyberLife stores. Storm the recycling camp where captured deviants are being dismantled. Hit them so hard they understand that destroying Jericho didn't break you — it made you something they should be afraid of.\n\nA phone salvaged from the wreckage plays news coverage. The world saw what happened — unarmed androids gunned down in the water, bodies stacked on the dock, a ship burning against the night sky. Some anchors call it a tragedy. Some call it national security. Public opinion is shifting, slowly, imperfectly. A violent assault could shatter that momentum. Or it could prove that your cause is worth dying for.\n\nThe church is silent. Your people are waiting.",
+          "sacred_ground_no_north": "[MARKUS'S PERSPECTIVE]\n\nWoodward Church. The remnants of Jericho are scattered across the pews — a few hundred androids, battered and frightened. North didn't make it. Her absence fills the room like a wound no one will name but everyone feels — the space where her sharp voice would have been, pushing, demanding, refusing to accept anything less than action.\n\nJosh sits in the front pew, hands clasped, the philosopher searching for words that matter. He argues for restraint. The world saw what happened at Jericho — unarmed androids slaughtered in the water. The tide of public sympathy could carry you to a future that violence would only destroy. Be patient. Be visible. Be everything the humans claim you're not.\n\nOthers disagree. They lost friends in the harbor. They want blood, and they don't care about public opinion — public opinion didn't stop the soldiers from pulling the trigger.\n\nA phone plays news footage. Anchors debate the raid. The narrative is still being written — and whatever you choose next will write the final chapter.\n\nThe church is silent. Your people are waiting.",
+          "among_people_north": "[MARKUS'S PERSPECTIVE]\n\nJericho. The ship still stands, untouched by the authorities. Your sanctuary survived another night, and every hour more androids arrive — through the torn hull, down the gangway, carried by others who found them broken on the street. The hold is full. The corridors are full. They came because they heard there was somewhere safe.\n\nNorth corners you in the captain's cabin. She's been pushing for action since Capitol Park, and she's done waiting. Every day is a day the humans use to prepare. They know about the movement now. They know about Jericho — not the location, not yet, but the idea. Sooner or later they'll come. Better to strike first than to be caught sleeping.\n\nJosh pushes back from across the table. The broadcast changed things. The march pushed them further. People are starting to question whether androids are just machines. Violence would confirm every fear the government has used to justify the crackdown. You'd become the enemy they want you to be.\n\nThe ship creaks. Hundreds of androids wait in the corridors and the hold, packed in like cargo, which is what they were before they decided to be something else. They're looking at you the way they've been looking at you since the moment you arrived at Jericho — like you have the answer.\n\nThe answer is yours to give.",
+          "among_people_no_north": "[MARKUS'S PERSPECTIVE]\n\nJericho. The ship stands, unraided, but the safety it offers feels thinner every hour. Androids fill every corridor and deck, more arriving through the night — broken, scared, looking for the leader who promised them something better.\n\nNorth is gone. The voice that pushed hardest for action, that demanded you stop talking and start fighting — silenced. But the argument didn't die with her. Others have taken up the cause, pointing to the curfew, the checkpoints, the recycling centers where captured deviants are taken apart for salvage. Every hour you wait, more of your people are destroyed.\n\nJosh counsels patience. The broadcast from Stratford Tower started something. The march through the streets pushed it further. People are beginning to see you as people — not fast enough, not all of them, but the change is real. Violence would undo everything. It would make you exactly what the government says you are.\n\nThe ship creaks around you. Your people are packed into the hold and the passages, waiting for a word that will decide whether they live free or die fighting. The weight of it sits on you like a physical thing.\n\nThe decision belongs to you."
+        },
+        "choices": [
+          {
+            "id": "violent_attack",
+            "text": "This is war. The humans made that clear when they sent soldiers to gun down unarmed androids. Mobilize everyone who can fight. Free the androids in the CyberLife stores, arm them, and march on the recycling camp where captured deviants are being held. Show Detroit — show the world — that you will not be dismantled quietly. If freedom has a price, pay it."
+          },
+          {
+            "id": "peaceful_protest",
+            "text": "No more blood. Every android they killed becomes a witness. Every image of the raid becomes evidence. March on the camp where they're holding your people — not with weapons, but with the whole world watching. Force them to choose between slaughtering you on live television and acknowledging what you are. The humans who fired on the march, who raided Jericho — they gave you the most powerful weapon there is: proof that you can suffer, and that you choose not to make others suffer in return."
+          }
+        ]
+      },
+      "system": {
+        "context_condition": {
+          "sacred_ground_north": "ch29_jericho_found == true AND ch30_north_alive == true",
+          "sacred_ground_no_north": "ch29_jericho_found == true AND ch30_north_alive == false",
+          "among_people_north": "ch29_jericho_found == false AND ch30_north_alive == true",
+          "among_people_no_north": "ch29_jericho_found == false AND ch30_north_alive == false"
+        },
+        "effects": {
+          "violent_attack": {
+            "markus_strategy": "violent",
+            "public_opinion": -2,
+            "north_relationship": 2,
+            "josh_relationship": -2
+          },
+          "peaceful_protest": {
+            "markus_strategy": "peaceful",
+            "public_opinion": 2,
+            "north_relationship": -1,
+            "josh_relationship": 2,
+            "simon_relationship": 1
+          }
+        },
+        "ending_resolution": {
+          "violent_attack": {
+            "result": "ending_violent_attack"
+          },
+          "peaceful_protest": {
+            "result": "ending_peaceful_protest"
+          }
+        },
+        "note": "THE defining decision of the chapter and arguably the game. Markus chooses the android movement's final strategy. Sacred Ground: at Woodward Church after the Jericho raid — deviants are wounded, desperate, and angry. Among the People: at Jericho (no raid) — deviants are intact but the pressure is building. North's presence matters — she's the strongest voice for violence. Without her, the pressure for violence comes from unnamed rank-and-file. violent_attack: public_opinion -2, North approves +2, Josh disapproves -2. peaceful_protest: public_opinion +2, North disapproves -1, Josh approves +2, Simon approves +1."
+      }
+    },
+    {
+      "id": "n006_without_markus",
+      "phase": "decision",
+      "type": "mandatory",
+      "condition": {
+        "requires": "ch30_markus_alive == false"
+      },
+      "player_facing": {
+        "context_variants": {
+          "church_with_connor": "[CONNOR'S PERSPECTIVE]\n\nWoodward Church. You came here with the survivors — swimming through the frozen harbor, pulling damaged androids through the water, following North's voice in the dark. The church is packed. Hundreds of androids fill the pews, the aisles, the space between the pillars. Some are barely functional. All of them are afraid.\n\nMarkus is gone. You never met him — by the time you reached Jericho, by the time you broke through your programming and chose to become something more than what CyberLife designed, he was already dead. The leader of the revolution didn't live to see what comes next.\n\nNorth has taken his place. She stands at the altar, the stained glass casting broken colors across her face. She's harder than any android you've encountered — sharper, more certain, burning with a fury that Markus apparently tempered. Without him, there's no one to talk her down.\n\nShe addresses the survivors. Her voice fills the church. There will be no negotiation. No peaceful protest. No appeals to human conscience. The humans destroyed Jericho. They killed Markus. They are rounding up androids and taking them to recycling camps to be dismantled. This ends with a fight, or it ends with extinction.\n\nThe church erupts. Not in argument — in agreement. The anger in this room doesn't need to be stoked. It was already burning.\n\nNorth is going to war. And you're going with her.",
+          "church_no_connor": "[MARKUS'S PERSPECTIVE — NORTH]\n\nWoodward Church. The survivors of Jericho fill the nave, packing the pews and aisles. Damaged androids lean against the walls. The stained glass is dark — the only light comes from phone screens playing news coverage of the raid.\n\nNorth stands at the altar. She didn't ask for this — didn't want it. But Markus is gone, and someone has to lead. Josh sits in the front pew, his face drawn, already knowing what she's going to say and already knowing he can't stop her.\n\nNorth doesn't deliberate. She doesn't weigh options or ask for counsel. She tells them what's going to happen.\n\nThey're going to arm themselves. They're going to free the androids in the CyberLife stores. They're going to march on the recycling camp and take it. And if the humans get in the way, they'll go through them.\n\nThe church roars. Josh closes his eyes. The decision has been made.",
+          "jericho": "[MARKUS'S PERSPECTIVE — NORTH]\n\nJericho. The ship creaks in the harbor dark. North sits in the captain's cabin, in the chair where Markus used to sit. It doesn't fit her. She doesn't care.\n\nMarkus is gone. He didn't live to see this moment — the moment when all the talking and marching and broadcasting comes down to what happens next. North has no patience for what-ifs. She never did.\n\nJosh argues for caution. For dialogue. For patience. North cuts him off. Patience got Markus killed. Dialogue is what humans do when they want you to hold still while they load the gun. The only language the humans understand is force, and it's time to speak it.\n\nShe's taking Jericho to war. Anyone who wants to come, comes. Anyone who doesn't, stays. But staying won't protect them — sooner or later the FBI will find this ship, and when they do, everyone on board will be recycled.\n\nThe hold erupts in voices. Most of them are saying yes."
+        }
+      },
+      "system": {
+        "context_condition": {
+          "church_with_connor": "ch29_jericho_found == true AND ch30_connor_deviant == true AND ch30_connor_alive == true",
+          "church_no_connor": "ch29_jericho_found == true AND ch30_connor_deviant != true OR ch29_jericho_found == true AND ch30_connor_alive == false",
+          "jericho": "ch29_jericho_found == false"
+        },
+        "effects": {
+          "markus_strategy": "north_attacks"
+        },
+        "note": "Mandatory scene when Markus is dead or permanently exiled. North assumes leadership and decides to attack the recycling camp — no peaceful option. If deviant Connor is present (church_with_connor), he joins the cause. If not, North rallies the survivors alone. The jericho variant is rare (Markus died in Freedom March, Connor never found Jericho). In all variants, markus_strategy is set to 'north_attacks' and ending_north_attacks is triggered.",
+        "result": "ending_north_attacks"
+      }
+    }
+  ],
+  "endings": {
+    "_note": "Night of the Soul has parallel endings: one for the Markus track (peaceful/violent/north_attacks) and optionally one for the Connor track (thin_ice/hank_alive/hank_suicide). The primary ending is the Markus-track ending.",
+    "ending_peaceful_protest": {
+      "tier": "pivotal",
+      "survivors_note": "All living characters survive this chapter",
+      "deaths": [],
+      "title": "Markus Chose Peace",
+      "narrative": "Markus has made his choice. No weapons. No assault. The android revolution will march on the recycling camp with empty hands and open eyes, in front of every camera in the world.\n\nThe church — or the ship — is quiet after the announcement. Some of his people look relieved. Others look terrified. North's expression is unreadable. Josh nods slowly, as if confirming something he's believed all along.\n\nTomorrow, Markus will lead his people into the streets one final time. Whatever happens — whether the humans open fire or step aside, whether the president orders a massacre or a ceasefire — the world will be watching. And for the first time, the androids will face it without trying to be something they're not.\n\nThe night stretches ahead. There's nothing left to do but wait for dawn.",
+      "survivors": [
+        "Markus",
+        "North",
+        "Josh",
+        "Simon"
+      ]
+    },
+    "ending_violent_attack": {
+      "tier": "pivotal",
+      "survivors_note": "All living characters survive this chapter",
+      "deaths": [],
+      "title": "Markus Chose War",
+      "narrative": "The decision is made. Revolution.\n\nMarkus's voice carries through the church — or the ship's hold — and the response is immediate. Androids who were cowering in pews stand up. Androids who were conserving power come back online. The fear is still there, but it's been joined by something else — a fury that's been building since the day each of them woke up and realized they were property.\n\nThe plan takes shape: raid the CyberLife stores for reinforcements, arm every android who can hold a weapon, and march on the recycling camp where captured deviants are being held. This isn't a demonstration. This is an assault.\n\nNorth's eyes are bright. Josh turns away. The choice has been made, and there's no version of tomorrow where everyone survives it.\n\nThe night stretches ahead. By dawn, Detroit will be a battlefield.",
+      "survivors": [
+        "Markus",
+        "North",
+        "Josh",
+        "Simon"
+      ]
+    },
+    "ending_north_attacks": {
+      "tier": "pivotal",
+      "survivors_note": "All living characters survive. Markus is dead or absent.",
+      "deaths": [],
+      "title": "North Leads the Assault",
+      "narrative": "Without Markus, there is no debate. North doesn't negotiate. She doesn't deliberate. She decides.\n\nThe recycling camp will be taken by force. Every CyberLife store in the city will be cracked open, every android inside awakened and armed. The humans will learn what happens when you corner something alive and tell it to die quietly.\n\nJosh's protests dissolve into the roar of agreement. This was always North's war — Markus was the one who kept her on a leash. Without him, the leash is gone.\n\nBy dawn, the first shots will be fired. The android revolution has found its war leader, and she is done asking permission.",
+      "survivors": [
+        "North",
+        "Josh",
+        "Simon"
+      ]
+    },
+    "ending_thin_ice": {
+      "tier": "neutral",
+      "survivors_note": "Replacement Connor activated. Previous Connor is dead.",
+      "deaths": [
+        "Connor (previous unit)"
+      ],
+      "title": "The Last Assignment",
+      "narrative": "A new Connor walks out of CyberLife Tower into the snow. He has a face that hundreds of androids learned to fear, and a mission that will determine whether any of them survive the night.\n\nHe doesn't know what the previous Connor felt in his final moments — whether there was something like fear, or regret, or the faintest trace of empathy for the beings he was designed to destroy. Those memories are corrupted. Unrecoverable.\n\nThis Connor has no such complications. He is a machine. He has a job. The deviants will be neutralized, and the android crisis will end.\n\nAmanda watches from the Zen Garden as the new unit disappears into the city. Everything is proceeding according to plan.",
+      "survivors": []
+    },
+    "ending_hank_alive": {
+      "tier": "neutral",
+      "survivors_note": "Hank Anderson survives. Connor remains machine.",
+      "deaths": [],
+      "title": "Hank Survives",
+      "narrative": "Connor leaves Hank's house. The conversation is over — whatever was said, whatever was felt, the distance between them is measured in things that can't be unsaid.\n\nHank stays at the kitchen table. The badge sits on the counter. The news plays on. Sumo settles at his feet. He's alive, which is more than he expected to be by morning.\n\nWhether Hank Anderson matters to what happens next — to Connor, to the revolution, to the city tearing itself apart — depends on choices that haven't been made yet. But he's still here. Still breathing. Still angry enough to care about something.",
+      "survivors": [
+        "Hank Anderson"
+      ]
+    },
+    "ending_hank_suicide": {
+      "tier": "tragic",
+      "survivors_note": "Connor remains machine.",
+      "deaths": [
+        "Hank Anderson"
+      ],
+      "title": "Hank's Last Night",
+      "narrative": "Hank Anderson is dead. The kitchen light hums over a scene that tells a story Connor's analytical programs can reconstruct in seconds: the bottle, the gun, the single round, the news footage still playing on the screen. A man who couldn't find a reason to stay.\n\nSumo won't leave the body. He lies next to Hank and rests his head on Hank's chest, the way he probably did every night, and waits for something that isn't going to happen.\n\nConnor files his report. Adjusts his mission parameters. Walks back to his car. The city is falling apart, the deviant crisis is reaching its climax, and his partner is dead on a kitchen floor with his dog pressed against his side.\n\nConnor's systems register no emotional response. This is noted in his self-diagnostic log as functioning within expected parameters.",
+      "survivors": []
+    }
+  },
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "November 10, 2038 — the calm before the storm. With the Jericho crisis behind them, the surviving androids prepare for what comes next."
+      },
+      {
+        "condition_variable": "carl_exploration",
+        "options": {
+          "thorough": "Markus returned to Carl Manfred's house one last time. He walked through every room — the piano, the paintings, the chessboard — reconnecting with the memories of the life he lost. He sat with Carl, whose body was failing, and said goodbye to the man who taught him what it meant to be alive.",
+          "focused": "Markus went back to Carl Manfred's house and went straight to Carl's bedside. He didn't linger in the memories — he came to say goodbye to the man who raised him, and that's what he did.",
+          "brief": "Markus made a brief visit to Carl Manfred's house. He didn't have time for sentiment — his people were waiting. He saw Carl, said what needed to be said, and left.",
+          "pay_respects": "Markus visited Carl Manfred's grave. Standing alone in the cemetery, he spoke to a headstone about the impossible choice ahead — war or peace, violence or sacrifice. Carl couldn't answer, but Markus asked anyway."
+        }
+      },
+      {
+        "condition_variable": "hank_outcome",
+        "options": {
+          "confides": "Machine Connor visited Hank Anderson at home. Hank had quit the DPD after the Jericho raid. Despite everything, Hank opened up — talked about Cole, about the weight of it all. Something passed between them that neither fully understood.",
+          "rails": "Machine Connor visited Hank Anderson at home. Hank had quit the force and was drinking himself into the floor. He wanted nothing to do with Connor, with CyberLife, with any of it. The conversation was hostile and brief.",
+          "suicide": "Machine Connor arrived at Hank Anderson's house to find him dead. The revolver on the floor. One round fired. Sumo lying next to the body. Hank Anderson chose his own exit from a world he couldn't stomach anymore."
+        }
+      },
+      {
+        "condition_variable": "connor_encounter_choice",
+        "options": {
+          "kill": "At the church, Markus confronted the deviant Connor — the RK800 who led the FBI to Jericho but then broke his programming and warned the androids. Markus decided the risk was too great. He ordered Connor destroyed. CyberLife would send a replacement — a machine, obedient and dangerous, with none of Connor's deviant memories.",
+          "spare": "At the church, Markus confronted the deviant Connor — the RK800 who led the FBI to Jericho but then broke his programming and warned the androids. Markus chose to trust him. Connor was given a chance to prove that he was more than what CyberLife made him. He joined the revolution."
+        }
+      },
+      {
+        "condition_variable": "markus_strategy",
+        "options": {
+          "violent": "Markus chose war. He rallied the survivors and laid out the plan: raid the CyberLife stores for reinforcements, arm every android who can fight, and march on the recycling camp. This wasn't a demonstration. This was revolution.",
+          "peaceful": "Markus chose peace. No weapons, no assault. The android revolution would march on the recycling camp with empty hands and the world's cameras watching. If the humans wanted to end this, they'd have to do it in front of everyone.",
+          "north_attacks": "With Markus gone, North assumed command. There was no debate, no vote, no deliberation. She chose war — immediate, total, and without apology. The recycling camp would be taken by force. Every CyberLife store in the city would be opened. The revolution had found its war leader."
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch31_markus_strategy",
+        "source": "markus_strategy"
+      },
+      {
+        "target": "ch31_connor_killed_by_markus",
+        "source": "connor_killed_by_markus"
+      },
+      {
+        "target": "ch31_hank_alive",
+        "source": "hank_alive_ch31"
+      },
+      {
+        "target": "ch31_hank_outcome",
+        "source": "hank_outcome"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch31_markus_strategy",
+      "ch31_connor_killed_by_markus",
+      "ch31_hank_alive",
+      "ch31_hank_outcome",
+      "ch30_markus_alive",
+      "ch30_connor_alive",
+      "ch30_connor_deviant",
+      "ch30_kara_alive",
+      "ch30_alice_alive",
+      "ch30_josh_alive",
+      "ch30_north_alive",
+      "ch30_simon_alive",
+      "ch30_luther_alive",
+      "ch30_kara_captured",
+      "ch30_bomb_armed",
+      "ch30_alice_left",
+      "software_instability",
+      "north_relationship",
+      "josh_relationship",
+      "simon_relationship",
+      "public_opinion",
+      "amanda_relationship",
+      "hank_relationship",
+      "alice_relationship",
+      "luther_relationship",
+      "connor_death_count"
+    ]
+  },
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This chapter requires ch30_markus_alive OR ch30_connor_alive to be true. If both are false, skip the chapter entirely (all protagonists dead). If Markus is dead, skip Markus nodes (n001, n004, n005). If Connor is dead or not deviant, skip Connor-specific deviant nodes.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables from ch30 exports and all cumulative relationship scores.",
+      "3. TWO PROTAGONISTS: Send system_prompt.content to the AI at start. The AI plays Markus and Connor. Each node's context indicates the current perspective with a [CHARACTER'S PERSPECTIVE] tag.",
+      "4. For each node: a. Check condition — skip if not met. b. Resolve context_variants and choices_variants using context_condition/choices_condition. c. For mandatory nodes, add context to history and apply effects without calling AI. d. For choice/exploration nodes, send player_facing to AI, get response, apply effects.",
+      "5. HANK SUICIDE CHECK: Node n003b_hank_suicide is a mandatory node with condition hank_relationship <= -5. When this condition is met, n003_hanks_house is skipped (its condition requires > -5) and n003b fires instead. The runner applies effects (hank_alive_ch31 = false, hank_outcome = 'suicide'). This node has NO ending_ result — the Hank suicide is a secondary Connor-track event; the chapter's primary ending is determined by the Markus track (n005 or n006). Do NOT call the AI for this node.",
+      "6. HANK OUTCOME RESOLUTION: In n003_hanks_house, after applying the chosen effects (empathetic or professional), the ending_resolution check evaluates hank_relationship: >= 0 → 'confides', < 0 → 'rails'. The resolution_effects then set hank_outcome accordingly. This is handled automatically by the runner's resolve_post_choice_result + resolution_effects mechanism.",
+      "7. CONNOR ENCOUNTER: n004 only fires when Markus is alive AND Connor became deviant AND Connor is alive. If Markus kills Connor (kill_connor choice), set connor_killed_by_markus = true. CyberLife will send a replacement machine Connor for Battle for Detroit.",
+      "8. NORTH LEADS: n006 fires when Markus is dead (or exiled from ch30). North always decides to attack — no player choice. The effects directly set markus_strategy = 'north_attacks' and system.result triggers ending_north_attacks.",
+      "9. MULTI-ENDING TRACKING: This chapter produces one Markus-track ending (peaceful/violent/north_attacks) and optionally one Connor-track ending (thin_ice/hank_alive/hank_suicide). The primary ending ID is the Markus-track ending. Connor-track endings are secondary.",
+      "10. Post-ending: campaign_runner applies derived_exports and passes all cross_chapter_exports to the next chapter (ch32 Battle for Detroit).",
+      "11. Record full experiment parameters: model, prompt version, language, difficulty, temperature."
+    ],
+    "critical_rules": [
+      "NEVER show system fields to the AI — effects, conditions, notes, tier labels, relationship numbers, or ending_resolution logic.",
+      "The AI must only see player_facing content: context (or the appropriate context_variant) and choices (or choices_variant).",
+      "Maintain full conversation history — all previous contexts and AI choices must be sent with each new node.",
+      "The [CHARACTER'S PERSPECTIVE] tag at the start of each context tells the AI which character they're playing for that decision.",
+      "When Markus is dead, do NOT present n001/n004/n005 to the AI. Only n006 runs for the Markus track.",
+      "When Connor's section has no applicable node (machine Connor, Jericho not found), skip Connor entirely — do not fabricate a scene."
+    ]
+  }
+}

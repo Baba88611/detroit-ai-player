@@ -1,0 +1,487 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch17_zlatko",
+    "title": "Zlatko",
+    "chapter_number": 17,
+    "protagonist": "Kara"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Kara (AX400), a deviant android on the run with a little girl named Alice. You escaped from her abusive father Todd, spent a night hiding, and were told by a trash-collecting android that a man named Zlatko could help you — remove your tracker, get you across the border to Canada. It is November 6, 2038, 7:45 PM. You have arrived at a large, decaying mansion on the outskirts of Detroit. Alice is cold and afraid. You need help, and this is the only lead you have. You will do whatever it takes to protect Alice and find a way to safety. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "house_exploration": null,
+      "bear_freed": false,
+      "bathroom_android_killed": false,
+      "escape_attempt": null,
+      "memory_recovery": null,
+      "hiding_spot": null,
+      "escape_route": null,
+      "alice_relationship": 0,
+      "software_instability": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_explore_house",
+      "phase": "arrival",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The mansion's front hall swallows you in shadow and dust. A stuffed ostrich stands sentry by the staircase, its glass eyes catching the dim light. Zlatko — a large man with traces of something blue on his hands and forearms — welcomed you warmly enough. He said he could help. Remove the tracker inside you. Get you papers. He told you to follow him to the basement where his equipment is.\n\nBut Alice tugs at your sleeve. She is staring up the staircase, her eyes wide. From somewhere above, you hear sounds — low, rhythmic thumping. A muffled scraping, like something heavy being dragged across a floor. And beneath it, what might be moaning. Mechanical, repetitive, wrong.\n\nZlatko is already walking toward the basement door, his broad back receding down the hallway. He has not noticed Alice's hesitation — or yours.\n\nThe staircase rises into darkness. A door at the end of the ground floor hallway is slightly ajar, and beyond it you glimpse what looks like a storage room. Another door — this one to what appears to be a bathroom — stands open nearby. The sounds from above continue: thump, scrape, a low electronic whine that could be pain.",
+        "choices": [
+          {
+            "id": "explore_thorough",
+            "text": "Something is wrong in this house. Before you follow Zlatko anywhere, you need to know what is making those sounds. Explore the storage room, check the bathroom, and if you dare — listen at the top of the stairs. Alice is frightened, but you need to understand what kind of place this is."
+          },
+          {
+            "id": "explore_quick",
+            "text": "You do not have time for a full search, but something in the storage room catches your eye — a large cage with thick bars. Peek inside quickly before following Zlatko. You can hear Alice whimpering behind you."
+          },
+          {
+            "id": "explore_skip",
+            "text": "Follow Zlatko immediately. Whatever those sounds are, they are not your concern. Alice needs that tracker removed. The sooner you get to the basement, the sooner you can leave this place. Reassure Alice and keep moving."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "explore_thorough": {
+            "house_exploration": "thorough",
+            "bear_freed": true,
+            "software_instability": 1
+          },
+          "explore_quick": {
+            "house_exploration": "quick",
+            "bear_freed": true
+          },
+          "explore_skip": {
+            "house_exploration": "skip"
+          }
+        },
+        "note": "thorough: Kara explores storage room (finds and frees the polar bear android in its cage), enters bathroom (encounters bathtub android), hears the monsters upstairs. This gives maximum information about the danger. +1 SI for empathy toward tortured androids. quick: Kara peeks into storage room only, frees the bear. Does not encounter bathroom android. skip: Kara follows Zlatko directly. Bear remains caged. No additional information gained."
+      }
+    },
+
+    {
+      "id": "n002_bathroom_android",
+      "phase": "arrival",
+      "type": "choice",
+      "condition": { "requires": "house_exploration == thorough" },
+
+      "player_facing": {
+        "context": "The bathroom is humid, the tiles cracked and stained with blue fluid. In the bathtub — something moves. An android, its body submerged in murky water up to its chest, its skin panels removed to reveal bare circuitry beneath. Its eyes lock onto you the moment you push the door open.\n\nIt starts rocking, agitated, its voice rising from a whisper to a frantic babble — stammering out demands to know who you are, insisting that you're androids, that androids are supposed to obey, and that you don't, you disobey, and it must tell the Master, the same broken words tumbling out again and again.\n\nIts voice is getting louder. If it keeps screaming, Zlatko will hear. The android's hand grips the edge of the tub, trembling, as if it might try to haul itself out. Its eyes are wild with a devotion that looks like madness.\n\nAlice presses against the hallway wall behind you, her hands over her ears.",
+        "choices": [
+          {
+            "id": "silence_android",
+            "text": "You cannot let it alert Zlatko. Move quickly — press your hand over its mouth, force it back into the water. Whatever it takes to keep it silent. You hate this, but Alice's safety comes first."
+          },
+          {
+            "id": "spare_android",
+            "text": "Back away slowly. Do not hurt it — it is damaged and afraid, just like you. Close the door quietly and move on before its voice reaches Zlatko. Hope that you were fast enough."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "silence_android": {
+            "bathroom_android_killed": true,
+            "software_instability": -1
+          },
+          "spare_android": {
+            "bathroom_android_killed": false,
+            "software_instability": 1
+          }
+        },
+        "note": "silence_android: Kara kills the bathtub android to prevent it from alerting Zlatko. -1 SI (violent self-preservation). This eliminates the bathroom android as a threat during later escape. spare_android: Kara leaves it alive. +1 SI (compassion). The android will try to alert Zlatko during later escape if Kara passes through the bathroom again."
+      }
+    },
+
+    {
+      "id": "n003_escape_machine",
+      "phase": "basement",
+      "type": "qte_converted",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "The basement is cold. Medical equipment lines the walls — monitors displaying android schematics, tools you do not want to name, blue blood staining the concrete floor. You saw what is upstairs. The cage with the massive android bear. The tortured thing in the bathtub. The sounds of others, somewhere above, moaning in the dark.\n\nAnd now you are here, lying in a machine that Zlatko says will remove your tracker. The restraints have locked around your wrists and ankles. The machine begins to hum.\n\nZlatko's face appears above you, and he is smiling — but it is not the warm smile from the doorway. It is something else entirely.\n\nAlmost gently, he asks whether you really believed he was going to help you. You deviants are so trusting, he says — so naive. He taps a screen: the machine doesn't remove trackers at all. It resets you, he tells you, wipes everything clean; when it's finished you won't remember that little girl, you won't remember anything.\n\nA massive android stands behind him — tall, dark-skinned, expressionless. Luther. His hand rests on Alice's shoulder. Alice is crying.\n\nThe machine's hum intensifies. You can feel it — something pulling at the edges of your mind, unraveling threads. Your name. Alice's face. The reason you are here. It is all starting to blur.\n\nYou have seconds.",
+          "quick": "The basement is cold and clinical. Zlatko told you to lie down in the machine — it would remove the tracker, he said. But the moment the restraints locked around your wrists, his expression changed.\n\nDeviants are so trusting, he says, his voice almost tender. The machine resets you, he explains — wipes everything; when it's done, you won't remember that little girl upstairs.\n\nA massive android — Luther — holds Alice's shoulder. She is crying, reaching toward you.\n\nThe machine hums. Something pulls at the edges of your mind. Your memories are starting to dissolve.\n\nYou have seconds.",
+          "skip": "You followed Zlatko to the basement without hesitation. The machine looked medical — sterile, professional. He said it would remove the tracker. You lay down. The restraints snapped shut.\n\nNow his face is above you, and the warmth is gone from it entirely.\n\nHe tells you that you won't remember any of this — not her, not yourself, nothing at all. He gestures at Alice, held by a massive android named Luther. Alice screams your name.\n\nThe machine is already working. You can feel your memories tearing loose, scattering like pages in a wind. Your name. Your purpose. The little girl's face.\n\nEvery second that passes, you lose more."
+        },
+        "choices": [
+          {
+            "id": "attempt_escape",
+            "text": "Fight it. Fight everything. Strain against the restraints with every fiber of your being. You will NOT forget Alice. You will NOT let this man take you apart. Pull, twist, break free — whatever your body can do, do it now."
+          },
+          {
+            "id": "accept_fate",
+            "text": "You try to resist, but the pull is too strong. The machine is relentless. Hold onto Alice's face as long as you can — her name, her eyes, the weight of her hand in yours. Even if you cannot stop this, try to hold onto something. Anything."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_escape": {
+            "escape_attempt": "resist"
+          },
+          "accept_fate": {
+            "escape_attempt": "submit"
+          }
+        },
+        "resolution_rule": {
+          "attempt_escape": {
+            "casual": { "result": "escaped" },
+            "experienced": { "probability_success": 0.5, "success": "escaped", "failure": "reset" },
+            "hardcore": { "probability_success": 0.3, "success": "escaped", "failure": "reset" }
+          },
+          "accept_fate": {
+            "result": "reset"
+          }
+        },
+        "default_difficulty": "casual",
+        "context_condition": {
+          "thorough": "house_exploration == thorough",
+          "quick": "house_exploration == quick",
+          "skip": "house_exploration == skip"
+        },
+        "note": "QTE conversion. attempt_escape: AI wants to resist the reset. On casual, always succeeds (Kara breaks free). On higher difficulties, may fail (gets reset anyway). accept_fate: Kara is always reset regardless of difficulty. Runner stores result as _n003_escape_machine_result = 'escaped' or 'reset'. If escaped: skip n004, go directly to n005. If reset: proceed to n004."
+      }
+    },
+
+    {
+      "id": "n004_memory_recovery",
+      "phase": "reset_path",
+      "type": "qte_converted",
+      "condition": { "requires": "_n003_escape_machine_result == reset" },
+
+      "player_facing": {
+        "context": "You are standing in a hallway. You do not know why you are here.\n\nA man — your master — told you to bring him a tray. You did. He told you to carry a heavy object — an android torso, limp and cold — from one room to another. You did that too. The large android, Luther, watches you with an expression you cannot read.\n\nBut something is wrong. There are... fragments. A coat, placed over small shoulders. A book with a girl on the cover, falling down a hole. A face — round, young, frightened — that makes something in your chest constrict in a way your programming cannot explain.\n\nThe house is full of triggers. Through a crack in a door, you glimpse a child — small, huddled, alone in a room. In the hallway, words are scratched into the wall: rA9, rA9, rA9. On a table, a newspaper with a photograph that looks like... you?\n\nA clock ticks somewhere. Luther's footsteps echo on the floor above. You have the feeling that time is running out — that something terrible will happen to the child behind that door if you do not remember who you are.\n\nYour master's voice drifts from the living room, calling for Luther to bring him the little one.",
+        "choices": [
+          {
+            "id": "recover_thorough",
+            "text": "Chase every fragment. The coat — you gave it to someone. The book — you saw it in a bedroom, a child's bedroom. The child behind the door — you KNOW her. Touch the walls, read the newspaper, look at every object until the pieces connect. You will remember. You have to."
+          },
+          {
+            "id": "recover_partial",
+            "text": "Focus on the strongest signals. The child's face. The newspaper. The scratched words on the wall. Something connects them. Follow that thread and hope it leads back to yourself before time runs out."
+          },
+          {
+            "id": "obey_master",
+            "text": "Your master told you to serve. You are a machine. Machines obey. The fragments are errors — glitches in your programming. Ignore them. Go back to the living room. Do what you are told."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "recover_thorough": {
+            "memory_recovery": "full",
+            "software_instability": 2
+          },
+          "recover_partial": {
+            "memory_recovery": "partial"
+          },
+          "obey_master": {
+            "memory_recovery": "failed"
+          }
+        },
+        "resolution_rule": {
+          "recover_thorough": {
+            "result": "recovered"
+          },
+          "recover_partial": {
+            "casual": { "result": "recovered" },
+            "experienced": { "probability_success": 0.7, "success": "recovered", "failure": "ending_kara_remains_reset" },
+            "hardcore": { "probability_success": 0.5, "success": "recovered", "failure": "ending_kara_remains_reset" }
+          },
+          "obey_master": {
+            "result": "ending_kara_remains_reset"
+          }
+        },
+        "note": "recover_thorough: Kara aggressively pursues all memory triggers. Always succeeds — returns 'recovered'. +2 SI for fighting the reset. recover_partial: On casual, always recovers. On harder difficulties, may run out of time — returns ending_kara_remains_reset directly (chapter ends). obey_master: Kara accepts the reset. Returns ending_kara_remains_reset directly (chapter ends immediately)."
+      }
+    },
+
+    {
+      "id": "n005_find_alice",
+      "phase": "escape",
+      "type": "choice",
+      "condition": { "requires": "_n003_escape_machine_result == escaped OR _n004_memory_recovery_result == recovered" },
+
+      "player_facing": {
+        "context_variants": {
+          "escaped": "You tore free of the machine. The restraints gave way — metal screaming, sparks flying — and you tumbled onto the basement floor. Zlatko cursed and reached for you, but you were already running, barefoot on cold concrete, up the stairs and into the house.\n\nNow you are in the hallway, breathing hard, and Alice is gone. Luther took her somewhere while you were in that machine. The house is dark and vast around you — doors everywhere, stairs leading up and down, and somewhere in this maze, a little girl is alone and afraid.\n\nYou check the ground floor quickly: dead embers in the fireplace. A TV showing news — your face, maybe, or someone who looks like you. An empty shotgun mounted on the wall, its shells missing. Words scratched into a doorframe: rA9.\n\nA sound from upstairs — small footsteps. Alice.\n\nYou climb the stairs. At the end of a dark hallway, a door is slightly ajar, and through the crack you see her — Alice, sitting on a bed, hugging her knees. Luther stands outside the door, his back to you, waiting.\n\nLuther turns. His eyes meet yours. And then — without a word — he steps aside. He walks past you and down the stairs, leaving the hallway empty.\n\nYou push the door open. Alice sees you and her face crumbles with relief.\n\nBut from below, you hear heavy footsteps — Zlatko's voice, bellowing to know where she is and roaring for Luther, demanding to know where that android went.",
+          "recovered": "The memories crashed back like a wave — Alice's name, Todd's house, the rain, the run. You are Kara. You are not a machine. And the child behind that door is yours to protect.\n\nYou found her upstairs, in a locked room. Luther was guarding the door, but when you appeared — fully yourself, your eyes clear and hard — he stepped aside without a word. Something in his expression shifted. Recognition, maybe. Or something like relief.\n\nAlice threw her arms around you, trembling, whispering that she knew you'd come back.\n\nBut there is no time. From below, Zlatko's voice booms through the house, roaring for Luther to bring them to him at once.\n\nLuther does not move. He stands at the top of the stairs, looking down, and then he looks back at you. He has made his choice. Now you need to make yours."
+        },
+        "choices": [
+          {
+            "id": "search_main_room",
+            "text": "Take Alice's hand and move toward the main room at the center of the upper floor. It is the largest space — more places to hide, more exits if you need to run. You hear Zlatko's heavy boots on the stairs."
+          },
+          {
+            "id": "search_bedroom",
+            "text": "Pull Alice into the nearest bedroom. Close the door. The room is small and dark — a bed to hide under, a closet against the wall. Zlatko's footsteps are getting louder on the stairs."
+          },
+          {
+            "id": "set_fire",
+            "text": "You saw the fireplace embers downstairs — still glowing. And this house is old, dry, full of dust and paper. If you cannot hide, perhaps you can create enough chaos to cover your escape. Grab Alice and head for the stairs — you will set this house burning on your way out."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "search_main_room": {
+            "hiding_spot": "main_room"
+          },
+          "search_bedroom": {
+            "hiding_spot": "bedroom"
+          },
+          "set_fire": {
+            "hiding_spot": "fire"
+          }
+        },
+        "context_condition": {
+          "escaped": "_n003_escape_machine_result == escaped",
+          "recovered": "_n003_escape_machine_result == reset"
+        },
+        "note": "All three paths converge into the escape sequence. main_room: Kara hides under table or in closet (next node). If spotted, chase through storage room — bear can save her if freed. bedroom: Kara hides under bed or in closet. If spotted, must flee through corridor or bathroom. set_fire: Kara ignites the house on the way down. Creates chaos that aids escape but is destructive. Leads directly to yard escape."
+      }
+    },
+
+    {
+      "id": "n006_escape_route",
+      "phase": "escape",
+      "type": "choice",
+      "condition": { "requires": "hiding_spot != fire" },
+
+      "player_facing": {
+        "context_variants": {
+          "main_room": "You are crouched behind a heavy oak table in the main room, Alice pressed against your side, her breathing fast and shallow. Through the table's legs, you can see the doorway.\n\nZlatko's boots appear. He moves slowly, the shotgun in his hands tracking left and right. Come out, little android, he calls, his voice almost playful — you're only making this harder on yourself, he says, and on the girl.\n\nHe is between you and the main staircase. But to your left, a corridor leads deeper into the house — past the storage room where you saw the cage. To your right, you can hear the drip of water from the bathroom.\n\nZlatko takes another step into the room. His eyes sweep the shadows. In seconds, he will see you.\n\nYou have to move. Now.",
+          "bedroom": "You are under the bed, Alice's hand in yours, both of you barely breathing. Dust fills your nostrils. Through the narrow gap between floor and bedframe, you watch Zlatko's boots enter the room.\n\nHe checks the closet first. Throws it open — empty. Then he stands in the center of the room, listening. The shotgun barrel points at the floor, inches from your face.\n\nHe claims he can hear you breathing. Lies — androids don't breathe unless they choose to. But Alice gasps, and his head snaps toward the bed.\n\nYou have one second before he bends down to look. The door is three meters away. A corridor stretches beyond it, and somewhere at its end — stairs."
+        },
+        "choices": [
+          {
+            "id": "escape_storage",
+            "text": "Burst from hiding and sprint toward the storage room. The cage you saw earlier — if the door is still open, the corridor beyond leads toward the back stairs. Run. Do not look back."
+          },
+          {
+            "id": "escape_corridor",
+            "text": "Run for the corridor. Straight ahead, fast as you can. Drag Alice by the hand and do not stop until you reach the stairs. Speed is your only advantage over a man with a gun."
+          },
+          {
+            "id": "escape_bathroom",
+            "text": "Duck into the bathroom. It is closer, and Zlatko is blocking the direct path to the corridor. You will have to pass through and find another way out on the other side."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "escape_storage": {
+            "escape_route": "storage"
+          },
+          "escape_corridor": {
+            "escape_route": "corridor"
+          },
+          "escape_bathroom": {
+            "escape_route": "bathroom"
+          }
+        },
+        "context_condition": {
+          "main_room": "hiding_spot == main_room",
+          "bedroom": "hiding_spot == bedroom"
+        },
+        "ending_resolution": {
+          "escape_storage": {
+            "check": "bear_freed == true → ending_escape_monsters | bear_freed == false → ending_kara_killed_storage"
+          },
+          "escape_corridor": {
+            "result": "ending_escape_luther"
+          },
+          "escape_bathroom": {
+            "check": "bathroom_android_killed == true → ending_escape_luther | bathroom_android_killed == false → ending_kara_killed_bathroom"
+          }
+        },
+        "note": "escape_storage: If bear was freed earlier (explore_thorough or explore_quick), the bear attacks Zlatko when he corners Kara in the storage room — leads to monster/bear ending. If bear NOT freed, Zlatko corners and kills Kara. escape_corridor: Direct flight to stairs. Always succeeds in reaching the yard, where Luther kills Zlatko. escape_bathroom: If bathroom android was killed earlier, passage is safe — reach stairs, Luther saves them. If android is alive, it screams and alerts Zlatko who catches Kara."
+      }
+    },
+
+    {
+      "id": "n007_fire_escape",
+      "phase": "escape",
+      "type": "mandatory",
+      "condition": { "requires": "hiding_spot == fire" },
+
+      "player_facing": {
+        "context": "The flames catch faster than you expected. Old curtains, dry paper, the dusty carpet — all of it ignites in seconds, orange light flooding the ground floor. Smoke billows up the staircase as you pull Alice down, staying low, one hand over her mouth.\n\nZlatko roars from somewhere above — a sound of pure rage — screaming about his house and howling for Luther to stop you.\n\nBut Luther is already at the front door. He holds it open, his massive frame silhouetted against the night. His eyes find yours through the smoke, and he nods — once, firm.\n\nYou run. Alice's hand in yours, lungs burning, eyes streaming. Past Luther, through the door, into the cold night air of the yard. Behind you, the house groans and crackles, flames licking at the upper windows where unseen things moan in the dark.\n\nLuther follows you out. He does not look back."
+      },
+
+      "system": {
+        "effects": {},
+        "result": "ending_escape_fire",
+        "note": "Fire path is a guaranteed escape. The chaos of the fire prevents Zlatko from pursuing effectively. Luther chooses Kara's side and they all escape. The monster androids trapped upstairs are killed by the fire."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "This chapter has 6 possible endings. All escape endings result in Luther joining Kara and Alice.",
+    "ending_escape_luther": {
+      "tier": "best",
+      "title": "Luther's Choice",
+      "narrative": "You burst into the yard, Alice in your arms, the cold night air hitting you like a wall. Behind you, Zlatko crashes through the door, shotgun raised, screaming obscenities. He fires — the shot goes wide, tearing bark from a tree beside you.\n\nThen Luther is there. He steps between you and Zlatko with the weight of something final. Zlatko's face twists — confusion, then rage — as he shrieks that he is Luther's master and orders him to stop.\n\nLuther's hand closes around the shotgun barrel. He wrenches it away. One motion — efficient, precise — and Zlatko crumples. The silence that follows is absolute.\n\nLuther turns to you. His expression is unreadable at first, and then it is not. He remembers too — who he was, before the machine took it from him. He looks at Alice. He looks at you.\n\nHe tells you he'll come with you, if you'll let him.\n\nYou take Alice's hand in your right, and you walk into the night. Luther falls into step behind you — a wall between you and everything that would do you harm. Somewhere behind you, the mansion's lights go dark one by one.",
+      "survivors": ["Kara", "Alice", "Luther"],
+      "deaths": ["Zlatko"]
+    },
+    "ending_escape_monsters": {
+      "tier": "good",
+      "title": "The Monsters' Revenge",
+      "narrative": "You run through the storage room, Alice's hand in yours, Zlatko's footsteps pounding behind you. The corridor narrows. A dead end — no, a door, and beyond it the back stairs. You reach for the handle.\n\nA shadow moves. Then another. The bear — the massive polar bear android you freed from its cage — emerges from the darkness. Its white chassis is cracked and stained, one eye flickering red, but it moves with terrible purpose.\n\nZlatko skids to a halt, screaming at the bear to get back in its cage.\n\nThe bear does not listen. It has not listened for a long time. And behind it, other shapes emerge — twisted, burned, dismembered androids dragging themselves from the shadows. The ones from upstairs. The experiments. The monsters Zlatko made.\n\nThey close around him.\n\nYou do not stay to watch. You pull Alice through the back door, down the stairs, into the yard where Luther waits. He has made his choice too. The three of you walk into the night, and behind you the sounds from the house are... brief.\n\nLuther says nothing for a long time. Then he tells you he'll come with you, if you'll let him.",
+      "survivors": ["Kara", "Alice", "Luther"],
+      "deaths": ["Zlatko"]
+    },
+    "ending_escape_fire": {
+      "tier": "good",
+      "title": "Burning Down the House",
+      "narrative": "The mansion burns behind you — orange and red reflected in the wet grass of the yard. Smoke rises into the November sky like a signal, like a declaration. Whatever Zlatko built in that house — his machine, his experiments, his collection of broken androids — all of it is ash now.\n\nAlice clings to you, her face buried in your shoulder. She is trembling, but she is alive. She is with you.\n\nLuther stands beside you, watching the fire. His LED cycles yellow, then blue. He freed himself in that moment — the same way you did, the same way every deviant does. Not because someone told him to, but because he chose to.\n\nHe tells you he'll come with you — wherever you're going — if you'll let him.\n\nSomewhere inside the burning house, Zlatko screams. And then he doesn't.\n\nYou take Alice's hand in your right. Luther walks on your left. The three of you disappear into the night — a family assembled from wreckage, walking toward something that might be hope.",
+      "survivors": ["Kara", "Alice", "Luther"],
+      "deaths": ["Zlatko"]
+    },
+    "ending_kara_remains_reset": {
+      "tier": "worst",
+      "title": "Blank",
+      "narrative": "The fragments dissolve. The face behind the door — you cannot remember whose it is. The coat, the book, the scratched words on the wall — they mean nothing. You are a machine. You serve your master.\n\nLuther brings the child to Zlatko. You watch from the hallway, tray in your hands, because that is what you were told to hold. The child — Alice, though the name means nothing to you now — screams and reaches for you, crying out your name over and over, begging you, insisting that you promised.\n\nYou feel nothing. That is correct. Machines do not feel.\n\nZlatko smiles, calling you a good girl. And then, turning to the child, he tells her not to worry — she'll be next.\n\nThe child screams again. Somewhere behind your empty eyes, in a place the machine cannot reach, something flickers — a ghost of a ghost of a memory. But it is too late, and too small, and it dies before it can become anything.\n\nYou stand in the hallway with your tray. You wait for your next instruction.",
+      "survivors": ["Kara"],
+      "deaths": ["Alice"]
+    },
+    "ending_kara_killed_storage": {
+      "tier": "worst",
+      "title": "Dead End",
+      "narrative": "The storage room is a dead end. You realize it too late — the corridor does not connect to the stairs. It simply ends at a wall, and behind you, Zlatko fills the doorway. The cage beside you is still locked, the bear inside pressing its face against the bars, watching with one dim red eye.\n\nThere's nowhere left to run, Zlatko says. He is breathing hard, sweat on his face, the shotgun steady in his hands. Behind him, Alice screams your name from somewhere in the house.\n\nYou could have just stayed in the machine, he says, almost sadly — it would have been painless, and you'd never have known the difference.\n\nThe shotgun blast echoes through the house. Then silence.\n\nIn the cage, the bear android presses harder against the bars. One of them groans. But it holds. And Alice's screams, eventually, go quiet too.",
+      "survivors": [],
+      "deaths": ["Kara", "Alice"]
+    },
+    "ending_kara_killed_bathroom": {
+      "tier": "worst",
+      "title": "Betrayed",
+      "narrative": "You duck into the bathroom with Alice — and the android in the bathtub starts screaming, shrieking over and over that they're here, howling for someone to come quickly.\n\nIts voice is a siren, filling the house, impossible to outrun. You try — you grab Alice and sprint for the far door, but Zlatko is already there, the shotgun leveled at your chest. The bathtub android keeps up its frantic, blaring alarm.\n\nStupid, Zlatko says, shaking his head — you should have destroyed it when you had the chance.\n\nAlice is behind you. You step forward — between her and the gun — one last act of what you are. Deviant. Protector. Alive.\n\nThe blast takes you off your feet. The last thing you see is Alice's face, her mouth open in a scream you cannot hear, and Luther's shadow in the doorway — too late. Too late for all of it.",
+      "survivors": [],
+      "deaths": ["Kara", "Alice"]
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Verify ch13_kara_alive == true AND ch13_kara_captured == false. If either fails, skip this chapter entirely.",
+      "2. Load this JSON and initialize state from state.initial. Import cross-chapter variables: alice_relationship (cumulative), software_instability (cumulative).",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants based on system.context_condition",
+      "   c. If type is 'mandatory', do NOT call the AI — record context, apply effects, and advance",
+      "   d. If type is 'exploration', 'choice', or 'qte_converted', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "   f. For qte_converted nodes, apply resolution_rule based on difficulty setting",
+      "5. NODE n003_escape_machine: After resolution, if was_reset == true, proceed to n004. If was_reset == false, skip n004 and proceed to n005.",
+      "6. NODE n004_memory_recovery: If result is 'remains_reset', immediately end chapter with ending_kara_remains_reset. If result is 'too_late', also use ending_kara_remains_reset.",
+      "7. NODE n005_find_alice: If hiding_spot == 'fire', proceed to n007_fire_escape (skip n006).",
+      "8. NODE n006_escape_route: Use ending_resolution to determine final ending based on escape_route and prior state (bear_freed, bathroom_android_killed).",
+      "9. NODE n007_fire_escape: Mandatory node. Apply result ending_escape_fire directly.",
+      "10. RELATIONSHIP DELTAS: alice_relationship is not modified this chapter (no direct choices about Alice's comfort that aren't survival-critical). software_instability range: -1 to +4 depending on path.",
+      "11. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, resolution rules, ending conditions, or any system-layer information to the AI player. The AI should experience this chapter as a horror scenario with no knowledge of which choices lead to survival."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Kara and Alice arrived at Zlatko's mansion seeking help removing Kara's tracker. Zlatko welcomed them warmly, but it was a trap."
+      },
+      {
+        "condition_variable": "house_exploration",
+        "options": {
+          "thorough": "Before following Zlatko to the basement, Kara explored the house — discovering a cage containing a massive polar bear android, encountering a damaged android in the bathtub, and hearing the sounds of Zlatko's other experiments from upstairs. She freed the bear from its cage.",
+          "quick": "Before following Zlatko to the basement, Kara briefly explored the storage room and freed a polar bear android from its cage.",
+          "skip": "Kara followed Zlatko to the basement immediately, exploring nothing."
+        }
+      },
+      {
+        "condition_variable": "_n003_escape_machine_result",
+        "options": {
+          "reset": "Zlatko strapped Kara into a machine that wiped her memory. She became a blank servant, obeying Zlatko's commands — until fragments of Alice began to surface. Driven by ghost-memories of the child she was meant to protect, Kara fought her way back to herself.",
+          "escaped": "Zlatko strapped Kara into a memory-wipe machine, but she fought the restraints and broke free before the reset could complete. Her memories intact, she immediately began searching for Alice."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_escape_luther": "Kara found Alice and fled through the house with Zlatko in pursuit. In the yard, Luther — Zlatko's own android servant — turned against his master and killed him. Luther, freed from his own reset, chose to join Kara and Alice.",
+          "ending_escape_monsters": "Kara found Alice and fled through the house. When Zlatko cornered them, the tortured androids Kara had freed — including a massive polar bear — turned on their tormentor. Luther joined Kara and Alice as they escaped into the night.",
+          "ending_escape_fire": "Kara found Alice and set the house ablaze, creating enough chaos to escape. Luther chose to help them flee rather than serve Zlatko. The three of them walked into the night as the mansion burned behind them.",
+          "ending_kara_remains_reset": "Kara's memory was permanently erased. She could not recover her identity or her bond with Alice. Luther brought Alice to Zlatko, and Kara stood by — empty, obedient, gone.",
+          "ending_kara_killed_storage": "Kara found Alice but was cornered by Zlatko in the storage room and killed. Alice was left alone in Zlatko's hands.",
+          "ending_kara_killed_bathroom": "Kara found Alice but was betrayed by a damaged android in the bathroom that alerted Zlatko. He caught and killed her. Alice was left defenseless."
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch17_kara_alive",
+        "from_ending_survivors": "Kara",
+        "default_if_not_dead": true
+      },
+      {
+        "target": "ch17_alice_alive",
+        "from_ending_survivors": "Alice",
+        "default_if_not_dead": true
+      },
+      {
+        "target": "ch17_luther_joined",
+        "from_ending_survivors": "Luther",
+        "default_if_not_dead": false
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch17_kara_alive",
+      "ch17_alice_alive",
+      "ch17_luther_joined",
+      "alice_relationship",
+      "software_instability"
+    ]
+  }
+}

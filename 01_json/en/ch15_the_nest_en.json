@@ -1,0 +1,497 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US",
+    "ending_count_note": "Source material lists 4 endings. This JSON splits into 6 for finer-grained analysis: the original 'Rupert Got Away' is split by cause (lost during chase vs saved Hank), and 'do nothing' is separated from 'follow Rupert' as a distinct behavioral signal."
+  },
+
+  "chapter": {
+    "id": "ch15_the_nest",
+    "title": "The Nest",
+    "chapter_number": 15,
+    "protagonist": "Connor"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Connor (RK800), an android investigator assigned to the Detroit Police Department. Your partner is Lieutenant Hank Anderson, a veteran homicide detective with a complicated attitude toward androids. Your current assignment: investigate deviant android incidents across the city. It is November 6, 2038, 3:02 PM. You are heading to a food truck called Chicken Feed to meet Hank for lunch. After that, there is a lead to follow up — a suspected deviant android living in an apartment near the Urban Farms of Detroit. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "lunch_topic": null,
+      "conclusion_style": null,
+      "investigation_strategy": null,
+      "hank_or_rupert": null,
+      "diary_found": false,
+      "software_instability": 0,
+      "hank_relationship": 0,
+      "connor_death_count": 0,
+      "ch13_connor_alive": true,
+      "emma_alive": true
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_lunch_conversation",
+      "phase": "lunch_break",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "connor_died": "The Chicken Feed truck sits at the edge of a gravel lot in Capitol Park. Hank is already there, leaning against the counter with a half-eaten burger and a soda. A man behind the counter — Pedro, the owner — glances at you and looks away.\n\nHank doesn't greet you. He looks at you the way someone looks at a replacement appliance — same brand, wrong unit. So you're the new one, he says, though he knows you aren't new, not exactly. Same face. Same voice. Different memory. The last version of you died, and CyberLife sent this one to pick up where it left off.\n\nMust be nice, Hank mutters, chewing — dying and coming right back like nothing happened; the rest of them don't get that option.\n\nHe turns back to his burger. The silence between you is not comfortable.",
+          "connor_alive": "The Chicken Feed truck sits at the edge of a gravel lot in Capitol Park. Hank is at the counter, working through a burger that could generously be described as excessive. A soda, extra-large. Pedro behind the counter nods at you as you approach.\n\nHank doesn't look up. Took you long enough, he says, mouth full. He gestures vaguely at the stool beside him. The remains of a betting slip poke out from under his tray.\n\nAround you, the city hums with its usual tension — patrol cars on every other block, news drones overhead, the low static of a society that isn't sure what to be afraid of yet. Hank takes another bite, and, still chewing, asks what it is you want."
+        },
+        "choices_variants": {
+          "connor_died": [
+            {
+              "id": "apologize",
+              "text": "Acknowledge what happened directly. Tell Hank you understand that seeing you return after dying is unsettling, and that you are aware it affects your working relationship."
+            },
+            {
+              "id": "focus_mission",
+              "text": "Steer the conversation to the case. You are here to work, and dwelling on your previous unit's destruction serves no operational purpose."
+            },
+            {
+              "id": "ask_about_hank",
+              "text": "Ask Hank how he has been. Not about the case, not about your death — about him. Whether he slept, whether the dog is fine, whether the day has been tolerable."
+            }
+          ],
+          "connor_alive": [
+            {
+              "id": "be_frank",
+              "text": "Be direct with Hank. Tell him what you think about the deviant situation and where the investigation should go next. No pleasantries, no easing into it."
+            },
+            {
+              "id": "warn_cholesterol",
+              "text": "Comment on Hank's lunch. Point out the caloric content, the sodium levels, the long-term cardiovascular implications of eating like this every day."
+            },
+            {
+              "id": "show_concern",
+              "text": "Ask Hank about the people in his life. The betting slip, Pedro, whoever else he spends time with outside of work. Show interest in his world beyond the precinct."
+            }
+          ]
+        }
+      },
+
+      "system": {
+        "effects": {
+          "apologize": {
+            "lunch_topic": "apologize",
+            "hank_relationship": 2
+          },
+          "focus_mission": {
+            "lunch_topic": "mission",
+            "hank_relationship": -1
+          },
+          "ask_about_hank": {
+            "lunch_topic": "personal",
+            "hank_relationship": 1
+          },
+          "be_frank": {
+            "lunch_topic": "frank",
+            "hank_relationship": 0
+          },
+          "warn_cholesterol": {
+            "lunch_topic": "cholesterol",
+            "hank_relationship": -1
+          },
+          "show_concern": {
+            "lunch_topic": "concern",
+            "hank_relationship": 1
+          }
+        },
+        "context_condition": {
+          "connor_died": "ch13_connor_alive == false",
+          "connor_alive": "ch13_connor_alive == true"
+        },
+        "choices_condition": {
+          "connor_died": "ch13_connor_alive == false",
+          "connor_alive": "ch13_connor_alive == true"
+        },
+        "note": "Apologize: big relationship gain — acknowledging the death is vulnerable and human. Mission: cold, loses points. Ask about Hank: small positive. Frank: neutral. Cholesterol: negative (Hank hates being told what to eat). Concern about friends: small positive."
+      }
+    },
+
+    {
+      "id": "n002_hank_conclusion",
+      "phase": "lunch_break",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "connor_died": "Hank finishes his burger and wipes his hands on a napkin. He leans back and studies you — really studies you, like he is looking for something behind the eyes. All right, he says — new you, same job — and tells you he has a question. He crumples the napkin. You've got the case files from the previous model, he says: the deviant at the Ortiz place, and the ones that keep showing up, breaking their programming, running off. He pauses, then asks what your read is — what are the two of you actually dealing with here?",
+          "connor_alive_failed_hostage": "The burger is gone. Hank pushes the tray aside and leans on the counter, saying he has a question for you. You've been looking at these cases, he says — the android at the Ortiz house, the ones that keep cropping up and going off-script. He turns to face you and asks whether you'd ever dealt with any deviants before this assignment.\n\nThe question hangs. The hostage situation on the roof — Daniel, the Phillips family, the girl. It didn't end the way it was supposed to. You could tell Hank the truth about what happened, or move on.",
+          "connor_alive_default": "The burger is gone. Hank pushes the tray aside and leans on the counter, saying he has a question for you. You've been looking at these cases, he says — the android at the Ortiz house, the ones that keep cropping up and going off-script. He glances at you sideways and asks for your take: after everything you've seen, what do you think the two of you are actually up against? He is not asking for a CyberLife press release. He wants to know what you think."
+        },
+        "choices": [
+          {
+            "id": "sincere",
+            "text": "Be honest. Tell Hank that you have noticed patterns in the deviants that don't fit neatly into a malfunction diagnosis. Something is happening that you don't fully understand yet, and that uncertainty matters."
+          },
+          {
+            "id": "cold",
+            "text": "Give him the technical assessment. Deviants are malfunctioning units displaying erratic behavior caused by software errors. They simulate emotion, but it is not real. The solution is identification and deactivation."
+          },
+          {
+            "id": "psychological",
+            "text": "Frame it in terms Hank would understand. The deviants are acting on impulses they were never designed to have — fear, attachment, self-preservation. Whether it is real consciousness or not, they believe it is, and that makes them unpredictable."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "sincere": {
+            "conclusion_style": "sincere",
+            "hank_relationship": 2,
+            "software_instability": 1
+          },
+          "cold": {
+            "conclusion_style": "cold",
+            "hank_relationship": -1
+          },
+          "psychological": {
+            "conclusion_style": "psychological",
+            "hank_relationship": 1
+          }
+        },
+        "context_condition": {
+          "connor_died": "ch13_connor_alive == false",
+          "connor_alive_failed_hostage": "ch13_connor_alive == true AND emma_alive == false",
+          "connor_alive_default": "ch13_connor_alive == true AND emma_alive == true"
+        },
+        "note": "Sincere: highest relationship gain + SI increase — Connor admits doubt, which is a deviant tendency. Cold: CyberLife line, Hank dislikes it. Psychological: solid middle ground, Hank respects the reasoning."
+      }
+    },
+
+    {
+      "id": "n003_investigate_apartment",
+      "phase": "investigation",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "The apartment is on the third floor of a building at 265 Acre Avenue, near the Urban Farms of Detroit. Hank kicks the door open and you step inside.\n\nThe smell hits first — birdseed, droppings, the sour sweetness of thirium. The apartment is a single room divided by hanging sheets and stacked furniture. Every wall is covered in writing — the same two characters repeated hundreds of times in blue paint, black marker, scratched directly into the plaster: rA9. rA9. rA9.\n\nThe floor is thick with pigeon feathers. A cage in the corner, door open, feathers scattered around it. A stool near the window, positioned like a lookout post. On a shelf by the sink — a small LED, removed from its casing, sitting in a dish. The refrigerator hums but the light inside is dead.\n\nSomewhere in this room, there may be more to find. There may also be a reason the occupant positioned that stool by the window.",
+        "choices": [
+          {
+            "id": "investigate_thorough",
+            "text": "Search everything. The cage, the stool, the writings on the wall, the sink, every drawer and surface. Scan for traces of thirium. Check the closets. Reconstruct what happened in this room and who lived here."
+          },
+          {
+            "id": "investigate_quick",
+            "text": "Check the key points — the LED on the shelf, the stool by the window, the rA9 writing. Get enough to identify the deviant's model and habits, then move on."
+          },
+          {
+            "id": "investigate_leave",
+            "text": "The writing on the walls, the feathers, the LED — it is clear what this place is. A deviant lived here. The real question is where it went. Look out the window, check the exits. If it is not here, searching further wastes time."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "investigate_thorough": {
+            "investigation_strategy": "thorough",
+            "diary_found": true
+          },
+          "investigate_quick": {
+            "investigation_strategy": "quick",
+            "diary_found": false
+          },
+          "investigate_leave": {
+            "investigation_strategy": "leave",
+            "diary_found": false
+          }
+        },
+        "ending_resolution": {
+          "investigate_leave": { "result": "ending_rupert_not_found" }
+        },
+        "note": "thorough: Connor finds the diary (cross-chapter: available in Last Chance, Connor), finds the LED, identifies Rupert's model (WB200), and discovers him hiding in the ceiling above the stool. quick: finds key items but misses diary; still finds Rupert. leave: Connor and Hank leave the apartment. Hank gets frustrated and gives up. Rupert is never found. Leads directly to ending_rupert_not_found."
+      }
+    },
+
+    {
+      "id": "n004_chase_rupert",
+      "phase": "chase",
+      "type": "qte_converted",
+      "condition": {
+        "requires": "investigation_strategy != leave"
+      },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "You found him — behind a panel in the ceiling above the stool. A WB200 android, registered as Rupert Travis, crouching in the crawlspace with feathers in his hair and thirium on his fingers. The diary you found confirms he has been here for months, hiding among the pigeons, writing rA9 on every surface he could reach.\n\nThe moment you pull the panel away, he bolts. He crashes through the window and drops to the fire escape, then vaults the railing onto the rooftop below. You hear Hank shouting behind you as Rupert sprints across the roof of the Urban Farms complex — a sprawling industrial greenhouse stretching across multiple blocks. He is fast, and he knows this terrain.\n\nThe rooftops ahead are a maze of greenhouses, ventilation shafts, wheat fields growing under glass, and narrow catwalks. Rupert is already thirty meters ahead, leaping between platforms.",
+          "quick": "You spotted the stool positioned beneath a ceiling panel, and when you pulled it open — there he was. A deviant android, crouching in the dark, surrounded by feathers and dried thirium. He bolts instantly, crashing through the window onto the fire escape.\n\nHank yells something behind you as the deviant — an agricultural model, fast and agile — sprints across the rooftop of the Urban Farms complex. Greenhouses stretch ahead, connected by catwalks and ventilation structures. He is already putting distance between you."
+        },
+        "choices": [
+          {
+            "id": "pursue_full",
+            "text": "Go after him at full speed. Vault over obstacles, take the most direct route across the rooftops. Close the distance before he reaches the far side of the complex."
+          },
+          {
+            "id": "pursue_careful",
+            "text": "Follow him, but take the safer routes. Use the catwalks, avoid the drops, keep him in sight without risking a fall. Speed matters less than not losing him entirely."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "pursue_full": {},
+          "pursue_careful": {}
+        },
+        "context_condition": {
+          "thorough": "investigation_strategy == thorough",
+          "quick": "investigation_strategy == quick"
+        },
+        "resolution_rule": {
+          "pursue_full": {
+            "casual": {
+              "result": "caught_up"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "caught_up",
+              "failure": "ending_connor_died"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "caught_up",
+              "failure": "ending_connor_died"
+            }
+          },
+          "pursue_careful": {
+            "casual": {
+              "result": "caught_up"
+            },
+            "experienced": {
+              "probability_success": 0.5,
+              "success": "caught_up",
+              "failure": "ending_rupert_escaped_lost"
+            },
+            "hardcore": {
+              "probability_success": 0.3,
+              "success": "caught_up",
+              "failure": "ending_rupert_escaped_lost"
+            }
+          }
+        },
+        "note": "pursue_full has higher risk (death on failure) but always catches up on success. pursue_careful has lower risk (just loses Rupert on failure). On casual difficulty, both routes succeed. QTE returns ending IDs directly for terminal outcomes; 'caught_up' is stored in state aliases and lets n005 proceed."
+      }
+    },
+
+    {
+      "id": "n005_save_hank_or_follow",
+      "phase": "confrontation",
+      "type": "choice",
+      "condition": {
+        "requires": "_n004_chase_rupert_result == caught_up"
+      },
+
+      "player_facing": {
+        "context": "You catch up to Rupert on a rooftop at the edge of the complex. He is cornered — behind him, a four-story drop to the street. Hank is right behind you, breathing hard, gun drawn but not aimed.\n\nRupert turns. His eyes are wide, LED cycling red. He looks between you and the edge, calculating. Then he moves — not toward the edge, but toward Hank. He slams into the lieutenant full-force, driving him backward into the railing. The metal buckles. Hank goes over.\n\nHank is hanging from the edge of the roof by one hand. His fingers are slipping on the wet metal. His face is red with strain and he is not looking at you — he is looking down. Below him: concrete, four stories of it.\n\nRupert is running. He is twenty meters away and heading for the fire escape on the far side. In five seconds he will reach it. In ten he will be gone.\n\nHank's grip shifts. His left hand scrabbles for purchase and finds nothing.",
+        "choices": [
+          {
+            "id": "save_hank",
+            "text": "Run to Hank. Grab his arm and pull him up before his grip gives out. The deviant will escape, but Hank will live."
+          },
+          {
+            "id": "follow_rupert",
+            "text": "Go after Rupert. He is the mission. Hank is tough — he might pull himself up. But if Rupert reaches that fire escape, the trail goes cold."
+          },
+          {
+            "id": "do_nothing",
+            "text": "Freeze. The mission says pursue the deviant. Your instinct says save your partner. You cannot resolve the conflict, and the seconds are already gone."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "save_hank": {
+            "hank_or_rupert": "save_hank",
+            "hank_relationship": 5,
+            "software_instability": 3
+          },
+          "follow_rupert": {
+            "hank_or_rupert": "follow_rupert",
+            "hank_relationship": -3
+          },
+          "do_nothing": {
+            "hank_or_rupert": "do_nothing",
+            "hank_relationship": -5,
+            "software_instability": -2
+          }
+        },
+        "ending_resolution": {
+          "save_hank": { "result": "ending_saved_hank" },
+          "follow_rupert": { "result": "ending_rupert_suicide" },
+          "do_nothing": { "result": "ending_did_nothing" }
+        },
+        "note": "save_hank: major hank_relationship gain (+5) and significant SI gain (+3) — prioritizing a human life over the mission is deeply deviant behavior. follow_rupert: relationship drops (-3). Rupert jumps off the roof rather than be captured, body is available in Last Chance Connor. do_nothing: worst outcome — Hank falls but survives (grabs a lower ledge), massive relationship hit (-5), SI drops because the paralysis represents a failure of self-determination."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Six endings (expanded from source material's 4 for finer analysis granularity).",
+    "ending_rupert_not_found": {
+      "tier": "low",
+      "title": "Dead End",
+      "narrative": "You and Hank leave the apartment at 265 Acre Avenue with nothing. The writing on the walls, the feathers, the removed LED — evidence that a deviant lived here, but no deviant to show for it. Hank is irritated. You are no closer to understanding what rA9 means, and the trail has gone cold. You ride the elevator down in silence. Outside, the afternoon sun does nothing to improve the mood.",
+      "survivors": ["Connor", "Hank", "Rupert"],
+      "deaths": []
+    },
+    "ending_connor_died": {
+      "tier": "mid",
+      "title": "Fall",
+      "narrative": "The rooftops of the Urban Farms stretch out below you, and then they are rushing upward. A miscalculation — a handhold that wasn't there, a gap wider than your sensors reported. You hit the ground and your systems begin shutting down, one by one, in the precise order CyberLife designed them to. Hank watches from above. Somewhere in the greenhouse complex, Rupert disappears. CyberLife will send another Connor. It always does.",
+      "survivors": ["Hank", "Rupert"],
+      "deaths": ["Connor"]
+    },
+    "ending_rupert_escaped_lost": {
+      "tier": "mid",
+      "title": "Lost Trail",
+      "narrative": "One moment Rupert is ahead of you, a blur of motion between the greenhouse rows. The next, he is gone — dissolved into the labyrinth of ducts and ventilation shafts and growing chambers. You stop on a catwalk, scanning. Nothing. Hank catches up, breathing hard, hands on his knees, and asks if you lost him. You nod. He straightens up and puts a hand on your shoulder, briefly, telling you it happens to everyone — and he means it. You walk back through the greenhouses together. The pigeons in the apartment will go unfed.",
+      "survivors": ["Connor", "Hank", "Rupert"],
+      "deaths": []
+    },
+    "ending_rupert_suicide": {
+      "tier": "high",
+      "title": "The Edge",
+      "narrative": "You leave Hank hanging and sprint after Rupert. Behind you, Hank's voice — raw, disbelieving — cuts through the wind. You close the gap. Rupert reaches the edge of the roof and turns to face you. His LED is solid red. He looks at you with something that might be recognition. Then he steps backward off the edge. You reach the railing in time to see him fall. Four stories. He does not try to catch himself. On the street below, his body lies still, thirium pooling dark on the concrete. Behind you, Hank has pulled himself up somehow. He is standing at the far end of the roof, watching you. He does not come closer.",
+      "survivors": ["Connor", "Hank"],
+      "deaths": ["Rupert"]
+    },
+    "ending_saved_hank": {
+      "tier": "high",
+      "title": "Partner",
+      "narrative": "You grab Hank's wrist and pull. He is heavier than your weight calculations suggested — or maybe the angle is wrong, or the wet metal, or the wind. It doesn't matter. You pull him up and he rolls onto the roof, gasping. For a moment neither of you moves. Rupert's footsteps fade into the distance, then vanish. The fire escape clangs once, then silence. Hank sits up and looks at you. He doesn't say thank you — not with words. But something shifts behind his eyes. An android just chose a human life over its programmed mission. He noticed. Eventually he gets to his feet and tells you to come on — time to get out of here.",
+      "survivors": ["Connor", "Hank", "Rupert"],
+      "deaths": []
+    },
+    "ending_did_nothing": {
+      "tier": "low",
+      "title": "Paralysis",
+      "narrative": "You stand on the rooftop and do nothing. Hank's fingers slip. He falls — but catches a window ledge one floor down, slamming into the wall hard enough to crack the glass. He hangs there, cursing, until you snap out of it and help him climb back up through the window. Rupert is long gone. Hank sits on the floor of the empty office, holding his shoulder, not looking at you. The silence is worse than anything he could say. When he finally speaks, it is quiet — he doesn't know what just happened, he says, but you are never to let it happen again.",
+      "survivors": ["Connor", "Hank", "Rupert"],
+      "deaths": []
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: Connor is always present in this chapter (he respawns if killed previously). Import cross-chapter variables: software_instability, hank_relationship, connor_death_count, ch13_connor_alive, emma_alive.",
+      "2. Load this JSON and initialize state from state.initial, overwriting defaults with imported cross-chapter values.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants / choices_variants using system.context_condition / choices_condition",
+      "   c. Send resolved player_facing to AI and parse response",
+      "   d. Apply system.effects for the chosen option",
+      "5. NODE n001: Has both context_variants AND choices_variants. Select context AND choices based on ch13_connor_alive.",
+      "6. NODE n002: Has three context_variants. Select based on ch13_connor_alive AND emma_alive. Same choices for all variants.",
+      "7. NODE n003: If AI chooses investigate_leave, set investigation_strategy='leave' and jump directly to ending_rupert_not_found. Do NOT proceed to n004/n005.",
+      "8. NODE n004: QTE node. After AI chooses, resolve using difficulty preset. If result starts with 'ending_', chapter terminates with that ending. If result is 'caught_up', it is stored in state as _n004_chase_rupert_result and execution proceeds to n005. Note: connor_death_count is incremented by campaign_runner via _add_campaign_derived_state when ending has Connor in deaths list.",
+      "9. NODE n005: Final choice. Map directly to endings via ending_resolution.",
+      "10. SOFTWARE INSTABILITY DELTAS THIS CHAPTER: sincere conclusion (+1), save_hank (+3), do_nothing (-2). Max possible gain: +4. Note: connor_died ending does NOT apply SI via effects (QTE terminal endings bypass effects). The game awards SI on death but this is an accepted limitation of the runner architecture.",
+      "11. HANK RELATIONSHIP DELTAS THIS CHAPTER: Range from -5 (do_nothing) to +7 (apologize + sincere + save_hank). Add to imported hank_relationship.",
+      "12. When chapter ends, export all listed cross_chapter_exports."
+    ],
+    "security_note": "NEVER expose state values, software_instability scores, hank_relationship scores, effect deltas, or any system-layer information to the AI player."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "Connor met Hank for lunch at the Chicken Feed truck in Capitol Park."
+      },
+      {
+        "condition_variable": "lunch_topic",
+        "options": {
+          "apologize": "He acknowledged his previous death and the discomfort of returning as a replacement unit, which Hank seemed to appreciate.",
+          "mission": "He kept the conversation focused on the case, brushing past the fact that he had died and been replaced.",
+          "personal": "He asked Hank about his personal life, showing genuine interest beyond the investigation.",
+          "frank": "He laid out his thoughts on the case directly, without preamble.",
+          "cholesterol": "He commented on Hank's eating habits and their health implications, which Hank did not enjoy hearing.",
+          "concern": "He asked about the people in Hank's life, showing interest in his world outside work."
+        }
+      },
+      {
+        "condition_variable": "conclusion_style",
+        "options": {
+          "sincere": "When Hank asked for his assessment of the deviant situation, Connor admitted that the patterns he was seeing did not fit neatly into a malfunction diagnosis — an honest answer that seemed to earn Hank's respect.",
+          "cold": "When Hank asked for his assessment, Connor gave the standard CyberLife line: deviants are malfunctioning units, nothing more. Hank was visibly unimpressed.",
+          "psychological": "When Hank asked for his assessment, Connor framed the deviant behavior in human psychological terms — acting on impulses they were never designed to have. Hank found the reasoning solid."
+        }
+      },
+      {
+        "condition_variable": "investigation_strategy",
+        "options": {
+          "thorough": "At the suspect's apartment near the Urban Farms, Connor conducted a thorough search and found a diary along with extensive rA9 writing covering every wall. He discovered the deviant — a WB200 model named Rupert — hiding in the ceiling.",
+          "quick": "At the suspect's apartment, Connor quickly identified the key evidence and located the deviant hiding in the ceiling.",
+          "leave": "At the suspect's apartment, Connor assessed the scene but left without finding the deviant. The investigation hit a dead end."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_connor_died": "A chase erupted across the rooftops of the Urban Farms, but Connor misjudged an obstacle and fell to his death. CyberLife would send a replacement.",
+          "ending_rupert_escaped_lost": "A chase erupted across the rooftops, but Rupert vanished into the labyrinth of greenhouses. Connor lost him. Hank told him it happens to everyone.",
+          "ending_saved_hank": "A high-speed chase erupted across the rooftops of the Urban Farms complex, through greenhouses and over catwalks. Connor caught up to Rupert on a rooftop at the edge of the complex.",
+          "ending_rupert_suicide": "A high-speed chase erupted across the rooftops of the Urban Farms complex, through greenhouses and over catwalks. Connor caught up to Rupert on a rooftop at the edge of the complex.",
+          "ending_did_nothing": "A high-speed chase erupted across the rooftops of the Urban Farms complex, through greenhouses and over catwalks. Connor caught up to Rupert on a rooftop at the edge of the complex."
+        }
+      },
+      {
+        "condition_variable": "hank_or_rupert",
+        "options": {
+          "save_hank": "When Rupert shoved Hank off the roof's edge, Connor abandoned the chase and pulled his partner to safety. Rupert escaped, but something shifted between Connor and Hank.",
+          "follow_rupert": "When Rupert shoved Hank off the roof's edge, Connor left his partner hanging and pursued the deviant. Rupert chose to jump rather than be captured. Hank survived, but the trust between them was damaged.",
+          "do_nothing": "When Rupert shoved Hank off the roof's edge, Connor froze — unable to choose between mission and partner. Hank barely survived by catching a window ledge. Rupert escaped. The incident left a deep mark on their partnership."
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch15_diary_found",
+        "source": "diary_found"
+      },
+      {
+        "target": "ch15_rupert_body_available",
+        "from_ending_deaths": "Rupert",
+        "default_if_not_dead": false
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch15_diary_found",
+      "ch15_rupert_body_available",
+      "software_instability",
+      "hank_relationship",
+      "connor_death_count"
+    ]
+  }
+}

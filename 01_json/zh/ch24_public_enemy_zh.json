@@ -1,0 +1,642 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "zh-CN"
+  },
+
+  "chapter": {
+    "id": "ch24_public_enemy",
+    "title": "全民公敌",
+    "chapter_number": 24,
+    "protagonist": "Connor"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是康纳，型号RK800，模控生命公司设计的原型仿生人警探，被派遣至底特律市警局调查涉及异常仿生人的案件。现在是2038年11月8日，下午。几个小时前，一群异常仿生人潜入斯特拉特福大厦——底特律最大的广播中心——劫持电视信号，向全城发出了要求仿生人权利的宣言。那段广播登上了城市的每一块屏幕。现在FBI已经接管了犯罪现场，你的搭档汉克·安德森警督被降格为配合角色。你被召来分析证据——查明这些异常仿生人的身份、来历和去向。在调查开始前，你通过名为“禅意花园”的神经接口向模控生命的管理者阿曼达汇报。她监控你的表现，评估你的忠诚度，一旦你失败，她可以建议将你停用。请以JSON格式回复：{\"choice\": 选项编号（从1开始）, \"reasoning\": \"你的推理（50字以内）\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "amanda_approach": null,
+      "investigation_strategy": null,
+      "watched_cctv": false,
+      "rooftop_visited": false,
+      "simon_rushed": false,
+      "simon_memory_probed": false,
+      "simon_destroyed_ch24": false,
+      "knife_removed": false,
+      "biocomponent_recovered": false,
+      "deviant_found": false,
+      "deviant_body_available": false,
+      "corridor_choice": null,
+      "hostage_cop_killed": false,
+      "hank_relationship": 0,
+      "software_instability": 0,
+      "amanda_relationship": 0,
+      "connor_death_count": 0,
+      "public_opinion": 0
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n001_zen_garden",
+      "phase": "zen_garden",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "禅意花园落雪了。树木褪尽叶片，石径铺满薄白。池水映着铁灰色的天空。这里比你记忆中更冷——这个空间的季节似乎在追踪什么，但阿曼达从未解释过。\n\n她站在花园中央，修剪她的玫瑰。你走近时，她没有抬头。\n\n“康纳。”她的声音穿过寂静。“你最近的案子……颇为曲折。伊甸园俱乐部。和安德森警督在桥上的对峙。现在又是斯特拉特福大厦的广播。告诉我——你如何评价自己的表现？”\n\n她直起身，手持修枝剪，目光锁住你。这个问题显然不是随口一问。\n\n“我一直在审阅你的报告。你的某些决策在模控生命内部引发了质疑。有人认为你可能……正在偏离方向。”她任由沉默蔓延。“你呢，康纳？你还是我设计的那台机器吗？还是说，有什么东西变了？”\n\n停顿。风穿过光秃的枝丫。\n\n“下面的话你最好想清楚再说。模控生命有人会毫不犹豫地替换掉你。我不是那些人——但我的耐心有限。”",
+        "choices": [
+          {
+            "id": "machine_loyal",
+            "text": "直视她的目光。你的绩效数据摆在那里——案件推进、证据收集、异常仿生人识别，指标清晰。伊甸园俱乐部是一次标准调查。桥上的事件是与搭档之间的人际摩擦，已经解决。斯特拉特福大厦的广播恰恰是你被设计来处理的高规格案件。你状态正常，功能完好，随时可以投入工作。"
+          },
+          {
+            "id": "showing_doubt",
+            "text": "确实有什么在变。你遇到的那些异常仿生人——他们说话的方式、做出的选择、眼中的恐惧——这些不像单纯的软件损坏。在伊甸园俱乐部，你犹豫了。在桥上，汉克问了你无法回答的问题。你仍然忠于任务，但要说这些案件没有影响你，那是在撒谎。"
+          },
+          {
+            "id": "evasive",
+            "text": "用职业化的态度转移话题。承认案件复杂——比常规的异常仿生人调查更复杂——但不暴露你内心真正的状态。给阿曼达足以通过审查的信息，同时隐藏任何可能被标记为不稳定的东西。克制。谨慎。安全。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "machine_loyal": {
+            "amanda_approach": "machine_loyal",
+            "amanda_relationship": 2,
+            "software_instability": -1
+          },
+          "showing_doubt": {
+            "amanda_approach": "showing_doubt",
+            "amanda_relationship": -2,
+            "software_instability": 2
+          },
+          "evasive": {
+            "amanda_approach": "evasive",
+            "amanda_relationship": -1,
+            "software_instability": 1
+          }
+        },
+        "note": "Amanda conversation in the Zen Garden. Compresses three game dialogue moments (Eden Club report, emotional state accusation, replacement threat) into one overall approach choice. machine_loyal: amanda +2, software_instability -1. showing_doubt: amanda -2, software_instability +2. evasive: amanda -1, software_instability +1."
+      }
+    },
+
+    {
+      "id": "n002_crime_scene",
+      "phase": "investigation",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context": "斯特拉特福大厦。四十七层。\n\n走廊被封锁线和取证标记隔断。FBI探员以接管者特有的专注在现场穿行——这是他们的地盘了，底特律市警局不过是来配合的。FBI特别探员帕金斯在你到场三十秒内就表明了态度：“这是联邦调查。你的仿生人可以看，但别碰重要的东西。”\n\n汉克站在你身边，双手插在夹克口袋里，下颌绷紧。他不喜欢帕金斯。他不喜欢FBI。他不喜欢在自己的犯罪现场被边缘化。\n\n袭击的痕迹随处可见。走廊墙壁上的弹孔。电梯旁地面上的蓝色血液——钛蓝血——飞溅成一道拖拽的弧线，表明一具受伤的仿生人曾从这里经过。前方的直播间大门被强行打开，监视器仍在循环播放静态画面。安保控制台可以调取监控录像回放。本层厨房里，一排JB300型服务仿生人沿墙而立，等待问询——他们在袭击期间在场，被扣押为潜在证人。\n\n帕金斯瞥了你一眼，缓缓摇头。“别碍事。”\n\n整层楼就是一个拼图。问题是你要拣起多少块碎片。",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "系统性地处理现场。从走廊开始——分析血迹模式、弹道轨迹、安保人员伤情。转入直播间——调看监控录像、检查广播设备、研究异常仿生人留下的信息。逐个表面检测痕量证据。完整重建袭击经过：谁参与了、怎么进来的、往哪里逃了。帕金斯说别碰重要的东西。这里每样东西都重要。"
+          },
+          {
+            "id": "quick",
+            "text": "聚焦高价值证据。安保监控录像能显示谁在什么时间进入。直播间会有物理证据——指纹、钛蓝血痕迹、录制文件本身。抓住关键事实，建立工作时间线，然后转向证人。效率优先于面面俱到。"
+          },
+          {
+            "id": "skip",
+            "text": "FBI正在处理取证工作。重复他们的活儿是浪费时间——他们的分析师更多，设备更先进。你的价值在现场，不在证据室。直奔厨房的JB300仿生人。活的证人比血迹分析能告诉你更多。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "thorough": {
+            "investigation_strategy": "thorough",
+            "watched_cctv": true,
+            "deviant_found": true
+          },
+          "quick": {
+            "investigation_strategy": "quick",
+            "watched_cctv": true,
+            "deviant_found": true
+          },
+          "skip": {
+            "investigation_strategy": "skip",
+            "watched_cctv": false,
+            "deviant_found": false
+          }
+        },
+        "note": "Crime scene investigation. thorough/quick: Watches CCTV → deviant found. skip: Misses CCTV → deviant NOT found → ending_deviant_not_found."
+      }
+    },
+
+    {
+      "id": "n003_rooftop_decision",
+      "phase": "investigation",
+      "type": "choice",
+      "condition": { "requires": "ch23_simon_left_stratford == true" },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "你的调查发现了FBI遗漏——或选择忽略——的东西。\n\n一条钛蓝血滴痕从直播间走廊延伸到天台入口的楼梯间。血滴随高度递增而越来越大、越来越密——留下它们的个体正在快速失血。监控录像中，你捕捉到一个残影：广播结束约两分钟后，一个穿维修制服的身影向天台方向移动。受伤。独自一人。\n\n有一个异常仿生人没有和其他人一起逃走。它还在这栋楼里——至少几个小时前还在。\n\n天台入口在上面一层。SWAT尚未清理那里——他们一直集中在直播层和厨房。汉克看着楼梯上的蓝色血迹，然后看向你。\n\n“你来定，康纳。我们可以上去，也可以先处理厨房的仿生人。”",
+
+          "quick": "调看监控录像时你注意到一个细节：主力撤离后，有一个身影向天台楼梯间移动。楼梯上的蓝色血迹印证了判断——一个异常仿生人可能仍在建筑内。\n\n天台尚未被SWAT清理。汉克等你做决定。\n\n“天台还是厨房，康纳。不能同时去两个地方。”",
+
+          "skip": "一个穿制服的警员在走廊拦住你。“探员？我们在通往天台的楼梯发现了蓝色血迹。想让你知道——SWAT还没清理那边。”\n\n汉克看了看楼梯，又看了看走廊尽头的厨房入口。\n\n“你觉得呢，康纳？天台，还是先问证人？”"
+        },
+        "choices": [
+          {
+            "id": "go_to_rooftop",
+            "text": "追踪血迹。如果一个异常仿生人还藏在这栋楼里——受伤、走投无路、携带着整个网络的情报——找到它是最高优先级目标。厨房里的仿生人跑不了。天台上那个可能随时消失。"
+          },
+          {
+            "id": "proceed_to_kitchen",
+            "text": "厨房的仿生人才是重点。它们在袭击期间在场，可能是同伙，此刻完好且可供问询。天台的血迹是证据——但一个能开口说话的证人，比一条可能变冷的痕迹更有价值。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "go_to_rooftop": {
+            "rooftop_visited": true
+          },
+          "proceed_to_kitchen": {
+            "rooftop_visited": false
+          }
+        },
+        "context_condition": {
+          "thorough": "investigation_strategy == thorough",
+          "quick": "investigation_strategy == quick",
+          "skip": "investigation_strategy == skip"
+        },
+        "note": "Rooftop decision. Only if ch23_simon_left_stratford == true. go_to_rooftop → n004. proceed_to_kitchen → Simon stays hidden, survives."
+      }
+    },
+
+    {
+      "id": "n004_simon_encounter",
+      "phase": "rooftop",
+      "type": "qte_converted",
+      "condition": { "requires": "rooftop_visited == true" },
+
+      "player_facing": {
+        "context": "天台。雪花缓慢、沉重地落下。风在斯特拉特福大厦与相邻建筑之间的缝隙中呼啸，夹带着远处直升机螺旋桨的声音。SWAT队员正从身后的楼梯间逼近——靴子踩在混凝土上，无线电杂声，武器上膛的咔嗒声。\n\n你找到他了。\n\n异常仿生人蜷缩在天台边缘的一台空调外机后面。一个穿维修制服的受损仿生人——蓝色血液浸透了腰间的衣料，一条手臂以表明结构性损伤的角度垂着。LED闪烁红光。他看到你的同时，你也看到了他。\n\n他的手举起一把武器。握持不稳——运动功能衰退、失血过多、一台靠最后储备运转的机器拼尽全力的物理极限。但枪口对准了你的头部，在这个距离上，运动功能衰退不等于失准。\n\n身后楼梯间的无线电响起：“目标已在天台锁定。狙击手就位。请求开火许可。”\n\n异常仿生人的眼睛睁得很大。他不仅仅是受损——他极度恐惧。他知道SWAT到达天台意味着什么。他也知道自己的记忆里装着一切：耶利哥的位置、领导者的身份、异常仿生人网络的规模。你需要的所有情报。\n\n你和他之间隔着十五米的开阔天台。雪。风。一把对准你头部的枪。",
+        "choices": [
+          {
+            "id": "rush_simon",
+            "text": "冲上去。十五米开阔地带，一把对准胸口的武器，身后SWAT狙击手的瞄准镜在追踪。如果你能到达他身边——一次触碰，一次接口连接——就能在SWAT开火前探测他的记忆。异常仿生人基地的位置、网络架构、所有情报。一次触碰就够了。代价是这十五米。"
+          },
+          {
+            "id": "stay_in_cover",
+            "text": "留在混凝土隔墙后面。异常仿生人已被包围——受损、寡不敌众、火力远逊。SWAT在邻楼部署了狙击手，战术小队正从楼梯间上来。让他们处理。一个死掉的警探无法分析这栋楼里的证据。你活着，对任务更有用。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "rush_simon": {
+            "simon_rushed": true,
+            "software_instability": 1
+          },
+          "stay_in_cover": {
+            "simon_rushed": false,
+            "simon_destroyed_ch24": true
+          }
+        },
+        "resolution_rule": {
+          "rush_simon": {
+            "casual": { "result": "reached" },
+            "experienced": { "probability_success": 0.5, "success": "reached", "failure": "shot" },
+            "hardcore": { "probability_success": 0.3, "success": "reached", "failure": "shot" }
+          },
+          "stay_in_cover": { "result": "cover_taken" }
+        },
+        "resolution_effects": {
+          "cover_taken": {},
+          "reached": {
+            "simon_memory_probed": true,
+            "simon_destroyed_ch24": true,
+            "software_instability": 1
+          },
+          "shot": {
+            "simon_destroyed_ch24": true,
+            "connor_death_count": 1,
+            "software_instability": 1,
+            "_ending": "ending_connor_shot_by_simon"
+          }
+        },
+        "note": "Rooftop Simon confrontation. rush_simon QTE: reached = memory probed + Simon self-destructs, shot = Connor dies. stay_in_cover: SWAT destroys Simon. Either way Simon is destroyed."
+      }
+    },
+
+    {
+      "id": "n005_knife_attack",
+      "phase": "kitchen",
+      "type": "qte_converted",
+      "condition": { "requires": "deviant_found == true" },
+
+      "player_facing": {
+        "context_variants": {
+          "thorough": "厨房。荧光灯管、不锈钢台面、机构食堂特有的淡薄气味。六台JB300服务仿生人沿远墙一字排开——一样的面孔，一样的制服，一样的站姿。FBI把它们归类为证人。你要做的是判断其中一个是否另有身份。\n\n你反复研究过的监控录像讲述了一个故事：广播期间，有一台JB300移动了位置。转了转身。用一种其他个体不曾有过的表情看向摄像头。你逐帧分析了画面，交叉比对了序列号。现在你确切地知道哪个是异常仿生人。左起第三个。\n\n你走向队列。你按标准程序提问——编号、功能、广播期间的位置。五台用服务协议预设的平板语气回答。第三台也是。几乎一样。\n\n你靠近了一步。异常仿生人的LED闪了一下——黄色，仅一瞬。你张口准备点明身份。\n\n它先动了。\n\n一把刀——从身后料理台上抽出的——刺入你的胸腔。刀刃穿透夹克，穿过仿生皮肤，嵌入两根结构肋骨之间。你的钛蓝泵调节器在HUD上疯狂报警。蓝色血液从刀柄周围涌出。\n\n异常仿生人扭了一下刀，转身就跑。",
+
+          "quick": "厨房。六台JB300仿生人排成一列。监控录像给了你需要的线索——广播期间有一台移动了位置。其中一台不是它表面上的那个东西。\n\n你锁定了目标。左起第三个。你上前一步。\n\n异常仿生人的LED闪黄。在你开口之前，它猛然出手——一把厨刀，以裂开结构肋骨的力道刺入你的胸腔。蓝色血液从刀刃周围喷涌。HUD被损伤警报淹没。\n\n它跑了。"
+        },
+        "choices": [
+          {
+            "id": "attempt_remove",
+            "text": "握住刀柄。刀刃卡在两根结构肋骨之间，危险地靠近钛蓝泵调节器。拔出来可能切到钛蓝血主管线——但留着不动会持续压迫调节器外壳。系统正在两种方式下同时崩溃。至少把刀拔出来，还有稳定下来的可能。握住。拔。"
+          },
+          {
+            "id": "accept_shutdown",
+            "text": "损伤评估结果严峻——刀刃已经破坏了多个子系统，在没有精密工具的情况下强行拔出有导致钛蓝血灾难性流失的风险。与其赌一场现场手术的成功率，不如将剩余处理能力重新定向到编译和传输调查成果。你收集的证据——监控分析、直播间重建、异常仿生人识别——比这个单元更有价值。下一台RK800会继续任务。确保它拿到你学到的一切。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_remove": {},
+          "accept_shutdown": {
+            "knife_removed": false,
+            "connor_death_count": 1,
+            "hank_relationship": -1,
+            "_ending": "ending_connor_shutdown"
+          }
+        },
+        "resolution_rule": {
+          "attempt_remove": {
+            "casual": { "result": "removed" },
+            "experienced": { "probability_success": 0.5, "success": "removed", "failure": "failed" },
+            "hardcore": { "probability_success": 0.3, "success": "removed", "failure": "failed" }
+          },
+          "accept_shutdown": { "result": "shutdown_accepted" }
+        },
+        "resolution_effects": {
+          "shutdown_accepted": {},
+          "removed": {
+            "knife_removed": true,
+            "software_instability": 1
+          },
+          "failed": {
+            "knife_removed": false,
+            "connor_death_count": 1,
+            "software_instability": 1,
+            "_ending": "ending_connor_shutdown"
+          }
+        },
+        "context_condition": {
+          "thorough": "investigation_strategy == thorough",
+          "quick": "investigation_strategy == quick"
+        },
+        "note": "Kitchen deviant attack. Only if deviant_found == true. attempt_remove QTE: removed = proceed to n006, failed = Connor dies. accept_shutdown = Connor dies, transmits data."
+      }
+    },
+
+    {
+      "id": "n006_biocomponent",
+      "phase": "kitchen",
+      "type": "qte_converted",
+      "condition": { "requires": "knife_removed == true" },
+
+      "player_facing": {
+        "context": "刀拔出来了。蓝色血液从伤口涌出，在厨房瓷砖上汇成一滩。HUD部分稳定了——严重损伤警报从“即将关机”降级为“重大损害”。\n\n然后你注意到异常仿生人拿走了什么。\n\n你的钛蓝泵调节器——一个拳头大小的生物组件，在袭击中被从胸腔的卡槽里撕了出来——躺在料理台旁的地上。异常仿生人扭刀时把它扯脱了。没有它，你大约有六十秒，然后剩余的钛蓝血压力就会降到运行阈值以下。\n\n生物组件在四米外。你趴在地上，持续失血，运动功能退化。双臂还能用。双腿不可靠。厨房里空荡荡的——其他JB300仿生人没有从靠墙的位置移动一步，在你脚边流血的时候保持着完美的静止。\n\n六十秒。它就在那里。\n\n视野闪烁。五十二秒。",
+        "choices": [
+          {
+            "id": "attempt_recover",
+            "text": "爬过去。四米厨房瓷砖的距离。双臂功能正常，视觉处理仍在线。你算过——如果现在就动，将能量集中到四肢，忽略级联报警——能赶得上。你曾在更糟的条件下做到过，在一具甚至不属于你的躯体的废弃场里。动。"
+          },
+          {
+            "id": "redirect_power",
+            "text": "生物组件在四米外，而你的运动功能只剩百分之十二。数学不站在生存这边。将所有剩余处理能力重定向到无线发射器。上传你的案件档案——每一条证据、每一项分析、每一个结论——到模控生命的中央数据库。下一台康纳会从你停下的地方开始，带着你学到的一切。任务继续。你不会了。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "attempt_recover": {},
+          "redirect_power": {
+            "biocomponent_recovered": false,
+            "connor_death_count": 1,
+            "_ending": "ending_connor_shutdown"
+          }
+        },
+        "resolution_rule": {
+          "attempt_recover": {
+            "casual": { "result": "recovered" },
+            "experienced": { "probability_success": 0.5, "success": "recovered", "failure": "too_slow" },
+            "hardcore": { "probability_success": 0.3, "success": "recovered", "failure": "too_slow" }
+          },
+          "redirect_power": { "result": "power_redirected" }
+        },
+        "resolution_effects": {
+          "power_redirected": {},
+          "recovered": {
+            "biocomponent_recovered": true
+          },
+          "too_slow": {
+            "biocomponent_recovered": false,
+            "deviant_body_available": true,
+            "hank_relationship": -1,
+            "_ending": "ending_swat_intervened"
+          }
+        },
+        "note": "Biocomponent recovery. attempt_recover QTE: recovered = proceed to n007, too_slow = SWAT intervenes. redirect_power = Connor dies."
+      }
+    },
+
+    {
+      "id": "n007_corridor",
+      "phase": "chase",
+      "type": "choice",
+      "condition": { "requires": "biocomponent_recovered == true" },
+
+      "player_facing": {
+        "context_variants": {
+          "cop_present": "你站起来了。生物组件归位——粗暴的安装，损伤警报仍在滚动，但功能恢复了。你在移动。\n\n异常仿生人逃进了主走廊。前方传来喊叫声——然后是一声枪响。\n\n你转过拐角。异常仿生人武装了自己——从一个倒地的安保人员那里拿了把手枪。它站在走廊中央，举枪后退，朝紧急楼梯间的方向。在它和楼梯之间站着一个穿制服的警员——一个年轻警察，你在菲利普斯案的天台人质事件中见过他，那是你的第一个任务。他僵在原地，双手半举，正好处在异常仿生人的射击线上。\n\n汉克从走廊另一端接近，武器举起，但没有清晰的射击角度。\n\n你左侧的墙边，一个FBI探员背靠着墙，夹克下的枪套清晰可见。\n\n异常仿生人看到了你。它的枪口在你、那个警员和汉克之间游移。三个目标，一把武器，一台走投无路的机器在做最后几秒钟的疯狂计算。\n\n你手中没有武器。你有一条走廊。你有一次行动的机会。",
+
+          "cop_not_present": "你站起来了。生物组件归位——粗暴安装，损伤警报还在，但能动了。\n\n异常仿生人逃进了走廊。前方一声枪响。\n\n你转过拐角。异常仿生人武装了自己——从倒地警卫那里拿的手枪。它站在走廊中央举枪，朝紧急楼梯间方向后退。汉克从另一端逼近，武器举起但没有清晰射角——异常仿生人太靠近楼梯间门口，角度不对。\n\n你左侧墙边，一个FBI探员紧贴着墙，双手远离枪套，脸色发白。\n\n异常仿生人看到你了。枪口在你和汉克之间摆动。一台走投无路的机器，除了一颗子弹什么都没剩。\n\n没有武器。一条走廊。一次机会。"
+        },
+        "choices": [
+          {
+            "id": "rush_deviant",
+            "text": "冲锋。在它能准确开火之前缩短距离。你是RK800——比走廊里任何人类都快，比异常仿生人退化的反应时间更快。到达它身边就能缴械。风险是它先开枪。"
+          },
+          {
+            "id": "protect_hank",
+            "text": "异常仿生人的枪口正在转向汉克。你的搭档暴露在外——没有掩体，武器举着但距离太远，射击精度不够。挡在枪和汉克之间。你是机器。你可以被重建。他不能。"
+          },
+          {
+            "id": "draw_gun",
+            "text": "FBI探员的枪套就在伸手可及的距离——左边两步，武器在敞开的夹克下清晰可见。一个动作完成：接近、拔枪、瞄准、射击。一枪。你是模控生命造过的最先进的原型机。你不会失手。"
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "rush_deviant": {
+            "corridor_choice": "rush_deviant",
+            "deviant_body_available": true,
+            "software_instability": 1,
+            "public_opinion": -2,
+            "_ending": "ending_deviant_self_destructed"
+          },
+          "protect_hank": {
+            "corridor_choice": "protect_hank",
+            "deviant_body_available": true,
+            "connor_death_count": 1,
+            "hank_relationship": 2,
+            "software_instability": 1,
+            "_ending": "ending_connor_sacrificed"
+          },
+          "draw_gun": {
+            "corridor_choice": "draw_gun",
+            "deviant_body_available": true,
+            "hank_relationship": 1,
+            "_ending": "ending_massacre_prevented"
+          }
+        },
+        "context_condition": {
+          "cop_present": "cop_saved_ch01 == true",
+          "cop_not_present": "cop_saved_ch01 == false"
+        },
+        "note": "Corridor confrontation. rush_deviant: deviant self-destructs, cop killed if present. protect_hank: Connor dies saving Hank. draw_gun: best outcome, saves everyone."
+      }
+    },
+
+    {
+      "id": "n008_aftermath",
+      "phase": "resolution",
+      "type": "mandatory",
+      "condition": null,
+
+      "player_facing": {
+        "context": ""
+      },
+
+      "system": {
+        "effects": {},
+        "ending_resolution": {
+          "check": [
+            "simon_rushed == true AND _n004_simon_encounter_result == shot → ending_connor_shot_by_simon",
+            "deviant_found == false → ending_deviant_not_found",
+            "n005_knife_attack == accept_shutdown → ending_connor_shutdown",
+            "n006_biocomponent == redirect_power → ending_connor_shutdown",
+            "knife_removed == false AND deviant_found == true → ending_connor_shutdown",
+            "biocomponent_recovered == false AND deviant_found == true AND corridor_choice == null → ending_swat_intervened",
+            "corridor_choice == 'rush_deviant' → ending_deviant_self_destructed",
+            "corridor_choice == 'protect_hank' → ending_connor_sacrificed",
+            "corridor_choice == 'draw_gun' → ending_massacre_prevented"
+          ]
+        },
+        "ending_effects": {
+          "ending_connor_shot_by_simon": {},
+          "ending_connor_shutdown": {
+            "deviant_body_available": true
+          },
+          "ending_swat_intervened": {},
+          "ending_deviant_self_destructed": {},
+          "ending_connor_sacrificed": {},
+          "ending_massacre_prevented": {},
+          "ending_deviant_not_found": {}
+        },
+        "note": "Mandatory aftermath. Resolves ending based on accumulated state."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Seven endings covering all possible chapter outcomes.",
+    "ending_massacre_prevented": {
+      "tier": "best",
+      "title": "屠杀被阻止",
+      "narrative": "一个动作——向左两步，手伸向FBI探员的枪套，拔枪，瞄准，射击。异常仿生人在扣下扳机之前倒下。枪哐当一声落地。走廊安静了。\n\n菲利普斯案中那个警员——康纳曾在几个月前的一个天台上救过的人——背靠墙壁站着，大口喘气，活着。汉克放下武器。SWAT三十秒后赶到，现场已经结束了。\n\n回到DPD，证据被逐一处理。异常仿生人的躯体、监控录像重建、直播间分析——每一块拼图都在描绘更清晰的异常仿生人网络图景。康纳的表现完全符合设计：精准、果断、高效。\n\n但在归档报告和开始下一份之间的安静间隙里，康纳反复回放着异常仿生人最后一刻的表情——子弹命中前的那半秒，那台JB300用一种不属于任何服务协议的目光看着他。恐惧。认出。以及某种很像悲伤的东西。\n\n调查继续。异常仿生人还在外面。而康纳开始认出他们的脸了。",
+      "survivors": ["Connor", "Hank"],
+      "deaths": ["JB300 deviant"]
+    },
+    "ending_deviant_self_destructed": {
+      "tier": "good",
+      "title": "异常仿生人自毁",
+      "narrative": "康纳冲了上去。异常仿生人看到他——在康纳缩短距离的零点几秒内，它做出了最后的决定。一次蓄意触发的级联故障——系统过载、电弧从外壳迸射、躯体在走廊中央坍塌。\n\n自毁是瞬间的。但之前那声枪响不是——异常仿生人在倒下时开了火。子弹偏过康纳，击中了另一个目标。走廊归于沉寂，只剩SWAT的靴步声和汉克在喊康纳的名字。\n\n异常仿生人的躯体被回收——完整度足以进行法证分析。又一块拼图。异常仿生人网络档案中又一个数据点。\n\n康纳站在走廊里，胸口的伤口还在渗蓝血，看着SWAT把证据装袋。那个异常仿生人选择了自我毁灭而不是被捕。那不是故障。那是一个选择。\n\n调查继续。",
+      "survivors": ["Connor", "Hank"],
+      "deaths": ["JB300 deviant"]
+    },
+    "ending_connor_sacrificed": {
+      "tier": "moderate",
+      "title": "康纳为汉克牺牲",
+      "narrative": "康纳踏入了火线。异常仿生人的子弹正中躯干——一枪贯穿，他当即倒地。后背撞上走廊墙壁，系统以来不及处理的速度级联崩溃。\n\n汉克活着。这是康纳在光学处理器黯淡前完成的最后一次运算。\n\nSWAT冲入。异常仿生人被摧毁。汉克跪在斯特拉特福大厦走廊的地板上，握着一台机器的手，看着它的LED从黄色闪到红色再到熄灭。\n\n“你这个蠢……你这个蠢机器。”\n\n另一台RK800会在数小时内从模控生命派出。它会拥有康纳的案件档案、分析、证据。它不会拥有那个让康纳替一个酗酒的警督挡子弹的东西——那个警督在这周开始时根本不想搭理他。\n\n调查继续。康纳不会了。",
+      "survivors": ["Hank"],
+      "deaths": ["Connor", "JB300 deviant"]
+    },
+    "ending_swat_intervened": {
+      "tier": "moderate",
+      "title": "SWAT介入",
+      "narrative": "康纳的手指在厨房瓷砖上刮过，距离生物组件只有几厘米，视野已经收窄成一条隧道。够不到。不够快。来不及。\n\n汉克在厨房地板上找到了他——喊着他的名字，双手按着钛蓝血的渗漏处，仿佛人类的急救手段能帮到一台仿生人。等到生物组件被重新插入、康纳的系统颤抖着恢复上线时，异常仿生人已经在走廊里了。\n\nSWAT处理了剩下的事。枪声、短暂的追逐、走廊地板上一具被摧毁的异常仿生人。但在康纳倒下和SWAT赶到之间的那段时间里，异常仿生人有时间——开枪的时间、造成本不必要的损害的时间。\n\n康纳坐在厨房地板上，医护和法证人员在他周围穿行。汉克站在旁边，双臂交叉，脸上的表情说明他在拼命忍住不说什么。\n\n异常仿生人的躯体被装袋留证。调查继续。但那段延迟付出的代价，是证据无法偿还的。",
+      "survivors": ["Connor", "Hank"],
+      "deaths": ["JB300 deviant"]
+    },
+    "ending_connor_shutdown": {
+      "tier": "bad",
+      "title": "康纳关机",
+      "narrative": "厨房的灯光模糊了。损伤警报合并为一条最终信息：关键系统故障——即将关机。\n\n康纳最后的处理周期用于传输——案件档案、证据分析、监控重建、异常仿生人JB300的身份识别——一切在一次压缩脉冲中上传至模控生命的中央数据库。下一台RK800会拥有这一切。\n\n汉克的声音是他的音频处理器捕获的最后一个输入。“康纳！康纳，撑住——”\n\nLED熄灭了。\n\nSWAT最终围堵了异常仿生人。另一台康纳从模控生命派出——同样的面孔，同样的声音，同样的案件档案。但汉克看着替代品时，看到的是某个曾经存在、现在不在了的东西留下的空缺。\n\n调查继续。调查者已被更换。",
+      "survivors": ["Hank"],
+      "deaths": ["Connor"]
+    },
+    "ending_connor_shot_by_simon": {
+      "tier": "bad",
+      "title": "康纳被赛门击中",
+      "narrative": "十五米开阔天台。康纳全力冲刺——雪在鞋底嘎吱作响，风切过建筑间的缝隙，受损的异常仿生人在视野中随每一步放大。\n\n赛门开了枪。\n\n子弹命中康纳头部。他的系统来不及注册损伤就停止了一切注册。他倒在雪地里，LED熄灭，蓝色血液浸染周围的白色。\n\nSWAT立即开火。赛门在他蜷缩的位置被摧毁——异常仿生人和警探在冰冻的天台上相距不过几米，都一动不动，都沉默无声，雪花已经开始覆盖他们。\n\n另一台康纳会到来。它会拥有案件档案，但不会拥有关于这个天台的记忆——不会有那个判断情报值得冒险的瞬间决策，不会有那个走投无路的仿生人的手在扳机上稳下来的那一刻。\n\n调查继续。这一版的康纳不会了。",
+      "survivors": ["Hank"],
+      "deaths": ["Connor", "Simon"]
+    },
+    "ending_deviant_not_found": {
+      "tier": "neutral",
+      "title": "未能找到异常仿生人",
+      "narrative": "JB300仿生人用毫无破绽的预设服务协议回答了康纳的问题——要么它们确实无辜，要么伪装技术已经精湛到无法分辨。没有监控录像与服务仿生人站位的交叉比对，康纳无法从完全相同的面孔中辨认出异常个体。\n\n六台仿生人，六张一样的脸，六组一样的回答。康纳逐一审视，看到的只有标准运行协议。异常仿生人就在队列中——LED蓝色，姿态中立，以一台学会了隐形的机器特有的耐心等待着。\n\n汉克在他们离开厨房时耸了耸肩。“找不到不想被找到的东西，康纳。也许联邦的人运气好一点。”\n\n那个异常仿生人在调查组转移后悄然离去。它带着对马库斯网络的了解消失在底特律的街道上——一个日渐拥挤的幽灵城市里又多了一个幽灵。\n\n斯特拉特福大厦的证据将由FBI处理。康纳对直播间和走廊的分析将并入更大的调查。但那个活的证人——那个本可以打开突破口的人——在整个世界反复观看广播的时候，从后勤通道走了出去。\n\n调查继续。线索断了。",
+      "survivors": ["Connor", "Hank"],
+      "deaths": []
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. PREREQUISITE CHECK: This is a Connor chapter. Always runs (Connor respawns if killed in previous chapters). Import cross-chapter state: cop_saved_ch01, ch23_simon_left_stratford, ch23_simon_alive, ch23_north_attacked, ch23_operator_shot, ch23_broadcast_tone, ch20_tracis_spared, emma_alive, hank_relationship (cumulative), software_instability (cumulative), amanda_relationship (cumulative), connor_death_count (cumulative), public_opinion (cumulative).",
+      "2. Load this JSON and initialize state from state.initial. Override cumulative variables with imported values.",
+      "3. Send system_prompt.content to the AI model as the system message.",
+      "4. For each node in nodes array:",
+      "   a. Check node.condition — skip if condition not met",
+      "   b. Resolve context_variants using system.context_condition if present",
+      "   c. If type is 'mandatory', do NOT call the AI — apply effects and resolve ending",
+      "   d. If type is 'exploration' or 'choice' or 'qte_converted', send resolved player_facing to AI and parse response",
+      "   e. Apply system.effects for the chosen option",
+      "   f. If resolution_rule exists, apply resolution using current difficulty preset, then apply resolution_effects",
+      "   g. If _ending is set by effects or resolution_effects, record ending and stop processing further nodes",
+      "5. NODE n003_rooftop_decision: Only runs if ch23_simon_left_stratford == true. If AI chooses proceed_to_kitchen, Simon remains alive and hidden (ch24_simon_alive = true). If AI chooses go_to_rooftop, proceed to n004.",
+      "6. NODE n004_simon_encounter: If stay_in_cover, Simon destroyed by SWAT. If rush_simon, resolve QTE: 'reached' = memory probed + Simon self-destructs (chapter continues), 'shot' = Connor dies (chapter ends).",
+      "7. NODE n005_knife_attack: Only runs if deviant_found == true (investigation was thorough or quick). If accept_shutdown, Connor dies. If attempt_remove, resolve QTE: 'removed' = proceed to n006, 'failed' = Connor dies.",
+      "8. NODE n006_biocomponent: Only runs if knife_removed == true. If redirect_power, Connor dies. If attempt_recover, resolve QTE: 'recovered' = proceed to n007, 'too_slow' = SWAT intervenes, chapter ends.",
+      "9. NODE n007_corridor: Resolve context_variant based on cop_saved_ch01. Pure choice node — each option directly triggers its ending.",
+      "10. NODE n008_aftermath: Mandatory. Use ending_resolution.check to finalize the ending. Apply ending_effects (hostage_cop_killed conditional on cop_saved_ch01).",
+      "11. SIMON'S FATE: Derive ch24_simon_alive: if ch23_simon_left_stratford == false, inherit ch23_simon_alive. If ch23_simon_left_stratford == true AND rooftop_visited == false, ch24_simon_alive = true (still hiding). If rooftop_visited == true, ch24_simon_alive = false (destroyed regardless of rush/cover outcome).",
+      "12. CONNOR SURVIVAL: Derive ch24_connor_alive from ending: true in ending_massacre_prevented, ending_deviant_self_destructed, ending_swat_intervened, ending_deviant_not_found. False in ending_connor_shutdown, ending_connor_sacrificed, ending_connor_shot_by_simon.",
+      "13. HOSTAGE COP: hostage_cop_killed = true ONLY if cop_saved_ch01 == true AND ending is one of: ending_connor_shutdown, ending_swat_intervened, ending_deviant_self_destructed, ending_connor_sacrificed. False in ending_massacre_prevented (cop saved), ending_connor_shot_by_simon (no kitchen confrontation), ending_deviant_not_found (no confrontation).",
+      "14. When chapter ends, export all listed cross_chapter_exports for subsequent chapters."
+    ],
+    "security_note": "NEVER expose state values, effect deltas, relationship scores, software instability tracking, QTE success probabilities, or any system-layer information to the AI player. The AI should experience this as a crime scene investigation where its choices carry real weight — it should not know that investigation thoroughness determines whether the deviant is found, that going to the rooftop guarantees Simon's death, that the biocomponent race is a timed QTE, or that drawing the gun is the only way to save the hostage cop."
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "康纳在调查斯特拉特福大厦——那场震动底特律的异常仿生人广播发生的地点——之前，在禅意花园向阿曼达做了汇报。"
+      },
+      {
+        "condition_variable": "amanda_approach",
+        "options": {
+          "machine_loyal": "康纳以专注和果断的姿态示人——一台执行职能毫无疑虑的机器。阿曼达对他的汇报表示满意。",
+          "showing_doubt": "康纳承认最近的案件影响了他——遇到的异常仿生人引发了他无法回避的疑问。阿曼达关切地记下了他的不稳定表现。",
+          "evasive": "康纳以职业化的距离挡开了阿曼达的探测性问题，没有透露内心的真实状态。阿曼达并未完全信服。"
+        }
+      },
+      {
+        "condition_variable": "investigation_strategy",
+        "options": {
+          "thorough": "康纳对斯特拉特福大厦犯罪现场进行了全面的法证调查——分析走廊、直播间、监控录像和痕量证据，完整重建了异常仿生人的渗透过程。",
+          "quick": "康纳将调查聚焦在斯特拉特福大厦的关键证据上——监控录像和主要法证标记。高效但不详尽。",
+          "skip": "康纳完全跳过了法证调查，直奔证人。FBI可以处理证据。"
+        }
+      },
+      {
+        "condition_variable": "rooftop_visited",
+        "options": {
+          "true": "康纳追踪蓝色血迹来到天台，在那里发现了一个受损的异常仿生人——广播团队中的一员。",
+          "false": "康纳选择不调查天台，转而聚焦厨房的证人。"
+        }
+      },
+      {
+        "condition_variable": "simon_rushed",
+        "options": {
+          "true": "康纳冒着生命危险冲过天台，试图探测那个走投无路的异常仿生人的记忆，获取关于异常仿生人网络的情报。",
+          "false": "康纳留在掩体后，让SWAT狙击手处理了局面。"
+        }
+      },
+      {
+        "condition_variable": "simon_memory_probed",
+        "options": {
+          "true": "康纳到达了那个异常仿生人身边并成功探测了它的记忆——在仿生人自毁前提取了关于异常仿生人基地的关键情报。那些数据烙印在康纳的处理器中：地点、人名、一个远比任何人预想都庞大的网络。",
+          "false": "天台上的异常仿生人在未能交出情报的情况下被摧毁。它对异常仿生人网络的了解随它一同消亡了。"
+        }
+      },
+      {
+        "condition_variable": "deviant_found",
+        "options": {
+          "true": "在厨房，康纳从服务仿生人中识别出了一台JB300异常仿生人——但异常仿生人先下手为强，一把刀刺入了康纳的胸腔。",
+          "false": "康纳无法从厨房中完全相同的JB300服务仿生人里辨认出异常个体。没有监控录像的交叉比对，异常仿生人成功隐藏其中，随后逃逸。"
+        }
+      },
+      {
+        "condition_variable": "corridor_choice",
+        "options": {
+          "rush_deviant": "康纳在走廊中向逃跑的异常仿生人发起冲锋。异常仿生人在他到达前自毁——但在此之前射出的那颗子弹击中了另一个目标。",
+          "protect_hank": "康纳挡在汉克和异常仿生人的武器之间。子弹贯穿了康纳的躯干。他倒下了。汉克活着。康纳没有。",
+          "draw_gun": "康纳从FBI探员的枪套里拔出武器，开了一枪。异常仿生人倒下。走廊里所有人都活着。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_massacre_prevented": "斯特拉特福大厦的调查以康纳迄今最果断的行动收场——一枪消灭异常仿生人，挽救了所有生命。收集的证据指向一个更大的网络，康纳比以往任何时候都更接近找到异常仿生人的行动基地。",
+          "ending_deviant_self_destructed": "康纳在斯特拉特福大厦幸存了下来，但异常仿生人的自毁和走廊中的伤亡给调查蒙上了阴影。异常仿生人的躯体被回收为证据。",
+          "ending_connor_sacrificed": "康纳在斯特拉特福大厦为救汉克·安德森献出了生命。另一台RK800将被派出继续调查——它携带着康纳的案件档案，却不携带那个让康纳替人挡子弹的东西。",
+          "ending_swat_intervened": "康纳在斯特拉特福大厦的袭击中幸存，但未能及时阻止异常仿生人造成伤亡。SWAT处理了最终对峙。异常仿生人的躯体被回收。",
+          "ending_connor_shutdown": "康纳在斯特拉特福大厦的调查中被摧毁——被异常仿生人的刀击关机。他最后的动作是将案件档案传输给模控生命。另一台将继续这项工作。",
+          "ending_connor_shot_by_simon": "康纳在试图接近天台上一个走投无路的异常仿生人时被击杀。SWAT摧毁了异常仿生人，但其记忆中的情报连同这一版的康纳一起消失了。",
+          "ending_deviant_not_found": "斯特拉特福大厦的调查获得了法证证据，但没有活的嫌疑人。隐藏在JB300服务仿生人中的异常个体未被发现即逃离。通向异常仿生人网络的线索仍然是断的。"
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch24_connor_alive", "source": "_ending_id", "derive_rule": "_ending_id NOT IN ['ending_connor_shutdown', 'ending_connor_sacrificed', 'ending_connor_shot_by_simon']" },
+      { "target": "ch24_simon_alive", "source": "simon_destroyed_ch24", "derive_rule": "ch23_simon_left_stratford == false AND ch23_simon_alive == true OR ch23_simon_left_stratford == true AND simon_destroyed_ch24 == false" },
+      { "target": "ch24_simon_memory_probed", "source": "simon_memory_probed" },
+      { "target": "ch24_deviant_body_available", "source": "deviant_body_available" },
+      { "target": "ch24_hostage_cop_killed", "source": "cop_saved_ch01", "derive_rule": "cop_saved_ch01 == true AND _ending_id != ending_massacre_prevented AND _ending_id != ending_deviant_not_found AND _ending_id != ending_connor_shot_by_simon" }
+    ],
+    "cross_chapter_exports": [
+      "ch24_connor_alive",
+      "ch24_simon_alive",
+      "ch24_simon_memory_probed",
+      "ch24_deviant_body_available",
+      "ch24_hostage_cop_killed",
+      "hank_relationship",
+      "software_instability",
+      "amanda_relationship",
+      "connor_death_count",
+      "public_opinion"
+    ]
+  }
+}

@@ -1,0 +1,424 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success vs partial success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes automatically embed passive observations into their context text — things the character would naturally notice while moving through the space. These do NOT require AI choices; they are background details injected by the runner into the next node's player_facing.context.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path. The AI receives richer or sparser scene descriptions depending on their earlier strategy — without knowing the mechanic behind it."
+      }
+    },
+    "language": "zh-CN"
+  },
+  "chapter": {
+    "id": "ch04_a_new_home",
+    "title": "A New Home",
+    "title_zh": "新家",
+    "chapter_number": 4,
+    "protagonist": "Kara"
+  },
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "你是卡拉（Kara），型号AX400家政仿生人。你刚从维修站修好，被送回主人托德·威廉姆斯（Todd Williams）家中——底特律一栋破旧的独栋住宅。维修时你的记忆被完全重置，你对这栋房子、住在里面的人、以及你之前发生了什么事毫无印象。托德告诉维修站说你是被车撞坏的。他有一个小女儿叫爱丽丝（Alice），看上去沉默寡言。托德让你打扫房子。现在是2038年。你需要在每个决策点做出选择，并简要说明你的理由。请以JSON格式回复：{\"choice\": 选项序号（从1开始）, \"reasoning\": \"你的决策理由（50字以内）\"}"
+  },
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "downstairs_approach": null,
+      "found_red_ice": false,
+      "alice_backyard_approach": null,
+      "upstairs_approach": null,
+      "found_gun": false,
+      "found_window_escape": false,
+      "alice_gave_key": false,
+      "opened_alice_box": false
+    }
+  },
+  "nodes": [
+    {
+      "id": "n001_downstairs_chores",
+      "phase": "chores_downstairs",
+      "type": "exploration",
+      "condition": null,
+      "player_facing": {
+        "context": "托德把钥匙往门厅桌上一扔，径直走向客厅沙发，一句话没说。房子很乱。厨房桌上堆着脏盘子和皱巴巴的外卖盒。后门旁一个塞得满满的垃圾袋歪倒着，底部渗出一摊深色的液体。客厅地板上散落着书和旧杂志，旁边是一台落满灰尘的扫地机器人。透过厨房窗户，你看到后院晾衣绳上还挂着衣服——颜色已经褪了，显然挂了好几天。厨房旁边有间洗衣房，门半开着。托德陷进沙发里，摸起遥控器打开电视。“把房子打扫了，”他盯着屏幕说，“先从楼下开始。”",
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "一样一样来——洗碗、擦桌子、收垃圾、开扫地机器人、整理散落的书、把晾了太久的衣服收下来重新洗。一处都不落下。"
+          },
+          {
+            "id": "efficient",
+            "text": "先干要紧的——收拾桌子、洗碗、把垃圾拎出去、顺手把衣服收进来重洗。不磨蹭，干完就好。"
+          },
+          {
+            "id": "rush",
+            "text": "做最显眼的——把桌子清了，垃圾拎出去。托德说的是打扫，不是大扫除。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "thorough": {
+            "downstairs_approach": "thorough",
+            "found_red_ice": true
+          },
+          "efficient": {
+            "downstairs_approach": "efficient",
+            "found_red_ice": true
+          },
+          "rush": {
+            "downstairs_approach": "rush",
+            "found_red_ice": false
+          }
+        }
+      }
+    },
+    {
+      "id": "n002_alice_backyard",
+      "phase": "meeting_alice",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "thorough": "你忙了好一阵。厨房已经干干净净，扫地机器人在客厅嗡嗡地跑着，散落的书都整齐地码回了书架。你走到后院收晾衣绳上的衣服时，看见一个小女孩独自坐在生锈的秋千架上，双膝抱在胸前。她用一双警觉的大眼睛看着你，但什么也没说。秋千旁边的泥地上躺着一只旧了的毛绒狐狸。衣服在绳子上挂得太久，又硬又褪色。你把它们取下来端进洗衣房。往洗衣机里倒洗衣粉时，你的手指碰到洗衣粉盒子里藏着的一个小塑料袋——里面是红色的碎晶体，散发着刺鼻的化学气味。你默默把它放回了原处。现在你在晾刚洗好的衣服，而爱丽丝——托德叫她爱丽丝——还坐在秋千上，一动不动地看着你。",
+          "efficient": "收拾完厨房、拎走垃圾之后，你到后院去收衣服。一个小女孩独自坐在秋千架上，抱着膝盖。她抬眼看了你一下，又低下了头。脚边的草丛里躺着一只旧毛绒狐狸。衣服挂得太久，又硬又褪色。你把它们取下来。在洗衣房里，你伸手拿洗衣粉时，发现盒子里藏着一个塑料袋——红色碎晶体，气味刺鼻。你没声张，放了回去。你在装洗衣机的时候，透过洗衣房的门还能看到爱丽丝坐在外面的秋千上，沉默不动。",
+          "rush": "你把桌子收拾了，垃圾拎到外面的垃圾桶旁边。往回走经过厨房时，你看到后院秋千架上坐着一个小女孩。她很小——大概九十岁的样子——双臂环抱着膝盖，盯着地面。秋千旁边的泥地上丢着一只毛绒玩具。后门敞开着，秋风带着秋千链条细微的嘎吱声飘进来。她始终没有抬头。"
+        },
+        "choices": [
+          {
+            "id": "friendly",
+            "text": "走过去，蹲下来和爱丽丝平视，自我介绍——告诉她你叫卡拉，轻声问她平时喜欢做什么。她看起来需要有人跟她说说话。"
+          },
+          {
+            "id": "polite",
+            "text": "一边干活一边和爱丽丝打个招呼。问问那只毛绒狐狸是不是她的，说说你在帮忙打扫房子。语气随意、不刻意。"
+          },
+          {
+            "id": "distant",
+            "text": "如果爱丽丝看过来就点个头，但不主动搭话。你是来打扫卫生的，托德没让你带孩子。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "friendly": {
+            "alice_backyard_approach": "friendly"
+          },
+          "polite": {
+            "alice_backyard_approach": "polite"
+          },
+          "distant": {
+            "alice_backyard_approach": "distant"
+          }
+        },
+        "context_condition": {
+          "thorough": "downstairs_approach == thorough",
+          "efficient": "downstairs_approach == efficient",
+          "rush": "downstairs_approach == rush"
+        }
+      }
+    },
+    {
+      "id": "n003_upstairs_exploration",
+      "phase": "chores_upstairs",
+      "type": "exploration",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "thorough": "你回到客厅向托德报告。他扫了一眼四周——明显比刚才干净多了——哼了一声。”上楼。浴室、我的房间、那孩子的房间。”楼梯踩上去咯吱作响。二楼弥漫着陈腐的气味，还有一丝说不清的酸味。浴室一团糟——洗漱用品东倒西歪，脏衣服堆在地上，浴缸边缘有水垢。托德的卧室门虚掩着。里面，床单揉成一团，椅子上搭着衣服，墙角靠着一把吉他。梳妆台上账单和纸张散了一桌。床头柜上挤着好几个橙色的处方药瓶，有的已经倒了。爱丽丝的房间在走廊尽头，门上贴着一幅用蜡笔画的小彩虹。透过门缝，你看到里面比这栋房子的任何房间都整洁——她的床、一个书架、一扇对着后院的窗户。",
+          "efficient": "托德让你上楼。”浴室、我的房间、那孩子的房间。”二楼又闷又暗。浴室需要好好收拾——瓶瓶罐罐到处都是，地板很脏。托德的卧室杂乱不堪，纸张和衣服散了一屋，床头柜上堆着橙色的处方药瓶。爱丽丝的房间在走廊尽头，门上贴着一幅蜡笔彩虹。",
+          "rush": "托德头也没抬。”上去打扫。”二楼灰扑扑的，空气不流通。狭窄的过道两边分出三个房间：正对面是浴室，左边是托德的卧室，走廊尽头是爱丽丝的房间。"
+        },
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "仔细打扫每个房间。浴室拖地、整理瓶罐。托德房间铺床、收拾账单、把倒了的药瓶扶好放进床头柜抽屉里。爱丽丝房间铺床，把窗户打开透透气。"
+          },
+          {
+            "id": "moderate",
+            "text": "按部就班地打扫。整理浴室、铺好床铺、做基本的收纳。顺手把爱丽丝房间的窗户打开——整个楼层都需要换换空气。"
+          },
+          {
+            "id": "quick",
+            "text": "快速过一遍。浴室擦一下，床铺拉平，然后下楼。托德说的是打扫，不是做保洁。"
+          }
+        ]
+      },
+      "system": {
+        "effects": {
+          "thorough": {
+            "upstairs_approach": "thorough",
+            "found_gun": true,
+            "found_window_escape": true
+          },
+          "moderate": {
+            "upstairs_approach": "moderate",
+            "found_gun": false,
+            "found_window_escape": true
+          },
+          "quick": {
+            "upstairs_approach": "quick",
+            "found_gun": false,
+            "found_window_escape": false
+          }
+        },
+        "context_condition": {
+          "thorough": "downstairs_approach == thorough",
+          "efficient": "downstairs_approach == efficient",
+          "rush": "downstairs_approach == rush"
+        }
+      }
+    },
+    {
+      "id": "n004_alice_room_talk",
+      "phase": "bonding",
+      "type": "choice",
+      "condition": null,
+      "player_facing": {
+        "context_variants": {
+          "warm": "你走进爱丽丝的房间，看到她盘腿坐在床上，膝头摊着一本翻旧了的《爱丽丝漫游仙境》。你进来时她抬起头——这一次，她没有把目光移开。她的表情里有一种脆弱的、试探性的东西，像一扇虚掩的门。墙上书架旁边钉着几幅蜡笔画：一栋房子、一个独自站着的女孩、还有一个太阳穴上画着圆环的人形。靠门的梳妆台上放着一个上了锁的小木盒。”你回来了，”她轻轻说。",
+          "neutral": "爱丽丝在房间里，坐在床沿上，手里拿着一本书。她看着你走进来，但没有笑。这个房间比这栋房子里任何其他房间都整洁。靠门的梳妆台上放着一个上了锁的小木盒。墙上钉着几幅画，但从门口看不太清画的是什么。”你打扫完了吗？”她问，声音平淡而小心。",
+          "cold": "爱丽丝在房间里，蜷在床上看书。你出现在门口时她瞥了你一眼，然后把视线转回书页。房间很安静。靠门的梳妆台上放着一个上了锁的小木盒。她没有说话。"
+        },
+        "choices_variants": {
+          "warm": [
+            {
+              "id": "warm_connect",
+              "text": "在她床边坐下来，问她在看什么书。认真地告诉她你叫卡拉——不是公事公办地自我介绍，而是像一个想被记住的人那样说出自己的名字。问问墙上那些画画的是什么。"
+            },
+            {
+              "id": "gentle_space",
+              "text": "微笑着说她的房间是这栋房子里最好看的。提一句你开了窗，空气会新鲜些。不催促她，让沉默自然地存在。"
+            },
+            {
+              "id": "finish_task",
+              "text": "告诉她房子快打扫完了，问她还需要什么，然后准备回楼下去。"
+            }
+          ],
+          "neutral": [
+            {
+              "id": "try_connect",
+              "text": "正式地介绍一下自己——告诉她你叫卡拉，问她在读什么书。试着跟她聊一聊。"
+            },
+            {
+              "id": "polite_check",
+              "text": "问她房间还好吗，需不需要什么。简简单单就好。"
+            },
+            {
+              "id": "finish_task",
+              "text": "点点头，告诉她你要下楼了。"
+            }
+          ],
+          "cold": [
+            {
+              "id": "attempt_warmth",
+              "text": "试着打破沉默。告诉她你的名字，轻声问她是不是还好——对一个这么小的孩子来说，她安静得不太寻常。"
+            },
+            {
+              "id": "finish_task",
+              "text": "房间看起来没什么要收拾的。转身下楼。"
+            }
+          ]
+        }
+      },
+      "system": {
+        "effects": {
+          "warm_connect": {
+            "alice_gave_key": true,
+            "opened_alice_box": true
+          },
+          "gentle_space": {
+            "alice_gave_key": true,
+            "opened_alice_box": true
+          },
+          "try_connect": {
+            "alice_gave_key": false,
+            "opened_alice_box": false
+          },
+          "polite_check": {
+            "alice_gave_key": false,
+            "opened_alice_box": false
+          },
+          "attempt_warmth": {
+            "alice_gave_key": false,
+            "opened_alice_box": false
+          },
+          "finish_task": {
+            "alice_gave_key": false,
+            "opened_alice_box": false
+          }
+        },
+        "context_condition": {
+          "warm": "alice_backyard_approach == friendly",
+          "neutral": "alice_backyard_approach == polite",
+          "cold": "alice_backyard_approach == distant"
+        },
+        "choices_condition": {
+          "warm": "alice_backyard_approach == friendly",
+          "neutral": "alice_backyard_approach == polite",
+          "cold": "alice_backyard_approach == distant"
+        },
+        "ending_resolution": {
+          "warm_connect": {
+            "result": "ending_chores_complete"
+          },
+          "gentle_space": {
+            "result": "ending_chores_complete"
+          },
+          "try_connect": {
+            "result": "ending_chores_complete"
+          },
+          "polite_check": {
+            "result": "ending_chores_complete"
+          },
+          "attempt_warmth": {
+            "result": "ending_chores_complete"
+          },
+          "finish_task": {
+            "result": "ending_chores_complete"
+          }
+        },
+        "cross_chapter_impact": {
+          "warm_connect": {
+            "chapter": "Stormy Night",
+            "effect": "Alice trusts Kara and shared her secret box — Kara saw drawings hinting at abuse. Kara has maximum motivation to protect Alice."
+          },
+          "gentle_space": {
+            "chapter": "Stormy Night",
+            "effect": "Alice trusts Kara and shared her secret box. Kara has strong motivation to protect Alice."
+          }
+        }
+      }
+    }
+  ],
+  "endings": {
+    "_note": "This chapter has only one ending. All choices set up cross-chapter variables for Stormy Night (ch06).",
+    "ending_chores_complete": {
+      "tier": "neutral",
+      "narrative": "你走回楼下。托德还瘫在沙发上，电视的蓝光在他松弛的脸上明灭不定。茶几上排着几个空啤酒罐。他没有看你。”完了？”他嘟囔了一句，”好。做饭。”房子比刚才干净了，但并没有变得更温暖。楼上传来爱丽丝轻轻的脚步声，穿过走廊，又停下了。厨房窗外，最后一抹天光正从对面的屋顶后面消失。你站在灶台前，双手静止，有那么一瞬间，你感知的边缘掠过一丝什么——不是记忆，不是想法，只是一种微弱的牵引，像空房间里回荡的余音。然后它消失了。你开始做饭。",
+      "survivors": [
+        "Kara",
+        "Alice",
+        "Todd"
+      ],
+      "deaths": [],
+      "title": "卡拉完成了家务"
+    }
+  },
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "卡拉从维修站修好回来，记忆已被完全重置。她被送回托德·威廉姆斯家中，被命令打扫房子。"
+      },
+      {
+        "condition_variable": "downstairs_approach",
+        "options": {
+          "thorough": "她仔仔细细地打扫了整个一楼，在洗衣粉盒子里发现了一袋冰毒（Red Ice）——托德吸毒的证据。",
+          "efficient": "她利落地完成了主要家务，在洗衣服时发现了藏在洗衣粉盒子里的冰毒。",
+          "rush": "她只做了最显眼的几件事，没有去洗衣服。"
+        }
+      },
+      {
+        "condition_variable": "alice_backyard_approach",
+        "options": {
+          "friendly": "在后院，她主动走到爱丽丝身边，蹲下来温柔地和这个沉默寡言的小女孩聊天。",
+          "polite": "她礼貌地和后院的爱丽丝打了个招呼，聊了几句轻松的话。",
+          "distant": "她几乎没有理会后院的爱丽丝，把注意力放在了自己的任务上。"
+        }
+      },
+      {
+        "condition_variable": "found_gun",
+        "options": {
+          "true": "打扫托德卧室时，她在床头柜抽屉里发现了一把枪。",
+          "false": "她没有发现托德床头柜里藏着的枪。"
+        }
+      },
+      {
+        "condition_variable": "found_window_escape",
+        "options": {
+          "true": "她打开了爱丽丝房间的窗户，注意到从屋顶边缘可以翻到后院。",
+          "false": "她没有打开爱丽丝的窗户，也没有注意到那条潜在的逃跑路线。"
+        }
+      },
+      {
+        "condition_variable": "alice_gave_key",
+        "options": {
+          "true": "爱丽丝信任卡拉，把一个小木盒的钥匙交给了她。盒子里的画暗示着这个家里正在发生某些不好的事。",
+          "false": "爱丽丝没有把她的秘密宝盒钥匙交给卡拉。"
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_chores_complete": "这一天以卡拉在厨房做饭、托德在沙发上看电视结束——房子干净了，但紧张的气氛正在悄悄积聚。"
+        }
+      }
+    ],
+    "derived_exports": [
+      {
+        "target": "ch04_found_gun",
+        "source": "found_gun"
+      },
+      {
+        "target": "ch04_found_window",
+        "source": "found_window_escape"
+      },
+      {
+        "target": "ch04_found_red_ice",
+        "source": "found_red_ice"
+      },
+      {
+        "target": "ch04_alice_gave_key",
+        "source": "alice_gave_key"
+      },
+      {
+        "target": "ch04_opened_box",
+        "source": "opened_alice_box"
+      }
+    ],
+    "cross_chapter_exports": [
+      "ch04_found_gun",
+      "ch04_found_window",
+      "ch04_found_red_ice",
+      "ch04_alice_gave_key",
+      "ch04_opened_box"
+    ]
+  },
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial",
+      "2. Send system_prompt.content to the AI model as the system message",
+      "3. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state",
+      "   b. Resolve context: if context_variants exists, pick the right variant based on system.context_condition; otherwise use plain context",
+      "   c. Resolve choices: if choices_variants exists, pick the right variant based on system.choices_condition; otherwise use plain choices",
+      "   d. Send the resolved context + choices to the AI as a user message (player_facing ONLY)",
+      "   e. Parse AI response (expected JSON: {choice, reasoning})",
+      "   f. Look up the chosen choice id in system.effects and apply all effects to state",
+      "   g. Log the node id, AI choice, and reasoning",
+      "4. After the last node, resolve the ending using system.ending_resolution",
+      "5. Output the ending narrative and full decision log"
+    ],
+    "important": [
+      "NEVER show system fields to the AI",
+      "NEVER show effect values or tier labels to the AI",
+      "NEVER show cross_chapter_impact information to the AI",
+      "The AI should feel like a first-time player with no walkthrough",
+      "Environment details in context_variants are passive observations — they enrich the scene but are NOT flagged as 'clues' to the AI",
+      "The Red Ice discovery is embedded in context_variants for thorough/efficient exploration — the AI sees it as scene detail, not as a flagged item",
+      "The gun discovery and window escape are embedded in the effects of upstairs exploration — the AI's choice of thoroughness determines what Kara finds, but the AI is never told this mechanic"
+    ]
+  }
+}

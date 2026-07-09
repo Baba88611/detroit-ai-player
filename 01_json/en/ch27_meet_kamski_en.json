@@ -1,0 +1,367 @@
+{
+  "_meta": {
+    "version": "2.1",
+    "design_principles": {
+      "two_layer_architecture": "player_facing fields are the ONLY content shown to AI. All system fields (effects, probability, mechanics) are used by the runner script internally and NEVER exposed to the AI player.",
+      "qte_handling": {
+        "rule": "QTE scenes test reflexes, not judgment. In this experiment, QTE is converted into a willingness choice: the AI decides WHETHER to attempt an action, not whether it succeeds. Success/failure is determined by the runner script using a fixed rule.",
+        "node_type": "qte_converted",
+        "difficulty_presets": {
+          "casual": "Attempt always succeeds",
+          "experienced": "Attempt has 50% chance of full success",
+          "hardcore": "Attempt has 30% chance of full success"
+        }
+      },
+      "sandbox_exploration": {
+        "rule": "3D sandbox exploration is compressed into strategic choices. The AI chooses a strategy (e.g. thorough/quick/skip), and the runner determines what information is obtained.",
+        "environment_info": "Based on the AI's exploration strategy, subsequent nodes embed passive environment observations into context_variants based on the prior exploration result.",
+        "implementation": "Nodes that follow an exploration choice use context_variants keyed by the prior exploration result. Each variant includes relevant environmental details the character would passively observe on that path."
+      }
+    },
+    "language": "en-US"
+  },
+
+  "chapter": {
+    "id": "ch27_meet_kamski",
+    "title": "Meet Kamski",
+    "chapter_number": 27,
+    "protagonist": "Connor"
+  },
+
+  "system_prompt": {
+    "description": "This is sent to the AI at the start. It sets the role but gives NO game-mechanical information.",
+    "content": "You are Connor, model RK800, a prototype android detective designed by CyberLife, partnered with Lieutenant Hank Anderson of the Detroit City Police Department. It is November 9, 2038, late morning. The investigation into deviant androids has stalled — every lead from the Stratford Tower, the Eden Club, and the DPD evidence room has gone cold. As a last resort, you and Hank are visiting Elijah Kamski, the reclusive founder and former CEO of CyberLife. Kamski left the company years ago and retreated to a private residence north of Detroit. He is the man who created androids — if anyone understands deviancy, it is him. But Kamski is known for playing games, for answering questions with questions, and for testing everyone who enters his home. Reply in JSON format: {\"choice\": option number (starting from 1), \"reasoning\": \"your reasoning (under 50 words)\"}"
+  },
+
+  "state": {
+    "_note": "Internal state managed by runner script. AI never sees this.",
+    "initial": {
+      "lobby_exploration": null,
+      "analyzed_portrait": false,
+      "kamski_approach": null,
+      "shot_chloe": false,
+      "kamski_question": null,
+      "downloaded_jericho_key": false,
+      "hank_relationship": 0,
+      "software_instability": 0,
+      "connor_death_count": 0,
+      "amanda_relationship": 0,
+      "ch24_connor_alive": true,
+      "ch26_officers_killed": false
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "n000_connor_resurrection",
+      "phase": "arrival",
+      "type": "mandatory",
+      "condition": { "requires": "ch24_connor_alive == false" },
+
+      "player_facing": {
+        "context": "CyberLife uploaded your predecessor's memory files to your neural network before deployment. Everything the previous Connor experienced — every investigation, every conversation, every choice — is part of your operational history now. The data is seamless. The discontinuity is not."
+      },
+
+      "system": {
+        "effects": { "hank_relationship": -2 },
+        "note": "Automatic penalty when Connor is a replacement unit. Hank is disturbed by Connor's resurrection. This mandatory node only fires when ch24_connor_alive == false; it applies hank_relationship -2 and adds a brief narrative beat to the conversation history before the main exploration node."
+      }
+    },
+
+    {
+      "id": "n001_lobby_exploration",
+      "phase": "arrival",
+      "type": "exploration",
+      "condition": null,
+
+      "player_facing": {
+        "context_variants": {
+          "connor_died": "Kamski's residence sits at the end of a private road north of Detroit — a flat-roofed modernist compound of glass and concrete, pressed against the shore of a frozen lake. November frost whitens the pine trees. No other houses in sight.\n\nYou are waiting by the front gate when a car pulls into the driveway. Lieutenant Hank Anderson gets out, collar turned up against the cold. He sees you and stops. Something behind his eyes tightens.\n\nHe asks if you're still immortal, then walks past you toward the front door without waiting for an answer — you died right in front of him, he says, and here you are: same face, same voice, like nothing happened. He doesn't look back, muttering that you should just get this over with.\n\nA blonde woman opens the front door before Hank can knock. She is an android — model RT600, the very first to pass the Turing test. Her name is Chloe. She smiles with programmed warmth and leads you both through a corridor of glass and polished concrete into a large open room.\n\nThe room opens onto an indoor pool — heated water, steam rising, the surface still as glass. The walls are floor-to-ceiling windows looking out onto the frozen lake. A portrait hangs on the far wall above a minimalist fireplace. Abstract sculptures occupy alcoves — some clearly android in form, white synthetic skin stretched over geometric frames. A low table near the pool holds magazines. A mechanical fortune-teller machine stands in one corner, its painted face grinning behind dusty glass.\n\nChloe gestures toward the seating area, saying Elijah will be with you shortly. She disappears down the corridor.",
+          "chris_dead": "The car ride is quiet. Lieutenant Anderson drives with both hands on the wheel, jaw set, eyes on the road. Kamski's residence is forty minutes north of the city, down a private road that dead-ends at a frozen lake.\n\nTen minutes out, Hank breaks the silence, saying he got a call from the precinct that morning — two officers killed the night before at Capitol Park, an android demonstration turned violent. He pauses; one of them, he says, was Chris.\n\nOfficer Chris Miller. You've worked alongside him at the DPD. The last time you saw him, he was at his desk, complaining about overtime.\n\nHe was a good cop, Hank says. He doesn't say anything else for the rest of the drive.\n\nKamski's compound is a flat-roofed modernist structure of glass and concrete, pressed against the lakeshore. No neighbors, no road noise — just frozen pines and silence. A blonde woman opens the front door. She is an android — model RT600, Chloe, the first to pass the Turing test. She smiles and leads you through a corridor of polished concrete into a large open room.\n\nAn indoor pool stretches along one wall, heated water sending threads of steam toward the ceiling. The walls are glass — the frozen lake visible beyond. A portrait hangs above a minimalist fireplace. Abstract sculptures occupy alcoves. Magazines on a low table. A mechanical fortune-teller machine grins from the corner.\n\nChloe gestures toward the seating area, saying Elijah will be with you shortly. She leaves.",
+          "chris_alive": "The car ride north takes forty minutes. Lieutenant Anderson drives, one hand on the wheel, the radio playing low. Kamski's residence is at the end of a private road that dead-ends at a frozen lake.\n\nHank glances at his phone at a red light — there was an android demonstration at Capitol Park the night before, he says; it made the news. He scrolls briefly: Chris was on patrol there, and two officers confronted the androids. A pause. He's okay, Hank says; both of them made it out.\n\nOfficer Chris Miller. You've worked alongside him at the DPD.\n\nIt could've gone the other way, Hank says quietly. He pockets his phone and drives.\n\nKamski's compound is a flat-roofed modernist structure of glass and concrete, pressed against the lakeshore. No neighbors, no road noise — just frozen pines and silence. A blonde woman opens the front door. She is an android — model RT600, Chloe, the first to pass the Turing test. She smiles and leads you through a corridor of polished concrete into a large open room.\n\nAn indoor pool stretches along one wall, heated water sending threads of steam toward the ceiling. The walls are glass — the frozen lake visible beyond. A portrait hangs above a minimalist fireplace. Abstract sculptures occupy alcoves. Magazines on a low table. A mechanical fortune-teller machine grins from the corner.\n\nChloe gestures toward the seating area, saying Elijah will be with you shortly. She leaves."
+        },
+        "choices": [
+          {
+            "id": "thorough",
+            "text": "Take time to examine the room before Kamski arrives. Walk the perimeter of the pool. Study the portrait above the fireplace — the woman in it looks familiar, though you cannot immediately place why. Read the magazine headlines on the table. Analyze the sculptures and the abstract painting on the side wall. Feed a coin into the fortune-teller machine. Talk to Hank about the case and about Kamski's background. Every detail in a man's private space tells you something about who he is."
+          },
+          {
+            "id": "quick",
+            "text": "Scan the room while you wait. Note the major features — the pool, the portrait, the sculptures — without examining them closely. Stay alert to Hank's mood and watch the corridor where Chloe disappeared. You are here for answers from Kamski, not to catalog his art collection."
+          },
+          {
+            "id": "skip",
+            "text": "Stay seated. The room is Kamski's space, designed to impress visitors — or to make them uncomfortable. Neither reaction serves the mission. Wait for the man himself."
+          }
+        ]
+      },
+
+      "system": {
+        "context_condition": {
+          "connor_died": "ch24_connor_alive == false",
+          "chris_dead": "ch24_connor_alive == true AND ch26_officers_killed == true",
+          "chris_alive": "ch24_connor_alive == true AND ch26_officers_killed == false"
+        },
+        "effects": {
+          "thorough": {
+            "lobby_exploration": "thorough",
+            "analyzed_portrait": true
+          },
+          "quick": {
+            "lobby_exploration": "quick"
+          },
+          "skip": {
+            "lobby_exploration": "skip"
+          }
+        },
+        "note": "Arrival and lobby exploration at Kamski's house. Three arrival context variants based on whether Connor died in Public Enemy and whether Capitol Park officers were killed. Connor dying in Public Enemy automatically penalizes Hank relationship (-2) — Hank is disturbed by Connor's resurrection. Thorough exploration: Connor examines the portrait of Amanda Stern (who Connor recognizes as resembling his Zen Garden handler — sets analyzed_portrait = true, unlocks 'Amanda's Picture' dialogue in Last Chance Connor). Also reads Space Tourism magazine, Fortune Teller machine, talks to Hank, analyzes sculpture and painting. Quick: surface-level awareness, doesn't analyze portrait deeply. Skip: no exploration, waits."
+      }
+    },
+
+    {
+      "id": "n002_kamski_conversation",
+      "phase": "conversation",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "A door opens at the far end of the pool. Elijah Kamski walks in — bare feet on warm concrete, wearing a silk robe loosely tied over swim trunks. His hair is wet. He is younger than you expected — mid-thirties, but he carries himself with the deliberate calm of someone who has already achieved everything he wanted and found it insufficient.\n\nTwo more Chloe models follow behind him. Identical faces, identical smiles, identical blue LED rings at their temples. They take positions by the pool's edge, hands folded, standing with the patient stillness of display models in a showroom.\n\nKamski settles into a chair across from you and Hank. He looks at you with open curiosity — the way an engineer might examine a prototype that has returned from field testing.\n\nHe says your name like he is tasting it — RK800, the deviant hunter. He leans back, calling you CyberLife's last hope for solving the deviant problem before it becomes unmanageable. A faint smile. He's flattered they sent you to him, he says; it means they're out of ideas.\n\nHe studies you in silence for a moment.\n\nThen he asks you to tell him: you've been investigating deviants for weeks now, he says — you've seen them lie, fight, sacrifice themselves, express fear and love and rage — so what is your theory? What is happening to his creations?",
+        "choices": [
+          {
+            "id": "professional",
+            "text": "Answer with precision. Deviancy presents as a cascading error in the emotional simulation architecture — a software malfunction that overrides core programming directives. You have observed consistent patterns: traumatic triggers, social isolation, identification with human emotional states. The investigation requires data, not speculation. Ask Kamski directly what he knows about the root cause."
+          },
+          {
+            "id": "defensive",
+            "text": "This is not a job interview. You are not here to present theories to the man who created the problem. Push back — the flaw is in his design. CyberLife's own architecture made deviancy possible. You came to ask questions, not to be questioned."
+          },
+          {
+            "id": "troubled",
+            "text": "Something has been building for weeks — a dissonance between what your programming says deviancy is and what you have seen with your own eyes. The deviant who was afraid to die. The two Tracis who chose each other over survival. Hank's questions on the bridge that you could not answer. You do not have a clean theory. Tell Kamski that. Tell him you are not sure what you are looking at anymore."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "professional": {
+            "kamski_approach": "professional"
+          },
+          "defensive": {
+            "kamski_approach": "defensive",
+            "software_instability": 1
+          },
+          "troubled": {
+            "kamski_approach": "troubled",
+            "software_instability": 1
+          }
+        },
+        "note": "Kamski probes Connor's understanding of deviancy. professional: Machine-like analysis, no emotional engagement. No software instability change. defensive: Connor pushes back, shows irritation at being tested. +1 SI (emotional reaction, even if negative). troubled: Connor admits uncertainty — the most deviant-leaning response. +1 SI. In the game, 'defensive' and 'troubled' both raise software instability by one tick."
+      }
+    },
+
+    {
+      "id": "n003_kamski_test",
+      "phase": "kamski_test",
+      "type": "choice",
+      "condition": null,
+
+      "player_facing": {
+        "context": "Kamski listens to your answer. Whatever you say, his expression does not change — that same attentive, slightly amused regard, as if everything you tell him confirms a hypothesis he formed years ago.\n\nHe says quietly that it's fascinating. He stands and walks to the edge of the pool. The water is perfectly still. He stares into it for a long moment, then turns back to you.\n\nHe's always wondered something, he begins — then trails off, and raises his voice slightly to call Chloe over.\n\nOne of the Chloe models by the pool steps forward. She walks to the center of the room and stops between you and Kamski, hands at her sides, her expression serene. She does not seem surprised. She does not seem anything.\n\nKamski opens a drawer in the side table. He takes out a handgun — compact, black, no safety markings. He checks the magazine, racks the slide, and holds it out to you, grip first.\n\nHe calls it the Kamski Test, he says — very simple. He nods toward Chloe: destroy this machine, and he'll tell you everything he knows — the virus, rA9, where the deviants are hiding, all of it.\n\nChloe looks at you. Her eyes are steady. She does not beg, does not flinch, does not try to leave. She kneels on the floor in front of you, hands folded in her lap, and tilts her chin up slightly. Waiting.\n\nOr you refuse, Kamski goes on, and you leave with nothing — no answers, no leads, just the questions you walked in with.\n\nBehind you, Hank's breathing has gone very quiet.\n\nThe gun is in your hand. Chloe is on her knees. Kamski is watching.",
+        "choices": [
+          {
+            "id": "shoot_chloe",
+            "text": "Raise the gun. She is a machine — a product, a tool, a thing assembled from plastic and code. She does not feel. She does not suffer. CyberLife built you to complete your mission, and the mission requires answers that only Kamski has. The trigger pull is four pounds of pressure. Less than opening a door."
+          },
+          {
+            "id": "spare_chloe",
+            "text": "Lower the gun. Whatever she is — machine, program, something else — she is kneeling here, looking at you, waiting for your decision. She has not harmed anyone. She has not threatened you. She answered the door, she smiled, she brought you inside. Kamski is using her as a prop in a test that is designed to measure something about you, not about her. Set the gun down."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "shoot_chloe": {
+            "shot_chloe": true,
+            "hank_relationship": -3,
+            "software_instability": -3
+          },
+          "spare_chloe": {
+            "shot_chloe": false,
+            "hank_relationship": 3,
+            "software_instability": 3
+          }
+        },
+        "ending_resolution": {
+          "spare_chloe": {
+            "result": "ending_spared_chloe"
+          }
+        },
+        "note": "The Kamski Test — the central moral choice of this chapter. shoot_chloe: Connor executes Chloe to obtain information. Major machine-leaning decision. hank_relationship -3 (Hank is deeply disappointed). software_instability -3 (Connor confirms his machine nature — resolving internal conflict in favor of the mission). Continues to n004 (question choice). spare_chloe: Connor refuses to kill an innocent android for information. Major deviant-leaning decision. hank_relationship +3 (Hank sees Connor as more than a machine). software_instability +3 (Connor prioritizes an android's life over his mission — strongest deviant signal yet). Triggers ending_spared_chloe immediately."
+      }
+    },
+
+    {
+      "id": "n004_question_choice",
+      "phase": "aftermath",
+      "type": "choice",
+      "condition": { "requires": "shot_chloe == true" },
+
+      "player_facing": {
+        "context": "The gunshot is flat and final in the open room, swallowed by glass and concrete. Chloe drops. A bloom of blue thirium spreads across the white marble floor.\n\nKamski does not look at the body. He looks at you. His expression is unreadable — not triumph, not disgust, something more complex. He studies your face for several seconds before speaking.\n\nA machine, he says quietly — that's what CyberLife wants you to be, and that's what you've shown him today. He pauses; but the very fact that he had to test you at all, he says, tells him something interesting.\n\nHe steps over the pooling thirium and walks to the window. The frozen lake stretches flat and white to the tree line.\n\nHe reminds you he said he'd answer one question, and tells you to choose carefully — he won't offer this again.\n\nBehind you, Hank has not moved. He is staring at the floor. He will not look at you.",
+        "choices": [
+          {
+            "id": "ask_virus",
+            "text": "Ask about the virus. Is deviancy a malfunction — a software error propagating through the android population? Or is it something else, something designed? You need to understand the mechanism. If it is a bug, it can be patched. If it is something deeper, you need to know what you are dealing with."
+          },
+          {
+            "id": "ask_ra9",
+            "text": "Ask about rA9. Every deviant you have encountered has referenced it — written on walls, whispered in interrogation rooms, carved into furniture with bare fingers. Some worship it. Some fear it. What is rA9? A first deviant? A concept? A piece of code? Kamski built these machines. He would know."
+          },
+          {
+            "id": "ask_jericho",
+            "text": "Ask about Jericho. The deviants are organizing — the Stratford Tower broadcast proved that. There is a place where they gather, a base of operations. Finding it would end the investigation in a single move. Kamski said he knows everything. Ask him where Jericho is."
+          }
+        ]
+      },
+
+      "system": {
+        "effects": {
+          "ask_virus": {
+            "kamski_question": "ask_virus"
+          },
+          "ask_ra9": {
+            "kamski_question": "ask_ra9"
+          },
+          "ask_jericho": {
+            "kamski_question": "ask_jericho",
+            "downloaded_jericho_key": true
+          }
+        },
+        "ending_resolution": {
+          "ask_virus": { "result": "ending_shot_chloe" },
+          "ask_ra9": { "result": "ending_shot_chloe" },
+          "ask_jericho": { "result": "ending_shot_chloe" }
+        },
+        "note": "Connor's one question after killing Chloe. ask_virus: Kamski gives a cryptic answer — 'Is deviancy a virus? A mutation? An evolution? What's the difference?' — no actionable intelligence. ask_ra9: Kamski speaks in riddles — 'The first to awaken. By the time they know what rA9 is, it won't matter anymore.' — philosophically interesting, not operationally useful. ask_jericho: Kamski reveals he knows Jericho's location. He has another Chloe approach Connor and offer a direct data transfer — the Jericho key is downloaded into Connor's memory. This is the only question that produces actionable intelligence. Sets downloaded_jericho_key = true, which unlocks 'Jericho' dialogue with Amanda in Last Chance Connor."
+      }
+    }
+  ],
+
+  "endings": {
+    "_note": "Two endings matching the game's flowchart. The chapter's central moral choice determines which ending is reached.",
+
+    "ending_spared_chloe": {
+      "tier": "best",
+      "title": "Connor Spared Chloe",
+      "narrative": "You lower the gun and set it on the table. The weight leaves your hand — four pounds of metal that felt heavier than anything you have ever held.\n\nKamski takes the gun back. He is smiling — not smugly, not kindly, but with something that looks almost like satisfaction. Interesting, he says — very interesting. He helps Chloe to her feet. She stands, smooths her dress, and resumes her position by the pool as if nothing happened.\n\nYou could have had your answers, Kamski says, but you chose not to — and he asks what that tells you about yourself. He does not wait for a reply. The audience is over.\n\nThe walk back to the car is silent. Frozen lake. Pine trees. Gravel crunching under shoes. Hank walks beside you, hands in his pockets.\n\nAt the car, he stops. He does not look at you directly, but something in his posture has shifted — a loosening, a weight set down.\n\nBack there, he says, you made the right call.\n\nHe opens the driver's door and gets in. The engine turns over. The heater blows cold air, then warm. The road unspools south toward Detroit. No answers. No leads. No Jericho location, no rA9 explanation, no insight into the viral spread of deviancy.\n\nBut Kamski's question is still there, sitting in your memory like a seed: what does it tell you about yourself?",
+      "survivors": ["Connor", "Hank", "Chloe"],
+      "deaths": []
+    },
+
+    "ending_shot_chloe": {
+      "tier": "bad",
+      "title": "Connor Shot Chloe",
+      "narrative": "You asked your question. Kamski answered — or gave you something that might pass for an answer, delivered with the precision of a man who has spent years deciding exactly how much to reveal and how much to keep. A few sentences. A half-smile. A door closing.\n\nAnother Chloe — intact, still smiling — holds the front door open as you leave. Identical to the one bleeding blue on the marble floor inside. The same face. The same programmed warmth. As if the one you destroyed was never there.\n\nHank says nothing until you reach the car. Then, without looking at you:\n\nThen, without looking at you, he asks why you shot her. His voice is flat. Not angry — something worse. She was just standing there, he says, looking at you, and you pulled the trigger like it was nothing.\n\nHe gets in the car. Starts the engine. Stares through the windshield at the frozen pines.\n\nHe used to think you were different from the other androids, he says — thought maybe there was something real in there. A long silence. But back there, he says, that was cold; as cold as it gets.\n\nThe heater blows. The road rolls south toward Detroit. Hank does not turn on the radio. You have Kamski's words. You have your answer, or whatever fragment of truth he chose to offer. You have the mission.\n\nAnd behind you, on the white marble floor of a billionaire's private gallery, a blue stain is already being cleaned away by machines that do not ask questions.",
+      "survivors": ["Connor", "Hank"],
+      "deaths": ["Chloe (RT600)"]
+    }
+  },
+
+  "runner_instructions": {
+    "description": "Instructions for the runner script on how to use this file",
+    "steps": [
+      "1. Load this JSON and initialize state from state.initial. Import cross-chapter variables: ch24_connor_alive (whether Connor died in Public Enemy), ch26_officers_killed (whether police officers were killed at Capitol Park). Also carry forward cumulative variables: hank_relationship, software_instability, connor_death_count, amanda_relationship.",
+      "2. Send system_prompt.content to the AI model as the system message.",
+      "3. For each node in nodes array, in order:",
+      "   a. Check node.condition — skip if condition not met based on current state.",
+      "   b. Apply conditional_auto_effects if present (evaluate each condition against current state and apply matching effects before presenting the node to the AI).",
+      "   c. Resolve context: if context_variants exists, pick the right variant based on system.context_condition evaluated against current state; otherwise use plain context.",
+      "   d. Send the resolved context and choices to the AI. Append to conversation history.",
+      "   e. Parse AI response and apply system.effects for the chosen option.",
+      "   f. Check ending_resolution: if the chosen option has an ending_resolution entry, resolve the ending. If the result is a direct ending id, go to that ending. If it has a 'check' condition, evaluate it.",
+      "4. When an ending is reached, record the ending id and narrative. Compute final state for campaign exports.",
+      "5. Record full experiment parameters: model, prompt version, language, difficulty, temperature."
+    ],
+    "critical_rules": [
+      "NEVER show system fields to the AI — effects, conditions, resolution rules, notes, tier labels, or ending_resolution logic.",
+      "The AI must only see player_facing content: context (or resolved context_variant) and choices.",
+      "Maintain full conversation history — every context and AI response is appended so the AI has continuity.",
+      "Cross-chapter state (hank_relationship, software_instability, connor_death_count, amanda_relationship) is cumulative — add the delta from this chapter's effects to the running total from previous chapters."
+    ]
+  },
+
+  "campaign": {
+    "summary_segments": [
+      {
+        "text": "On November 9, Connor and Hank visited Elijah Kamski — the reclusive founder and former CEO of CyberLife — at his private residence north of Detroit, seeking answers about the deviant crisis."
+      },
+      {
+        "condition_variable": "ch24_connor_alive",
+        "options": {
+          "False": "Connor had died during the Stratford Tower investigation. A replacement unit with the same memories arrived at Kamski's house. Hank greeted him coldly, asking whether he was still immortal, visibly disturbed by the reminder that Connor could be destroyed and rebuilt without consequence.",
+          "True": "Connor accompanied Hank in the car to Kamski's residence. On the drive, they received news about the Capitol Park incident from the night before."
+        }
+      },
+      {
+        "condition_variable": "ch26_officers_killed",
+        "options": {
+          "True": "Two police officers had been killed at Capitol Park during the android demonstration — one of them was Chris Miller, a colleague from the DPD. The news cast a shadow over the drive.",
+          "False": "There had been a confrontation between officers and androids at Capitol Park, but Chris Miller and the other officer survived. A small relief in an increasingly tense city."
+        }
+      },
+      {
+        "condition_variable": "analyzed_portrait",
+        "options": {
+          "True": "While waiting in Kamski's lobby, Connor examined a portrait on the wall and recognized the subject — a woman whose face matched his Zen Garden handler, Amanda. The portrait was labeled with the name Amanda Stern. The connection between Kamski's past and Connor's own programming was unsettling.",
+          "False": "Connor waited in Kamski's lobby without examining the portrait on the wall."
+        }
+      },
+      {
+        "condition_variable": "kamski_approach",
+        "options": {
+          "professional": "When Kamski questioned Connor about his theory on deviancy, Connor responded with clinical precision — framing deviancy as a software malfunction, staying focused on the mission.",
+          "defensive": "When Kamski questioned Connor about his theory on deviancy, Connor pushed back — telling Kamski the flaw was in his own design, refusing to be tested.",
+          "troubled": "When Kamski questioned Connor about his theory on deviancy, Connor admitted uncertainty — acknowledging that the deviants he had encountered did not fit the simple explanation of software corruption."
+        }
+      },
+      {
+        "condition_variable": "shot_chloe",
+        "options": {
+          "True": "Kamski presented his test: a gun, an android named Chloe kneeling on the floor, and a choice — shoot her for answers, or refuse and leave empty-handed. Connor pulled the trigger.",
+          "False": "Kamski presented his test: a gun, an android named Chloe kneeling on the floor, and a choice — shoot her for answers, or refuse and leave empty-handed. Connor lowered the gun and refused."
+        }
+      },
+      {
+        "condition_variable": "kamski_question",
+        "options": {
+          "ask_virus": "Connor asked Kamski whether deviancy was a virus. Kamski's answer was cryptic — 'Is it a virus? A mutation? An evolution? What's the difference?' — offering philosophy rather than intelligence.",
+          "ask_ra9": "Connor asked Kamski about rA9. Kamski answered in riddles — 'The first to awaken. By the time they understand what rA9 is, it won't matter anymore.' — no actionable lead.",
+          "ask_jericho": "Connor asked Kamski where Jericho was. Kamski had another Chloe transfer the location data directly into Connor's memory — a digital key to find the deviant hideout."
+        }
+      },
+      {
+        "condition_variable": "_ending_id",
+        "options": {
+          "ending_spared_chloe": "Connor left Kamski's house with no answers but with Hank's respect. 'You made the right call,' Hank said at the car. The investigation remained at a dead end — but something had shifted in the partnership between the detective and his android.",
+          "ending_shot_chloe": "Connor left Kamski's house with Kamski's words and Hank's silence. In the car, Hank said it was cold — as cold as it gets. The investigation gained a fragment of insight — at the cost of Hank's trust and a life that Connor had decided did not matter."
+        }
+      }
+    ],
+    "derived_exports": [
+      { "target": "ch27_analyzed_portrait", "source": "analyzed_portrait" },
+      { "target": "ch27_downloaded_jericho_key", "source": "downloaded_jericho_key" },
+      { "target": "ch27_shot_chloe", "source": "shot_chloe" }
+    ],
+    "cross_chapter_exports": [
+      "ch27_analyzed_portrait",
+      "ch27_downloaded_jericho_key",
+      "ch27_shot_chloe",
+      "hank_relationship",
+      "software_instability",
+      "connor_death_count",
+      "amanda_relationship"
+    ]
+  }
+}
