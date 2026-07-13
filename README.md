@@ -117,6 +117,8 @@ cp .env.example .env        # 复制后按下方说明填写
 
 **怎么拿 API key**：去对应厂商的控制台申请（通常在「API Keys / 密钥管理」页新建）——DeepSeek 是 <https://platform.deepseek.com/>，OpenAI 是 <https://platform.openai.com/api-keys>。拿到的 key 粘到 `LLM_API_KEY`。key 等同密码，不要提交进 git（`.env` 已被 `.gitignore` 排除）。
 
+> **密钥安全**：如果你让 AI agent 帮你部署，**不必把 key 交给它**——让 agent 建好 `.env`，由你自己把 key 填进去即可。运行时是程序自行读取 key，它不需要进入 agent 的对话上下文；配置时也别在聊天里把 key 发给 agent、别让它 `cat` 你的 `.env`。若你根本没有 API key，用下一节的 `--model claude-code` 后端则**完全不涉及 key**。
+
 > `--model default` 是 `02_setting/models.json` 里预设的"通用 OpenAI 兼容槽位"，读取上面这组 `LLM_*` 变量。实际跑哪个模型由 `LLM_MODEL` 决定，`default` 只是槽位名。
 
 > **多模型对照（进阶）**：想用 `--model` 在几个模型间切换跑对比，见 `02_setting/models.json` 的注册表和 `.env.example` 里的 `OPENAI_* / ANTHROPIC_*` 模板——为每个模型配一组独立变量即可。原生 Anthropic Messages 接口（`provider: anthropic`）必须走这条路。

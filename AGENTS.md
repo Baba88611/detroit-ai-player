@@ -27,17 +27,17 @@ pip install -r requirements.txt
 
 ### A. 用户有模型 API key（推荐，最通用）
 
-写 `.env`（在 `03_runner/` 下），填三个变量后用 `--model default`：
+用 `--model default`，走 `03_runner/.env` 里的配置。**API key 是敏感信息——由用户自己填，你不要经手：**
 
 ```bash
 cp .env.example .env      # Windows: copy .env.example .env
-# 编辑 .env，填入：
-#   LLM_API_KEY=<用户的 key>
-#   LLM_BASE_URL=<端点，如 https://api.deepseek.com 或 https://api.openai.com/v1>
-#   LLM_MODEL=<模型名，如 deepseek-chat / gpt-4o>
 ```
 
-> key 由**用户提供**，你不要编造，也不要把它写进任何会被提交/记录的地方（`.env` 已被 `.gitignore` 排除）。
+- 你（agent）可替用户填**非敏感**项：`LLM_BASE_URL`（端点，如 `https://api.deepseek.com` 或 `https://api.openai.com/v1`）、`LLM_MODEL`（模型名，如 `deepseek-chat` / `gpt-4o`）。
+- **`LLM_API_KEY` 留给用户自己填**：请用户用自己的编辑器把 key 粘进 `.env`。**不要让用户在对话里把 key 发给你**，你也**不要 `cat` / `echo` / 读取 `.env` 或打印环境变量**——程序运行时会自行读取，你全程无需看到 key。
+- key 等同密码，`.env` 已被 `.gitignore` 排除，不会被提交。
+
+确认用户填好 key 后再运行。
 
 ### B. 用户没有 API key，但本机装了 Claude Code 并已登录
 
