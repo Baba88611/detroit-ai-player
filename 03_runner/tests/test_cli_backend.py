@@ -11,6 +11,9 @@ from api_client import LLMClient  # noqa: E402
 from runner import build_llm_client_from_model_registry  # noqa: E402
 
 
+CLI_VERSION = "2.1.207 (Claude Code)"
+
+
 class FakeCompletedProcess:
     def __init__(self, stdout="", stderr="", returncode=0):
         self.stdout = stdout
@@ -32,14 +35,23 @@ def _claude_envelope(result_text, is_error=False, usage=None):
                 "cache_read_input_tokens": 15,
                 "output_tokens": 30,
             },
+            "modelUsage": {"claude-opus-4-6": {"inputTokens": 120, "outputTokens": 30}},
         }
     )
+
+
+def _is_version_probe(cmd):
+    # _call_claude_cli 会先跑一次 `claude --version`；测试里各 fake_run 用它区分，
+    # 别把版本探测和正式调用混在一起。
+    return "--version" in cmd
 
 
 def test_cli_client_calls_claude_headless_with_tools_disabled(monkeypatch):
     captured = {}
 
     def fake_run(cmd, **kwargs):
+        if _is_version_probe(cmd):
+            return FakeCompletedProcess(stdout=CLI_VERSION)
         captured["cmd"] = cmd
         captured["input"] = kwargs.get("input")
         captured["cwd"] = kwargs.get("cwd")
@@ -85,6 +97,9 @@ def test_cli_client_calls_claude_headless_with_tools_disabled(monkeypatch):
     usage = client.token_usage()
     assert usage["total_input_tokens"] == 140
     assert usage["output_tokens"] == 30
+    # 记录了 CLI 实际底层模型与版本，供结果复核
+    assert client.resolved_model == "claude-opus-4-6"
+    assert client.cli_version == CLI_VERSION
 
 
 def test_cli_client_scrubs_hijacking_auth_env_for_subprocess(monkeypatch):
@@ -98,6 +113,8 @@ def test_cli_client_scrubs_hijacking_auth_env_for_subprocess(monkeypatch):
     captured = {}
 
     def fake_run(cmd, **kwargs):
+        if _is_version_probe(cmd):
+            return FakeCompletedProcess(stdout=CLI_VERSION)
         captured["env"] = kwargs.get("env")
         return FakeCompletedProcess(stdout=_claude_envelope('{"choice": 1}'))
 
@@ -118,6 +135,8 @@ def test_cli_client_uses_english_labels_for_english_system_prompt(monkeypatch):
     captured = {}
 
     def fake_run(cmd, **kwargs):
+        if _is_version_probe(cmd):
+            return FakeCompletedProcess(stdout=CLI_VERSION)
         captured["input"] = kwargs.get("input")
         return FakeCompletedProcess(stdout=_claude_envelope('{"choice": 1}'))
 
@@ -139,6 +158,8 @@ def test_cli_client_retries_then_raises_on_persistent_error(monkeypatch):
     calls = {"n": 0}
 
     def fake_run(cmd, **kwargs):
+        if _is_version_probe(cmd):
+            return FakeCompletedProcess(stdout=CLI_VERSION)
         calls["n"] += 1
         return FakeCompletedProcess(stdout=_claude_envelope("boom", is_error=True))
 
@@ -158,6 +179,8 @@ def test_cli_client_retries_then_raises_on_persistent_error(monkeypatch):
 def test_cli_client_surfaces_stdout_detail_on_nonzero_exit(monkeypatch):
     # 真实认证失败：退出码非 0，401 详情在 stdout 信封的 result 里而非 stderr。
     def fake_run(cmd, **kwargs):
+        if _is_version_probe(cmd):
+            return FakeCompletedProcess(stdout=CLI_VERSION)
         return FakeCompletedProcess(
             stdout=_claude_envelope(
                 "Failed to authenticate. API Error: 401 Invalid authentication credentials",

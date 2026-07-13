@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,8 @@ def write_result(result: dict[str, Any], output_dir: str | Path) -> Path:
     filename = _build_filename(result)
     file_path = output_path / filename
     file_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 把绝对路径打到 stderr，用户/agent 跑完能立刻定位结果文件（stdout 留给结果 JSON）。
+    print(f"Saved chapter result: {file_path.resolve()}", file=sys.stderr)
     return file_path
 
 
@@ -20,6 +23,8 @@ def write_campaign_result(result: dict[str, Any], output_dir: str | Path) -> Pat
     filename = _build_campaign_filename(result)
     file_path = output_path / filename
     file_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    status = result.get("status", "unknown")
+    print(f"Saved campaign result [{status}]: {file_path.resolve()}", file=sys.stderr)
     return file_path
 
 

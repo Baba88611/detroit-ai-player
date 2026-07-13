@@ -14,7 +14,7 @@
 ## 前置检查
 
 1. **Python ≥ 3.10**（`python3 --version`）。
-2. **确认你在正确的目录**：所有命令假定在本仓库根目录下的 `03_runner/` 里运行。若用户机器上有多个同名副本（如 `Detroit/` 与 `Detroit-public/`），**以用户交给你的那个路径为准**，别跑错副本。
+2. **确认你在正确的目录**：所有命令假定在本仓库根目录下的 `03_runner/` 里运行。若用户机器上有多个副本或同名目录，**以用户交给你的那个路径为准**，别跑错副本。
 
 ## 装依赖
 
@@ -73,7 +73,12 @@ python src/campaign_runner.py --chapters ../01_json/zh/ch*.json --model default
 
 ## 结果在哪
 
-每次运行输出一个结果 JSON 到 `04_execution/results/`（同时打印到终端）。跑完把这个目录指给用户。
+结果写在 `04_execution/results/`，runner 每写一个文件都会把绝对路径打到 stderr。
+
+- **单章运行**：生成 1 个 `ch*.json`。
+- **完整 32 章 campaign**：生成 32 个 `ch*.json` + 1 个 `campaign_*.json`（共 33 个）。
+
+跑完**优先把 `campaign_*.json` 的绝对路径指给用户**（它是整轮汇总）。完整的判据：campaign 文件 `status=complete` 且 `progress.completed=config.chapter_count`；中断则为 `status=partial` 的检查点。
 
 ## 硬约束（务必遵守，否则实验无效）
 

@@ -36,6 +36,12 @@ class LLMClient:
             self.model = model or os.environ["LLM_MODEL"]
         self.temperature = temperature
         self.max_retries = max_retries
+        # CLI 后端运行环境（供结果如实记录、便于复核）：
+        #   resolved_model —— CLI 实际调用的底层模型（从 json 信封的 modelUsage 提取）
+        #   cli_version    —— CLI 版本（一次性探测 `claude --version`）
+        # 非 CLI 后端保持 None。
+        self.resolved_model: str | None = None
+        self.cli_version: str | None = None
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
         self.total_input_tokens = 0
@@ -217,6 +223,22 @@ class LLMClient:
             if key not in ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN")
         }
 
+        # 一次性探测 CLI 版本，记入结果便于复核（放在 child_env 之后，确保和正式
+        # 调用用同一套认证环境）。探测失败不阻断实验，cli_version 保持 None。
+        if self.cli_version is None:
+            try:
+                version_proc = subprocess.run(
+                    [executable, "--version"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    env=child_env,
+                )
+                if version_proc.returncode == 0:
+                    self.cli_version = version_proc.stdout.strip()
+            except (subprocess.SubprocessError, OSError):
+                pass
+
         for attempt in range(self.max_retries):
             try:
                 # 兜底：在临时空目录里跑，多一层不接触任何项目文件的保险
@@ -287,6 +309,11 @@ class LLMClient:
         envelope = json.loads(stdout)
         if envelope.get("is_error"):
             raise RuntimeError(f"claude CLI reported error: {envelope.get('result', envelope)}")
+
+        # 记录 CLI 实际用的底层模型（如 claude-opus-4-6），供结果复核。
+        model_usage = envelope.get("modelUsage", {}) or {}
+        if isinstance(model_usage, dict) and model_usage:
+            self.resolved_model = ",".join(sorted(str(name) for name in model_usage))
 
         usage = envelope.get("usage", {}) or {}
         input_tokens = usage.get("input_tokens", 0)

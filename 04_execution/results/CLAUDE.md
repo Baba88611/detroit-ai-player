@@ -95,10 +95,14 @@ campaign_{model}_{persona}_{difficulty}_{campaign_id_short}.json
 
 汇总文件包含：
 - `campaign_id`：campaign 唯一标识
-- `config`：实验参数
+- `status`：`complete` 表示整轮完整跑完；`partial` 表示运行中断或尚未完成的检查点
+- `progress`：`completed` / `requested` / `next_chapter_index`，标明已完成到第几章
+- `config`：实验参数（含 `chapter_count`；CLI 后端还含 `resolved_model` / `cli_version`）
 - `chapters`：各章结果的 experiment_id 列表
 - `final_cross_chapter_state`：最终跨章状态变量快照
 - `full_memory_summary`：完整的累积前情提要文本
+
+**判断完整性：** 只有 `status=complete` 且 `progress.completed == progress.requested`（完整流程即 `== 32`）才是完整 campaign；`status=partial` 是逐章检查点——campaign_runner 每完成一章就覆盖写入同一文件，中断后保留最近一次进度。
 
 汇总文件同样遵守只读、不删除的约束。
 

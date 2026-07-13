@@ -9,7 +9,14 @@ ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = ROOT.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from campaign_runner import apply_derived_exports, build_chapter_summary, run_campaign  # noqa: E402
+import pytest  # noqa: E402
+
+from campaign_runner import (  # noqa: E402
+    apply_derived_exports,
+    build_chapter_summary,
+    expand_chapter_paths,
+    run_campaign,
+)
 from api_client import LLMClient  # noqa: E402
 from runner import ScriptedAI, run_experiment  # noqa: E402
 from resolver import ending_payload, resolve_post_choice_result  # noqa: E402
@@ -346,6 +353,12 @@ def test_campaign_run_injects_previous_chapter_summary_into_second_chapter(tmp_p
 
     assert campaign["config"]["chapter_count"] == 2
     assert len(campaign["chapters"]) == 2
+    assert campaign["status"] == "complete"
+    assert campaign["progress"] == {
+        "completed": 2,
+        "requested": 2,
+        "next_chapter_index": None,
+    }
     assert campaign["final_cross_chapter_state"]["cop_saved_ch01"] is True
     assert campaign["final_cross_chapter_state"]["connor_death_count"] == 0
     assert "菲利普斯公寓的人质事件" in campaign["full_memory_summary"]
@@ -361,6 +374,96 @@ def test_campaign_run_injects_previous_chapter_summary_into_second_chapter(tmp_p
 
     campaign_files = list(tmp_path.glob("campaign_scripted_default_casual_*.json"))
     assert len(campaign_files) == 1
+
+
+def test_expand_chapter_paths_expands_literal_glob_in_chapter_order():
+    paths = expand_chapter_paths([str(PROJECT_ROOT / "01_json" / "zh" / "ch*.json")])
+
+    assert len(paths) == 32
+    assert Path(paths[0]).name == "ch01_the_hostage_zh.json"
+    assert Path(paths[-1]).name == "ch32_battle_for_detroit_zh.json"
+
+
+def test_expand_chapter_paths_preserves_explicit_path_order():
+    paths = expand_chapter_paths([str(CH03_ZH), str(CH01_ZH)])
+
+    assert paths == [str(CH03_ZH), str(CH01_ZH)]
+
+
+def test_expand_chapter_paths_rejects_unmatched_pattern():
+    missing = str(PROJECT_ROOT / "01_json" / "zh" / "missing*.json")
+
+    with pytest.raises(ValueError, match="matched no chapter files"):
+        expand_chapter_paths([missing])
+
+
+class MetadataOnlyCLIClient(LLMClient):
+    """进程内返回固定选择的 CLI 客户端：验证 campaign 元数据，不启动 claude 子进程、
+    不消耗订阅额度。"""
+
+    def __init__(self):
+        super().__init__(provider="cli", cli_kind="claude", model="claude-code")
+        self.resolved_model = "claude-opus-4-6"
+        self.cli_version = "2.1.207"
+
+    def choose(self, node_id, context, choices, messages):
+        return {
+            "choice_id": choices[0]["id"],
+            "reasoning": "metadata-only test",
+            "raw": json.dumps({"choice": 1, "reasoning": "metadata-only test"}),
+        }
+
+
+def test_cli_campaign_records_non_applicable_temperature_and_resolved_model(tmp_path):
+    client = MetadataOnlyCLIClient()
+
+    campaign = run_campaign(
+        chapter_paths=[CH03_ZH],
+        ai_client=client,
+        output_dir=tmp_path,
+        dry_run=True,
+    )
+
+    # campaign 与单章必须记同一套后端元数据：temperature 一致为 N/A (cli)，
+    # 并记录实际底层模型与 CLI 版本。
+    assert campaign["config"]["model"] == "claude-code"
+    assert campaign["config"]["resolved_model"] == "claude-opus-4-6"
+    assert campaign["config"]["backend"] == "cli"
+    assert campaign["config"]["cli_version"] == "2.1.207"
+    assert campaign["config"]["temperature"] == "N/A (cli)"
+
+
+class FailOnChapterThreeAI(ScriptedAI):
+    """ch01 正常跑完；进入 ch03（首节点 n001_park_exploration）时抛错，
+    模拟长 campaign 后段中断。"""
+
+    def choose(self, node_id, context, choices, messages):
+        if node_id == "n001_park_exploration":
+            raise RuntimeError("forced chapter failure")
+        return super().choose(node_id, context, choices, messages)
+
+
+def test_campaign_checkpoint_survives_later_chapter_failure(tmp_path):
+    with pytest.raises(RuntimeError, match="forced chapter failure"):
+        run_campaign(
+            chapter_paths=[CH01_ZH, CH03_ZH],
+            ai_client=FailOnChapterThreeAI(),
+            output_dir=tmp_path,
+            dry_run=True,
+        )
+
+    # 中断后仍应留下一个 status=partial 的 campaign 检查点，说明进度与已完成章节。
+    campaign_files = list(tmp_path.glob("campaign_scripted_default_casual_*.json"))
+    assert len(campaign_files) == 1
+
+    checkpoint = json.loads(campaign_files[0].read_text(encoding="utf-8"))
+    assert checkpoint["status"] == "partial"
+    assert checkpoint["progress"] == {
+        "completed": 1,
+        "requested": 2,
+        "next_chapter_index": 2,
+    }
+    assert [item["chapter"] for item in checkpoint["chapters"]] == ["ch01_the_hostage"]
 
 
 def test_campaign_run_supports_mandatory_story_chapter_between_choice_chapters(tmp_path):

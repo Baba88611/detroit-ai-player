@@ -90,18 +90,21 @@ docs/assets/    架构示意图
 **前置**：Python 3.10+，以及一个可用的模型 API key（下面教你怎么弄）。
 
 ```bash
-git clone <this-repo> && cd Detroit-public/03_runner
+git clone https://github.com/Baba88611/detroit-ai-player.git
+cd detroit-ai-player/03_runner
+python3 -m venv .venv && source .venv/bin/activate   # 可选，推荐隔离环境
 pip install -r requirements.txt
-cp .env.example .env        # 复制后按下方说明填写
+cp .env.example .env        # 仅走 API key 时需要；用 --model claude-code 可跳过
 ```
 
 > **Windows 用户**：整套流程和逻辑完全一致（纯 Python，无平台相关代码），只有个别命令的写法不同——把上面的 `cp` 换成 `copy`，其余按下表对应即可：
 >
 > | 操作 | Mac / Linux | Windows（PowerShell / CMD） |
 > |---|---|---|
+> | 克隆后进入 | `cd detroit-ai-player/03_runner` | `cd detroit-ai-player\03_runner` |
 > | 复制 .env | `cp .env.example .env` | `copy .env.example .env` |
 > | 运行 Python | `python3 src/runner.py ...` | `python src\runner.py ...` |
-> | （可选）虚拟环境 | `source venv/bin/activate` | `venv\Scripts\activate` |
+> | （可选）虚拟环境 | `python3 -m venv .venv && source .venv/bin/activate` | `py -3 -m venv .venv; .\.venv\Scripts\Activate.ps1` |
 >
 > 运行参数里的 `../01_json/...` 这类正斜杠路径在 Windows 上也能直接用（Python 会自动处理），无需改成反斜杠。
 
@@ -157,6 +160,39 @@ python src/campaign_runner.py --chapters ../01_json/zh/ch*.json --model default
 > **实验口径声明**：本框架调用 API 时**不传入任何工具（tools）**，不启用联网搜索——被测 AI
 > 仅凭 `player_facing` 层的情景文本自主决策。请勿将 `base_url` 指向默认联网的模型端点
 > （如自带 web search 的聚合网关），否则实验结果无效。
+
+## 查看结果
+
+runner 每写一个结果文件，都会在终端（stderr）打印它的**绝对路径**，跑完直接照着打开即可。
+
+- **单章运行**：在 `04_execution/results/` 生成 1 个 `ch*.json`。
+- **完整 32 章 campaign**：生成 **32 个 `ch*.json` + 1 个 `campaign_*.json`**（共 33 个）。
+
+**先看 `campaign_*.json`**——它是整轮实验的汇总（跨章状态、前情摘要、各章 `experiment_id`）；需要下钻某一章再看对应 `ch*.json`（节点级选择、reasoning、状态、结局）。
+
+判断一次 campaign 是否**完整**：campaign 文件同时满足 `status` 为 `complete`、`config.chapter_count` 为 `32`、`progress.completed` 为 `32`。中途中断会留下 `status` 为 `partial` 的检查点，标明已完成到第几章。
+
+查看最新一次 campaign 汇总：
+
+```bash
+# Mac / Linux
+ls -t ../04_execution/results/campaign_*.json | head -1
+```
+
+```powershell
+# Windows PowerShell
+Get-ChildItem ..\04_execution\results\campaign_*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+```
+
+## 参与开发 / 跑测试
+
+贡献者用开发依赖复现测试环境（普通用户运行不需要）：
+
+```bash
+cd 03_runner
+python -m pip install -r requirements-dev.txt
+python -m pytest tests -v
+```
 
 ## 分享你的结果
 

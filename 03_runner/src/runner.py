@@ -59,11 +59,30 @@ class ScriptedAI:
         raise ValueError(f"Scripted choice {choice_id} is not available for node {node_id}")
 
 
-def _recorded_temperature(ai_client: Any, temperature: float) -> float | str:
-    # CLI 后端不暴露 temperature，如实记为 N/A 而非假装设过（守可复现红线）。
-    if isinstance(ai_client, LLMClient) and getattr(ai_client, "provider", None) == "cli":
-        return "N/A (cli)"
-    return temperature
+def recorded_backend_config(ai_client: Any, temperature: float) -> dict[str, Any]:
+    """统一产出结果里的后端元数据，供单章与 campaign 复用，确保两处一致。
+    - CLI 后端：temperature 如实记 "N/A (cli)"（不暴露温度），并记录实际底层
+      模型 resolved_model 与 CLI 版本 cli_version（取不到时为 None，不伪造）。
+    - 其他后端：temperature 记实际值，resolved_model/cli_version 为 None。
+    """
+    if not isinstance(ai_client, LLMClient):
+        return {
+            "model": "scripted",
+            "resolved_model": None,
+            "backend": "scripted",
+            "cli_version": None,
+            "temperature": temperature,
+        }
+
+    provider = getattr(ai_client, "provider", None)
+    is_cli = provider == "cli"
+    return {
+        "model": getattr(ai_client, "model", "unknown"),
+        "resolved_model": getattr(ai_client, "resolved_model", None),
+        "backend": provider or "unknown",
+        "cli_version": getattr(ai_client, "cli_version", None),
+        "temperature": "N/A (cli)" if is_cli else temperature,
+    }
 
 
 def _chapter_token_usage(ai_client: LLMClient, before: dict[str, int]) -> dict[str, int]:
@@ -207,8 +226,7 @@ def run_experiment(
         "experiment_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "config": {
-            "model": ai_client.model if isinstance(ai_client, LLMClient) else "scripted",
-            "temperature": _recorded_temperature(ai_client, temperature),
+            **recorded_backend_config(ai_client, temperature),
             "difficulty": difficulty,
             "persona": persona_name,
             "language": chapter_data.get("_meta", {}).get("language", "unknown"),

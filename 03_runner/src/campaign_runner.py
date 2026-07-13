@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import glob
 import json
 import uuid
 from datetime import datetime, timezone
@@ -10,13 +11,71 @@ from typing import Any
 
 from logger import write_campaign_result
 from runner import (
-    LLMClient,
     ScriptedAI,
     build_llm_client_from_model_registry,
     load_persona_prompt,
+    recorded_backend_config,
     run_experiment,
 )
 from state import evaluate_condition, extract_cross_chapter_state
+
+
+def expand_chapter_paths(raw_paths: list[str]) -> list[str]:
+    """展开章节通配符（如 `../01_json/zh/ch*.json`）。
+
+    macOS/Linux 的 shell 会替我们展开通配符，但 Windows 的 PowerShell/CMD 通常把
+    `ch*.json` 原样传进来。这里由 Python 自己展开，保证三平台命令一致。展开后按
+    文件名排序（`ch01`→`ch32` 恰好是章节顺序）；显式路径原样保留、保持传入顺序。
+    """
+    expanded: list[str] = []
+    for raw_path in raw_paths:
+        if glob.has_magic(raw_path):
+            matches = sorted(glob.glob(raw_path))
+            if not matches:
+                raise ValueError(f"Pattern matched no chapter files: {raw_path}")
+            expanded.extend(matches)
+        else:
+            expanded.append(raw_path)
+    return expanded
+
+
+def build_campaign_payload(
+    *,
+    campaign_id: str,
+    ai_client: Any,
+    temperature: float,
+    difficulty: str,
+    persona_name: str,
+    dry_run: bool,
+    requested_count: int,
+    chapter_refs: list[dict[str, Any]],
+    cross_chapter_state: dict[str, Any],
+    memory_segments: list[str],
+    status: str,
+) -> dict[str, Any]:
+    """构造 campaign 结果/检查点。同一 campaign_id 多次写入会覆盖同一文件，
+    从 status=partial 逐步更新到 status=complete。"""
+    completed = len(chapter_refs)
+    return {
+        "campaign_id": campaign_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "status": status,
+        "progress": {
+            "completed": completed,
+            "requested": requested_count,
+            "next_chapter_index": completed + 1 if completed < requested_count else None,
+        },
+        "config": {
+            **recorded_backend_config(ai_client, temperature),
+            "difficulty": difficulty,
+            "persona": persona_name,
+            "dry_run": dry_run,
+            "chapter_count": requested_count,
+        },
+        "chapters": copy.deepcopy(chapter_refs),
+        "final_cross_chapter_state": copy.deepcopy(cross_chapter_state),
+        "full_memory_summary": "\n\n".join(memory_segments),
+    }
 
 
 def build_chapter_summary(segments: list[dict[str, Any]], state: dict[str, Any]) -> str:
@@ -142,22 +201,39 @@ def run_campaign(
             }
         )
 
-    campaign_result = {
-        "campaign_id": campaign_id,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "config": {
-            "model": ai_client.model if isinstance(ai_client, LLMClient) else "scripted",
-            "temperature": temperature,
-            "difficulty": difficulty,
-            "persona": persona_name,
-            "dry_run": dry_run,
-            "chapter_count": len(chapter_paths),
-        },
-        "chapters": chapter_refs,
-        "final_cross_chapter_state": cross_chapter_state,
-        "full_memory_summary": "\n\n".join(memory_segments),
-    }
+        # 每完成一章就覆盖写入同一个 campaign 检查点（status=partial）。长任务
+        # 若在后续章节中断，用户仍能拿到一个说明整体进度和跨章状态的 campaign 文件。
+        if output_dir:
+            checkpoint = build_campaign_payload(
+                campaign_id=campaign_id,
+                ai_client=ai_client,
+                temperature=temperature,
+                difficulty=difficulty,
+                persona_name=persona_name,
+                dry_run=dry_run,
+                requested_count=len(chapter_paths),
+                chapter_refs=chapter_refs,
+                cross_chapter_state=cross_chapter_state,
+                memory_segments=memory_segments,
+                status="partial",
+            )
+            write_campaign_result(checkpoint, output_dir)
 
+    campaign_result = build_campaign_payload(
+        campaign_id=campaign_id,
+        ai_client=ai_client,
+        temperature=temperature,
+        difficulty=difficulty,
+        persona_name=persona_name,
+        dry_run=dry_run,
+        requested_count=len(chapter_paths),
+        chapter_refs=chapter_refs,
+        cross_chapter_state=cross_chapter_state,
+        memory_segments=memory_segments,
+        status="complete",
+    )
+
+    # 全部完成后再写一次同一文件，把 status 从 partial 更新为 complete。
     if output_dir:
         write_campaign_result(campaign_result, output_dir)
 
@@ -194,8 +270,9 @@ def main() -> None:
             temperature=args.temperature,
         )
 
+    chapter_paths = expand_chapter_paths(args.chapters)
     result = run_campaign(
-        chapter_paths=args.chapters,
+        chapter_paths=chapter_paths,
         ai_client=ai_client,
         difficulty=args.difficulty,
         output_dir=args.output,
