@@ -17,3 +17,6 @@ __pycache__/
 
 # 版权材料：游戏剧情原文，禁止纳入公开仓库
 01_json/source/
+
+# 实验结果：本地产物，不入库（仅保留目录内的 CLAUDE.md 说明）
+04_execution/results/*.json

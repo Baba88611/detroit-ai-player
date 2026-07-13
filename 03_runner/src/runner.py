@@ -59,6 +59,13 @@ class ScriptedAI:
         raise ValueError(f"Scripted choice {choice_id} is not available for node {node_id}")
 
 
+def _recorded_temperature(ai_client: Any, temperature: float) -> float | str:
+    # CLI 后端不暴露 temperature，如实记为 N/A 而非假装设过（守可复现红线）。
+    if isinstance(ai_client, LLMClient) and getattr(ai_client, "provider", None) == "cli":
+        return "N/A (cli)"
+    return temperature
+
+
 def _chapter_token_usage(ai_client: LLMClient, before: dict[str, int]) -> dict[str, int]:
     after = ai_client.token_usage()
     return {
@@ -201,7 +208,7 @@ def run_experiment(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "config": {
             "model": ai_client.model if isinstance(ai_client, LLMClient) else "scripted",
-            "temperature": temperature,
+            "temperature": _recorded_temperature(ai_client, temperature),
             "difficulty": difficulty,
             "persona": persona_name,
             "language": chapter_data.get("_meta", {}).get("language", "unknown"),
@@ -233,11 +240,22 @@ def build_llm_client_from_model_registry(
         available = ", ".join(model.get("id", "<missing id>") for model in registry.get("models", [])) or "none"
         raise ValueError(f"Unknown model id: {model_id}. Available models: {available}")
 
+    provider = model_config.get("provider", "openai")
+    if provider == "cli":
+        # CLI 后端不读 LLM_* 环境变量：走本机已登录的 agent CLI。
+        # 底层模型跟随用户在 CLI 里自己选的默认，不写死 --model。
+        return LLMClient(
+            provider="cli",
+            cli_kind=model_config["cli_kind"],
+            model=model_config.get("cli_model") or model_config["id"],
+            temperature=temperature,
+        )
+
     return LLMClient(
         base_url=_env_value(model_config, "base_url_env"),
         api_key=_env_value(model_config, "api_key_env"),
         model=_env_value(model_config, "model_name_env"),
-        provider=model_config.get("provider", "openai"),
+        provider=provider,
         temperature=temperature,
     )
 

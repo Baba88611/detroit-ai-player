@@ -62,7 +62,7 @@
 然后用它跑（`--persona` 后跟文件名，不含 `.md`）：
 
 ```bash
-python -m src.runner --json ../01_json/zh/ch01_the_hostage_zh.json --model default --persona cautious
+python src/runner.py --json ../01_json/zh/ch01_the_hostage_zh.json --model default --persona cautious
 ```
 
 > **玩法建议**：如果你平时常用某个 AI（Claude、GPT……），把你观察到的它的性格、或你希望它扮演的角色，写成一段 persona 贴进来，就能看到"带着这种性格的 AI"如何走完整个故事。persona 用什么语言写都行，建议和你运行的章节语言一致（跑 `zh/` 用中文，跑 `en/` 用英文）。
@@ -95,6 +95,16 @@ pip install -r requirements.txt
 cp .env.example .env        # 复制后按下方说明填写
 ```
 
+> **Windows 用户**：整套流程和逻辑完全一致（纯 Python，无平台相关代码），只有个别命令的写法不同——把上面的 `cp` 换成 `copy`，其余按下表对应即可：
+>
+> | 操作 | Mac / Linux | Windows（PowerShell / CMD） |
+> |---|---|---|
+> | 复制 .env | `cp .env.example .env` | `copy .env.example .env` |
+> | 运行 Python | `python3 src/runner.py ...` | `python src\runner.py ...` |
+> | （可选）虚拟环境 | `source venv/bin/activate` | `venv\Scripts\activate` |
+>
+> 运行参数里的 `../01_json/...` 这类正斜杠路径在 Windows 上也能直接用（Python 会自动处理），无需改成反斜杠。
+
 ### 配置 API（编辑 `.env`）
 
 本框架走 **OpenAI 兼容接口**。最简单的方式：在 `.env` 里填好这三个变量，运行时用 **`--model default`**，就能驱动任意 OpenAI 兼容的模型（DeepSeek、OpenAI、GLM、本地模型、各类网关都行）：
@@ -111,14 +121,33 @@ cp .env.example .env        # 复制后按下方说明填写
 
 > **多模型对照（进阶）**：想用 `--model` 在几个模型间切换跑对比，见 `02_setting/models.json` 的注册表和 `.env.example` 里的 `OPENAI_* / ANTHROPIC_*` 模板——为每个模型配一组独立变量即可。原生 Anthropic Messages 接口（`provider: anthropic`）必须走这条路。
 
+### 没有 API key？用 Claude Code 跑（Agent CLI 后端）
+
+如果你没有任何模型的 API key，但本机装了 **[Claude Code](https://claude.com/claude-code)** 并已登录，可以让它顶替 API：runner 会调用你已登录的 `claude` 命令行,用你自己的订阅会话逐节点做决策，**不需要填 `.env`、不需要任何 key**。
+
+```bash
+# 前置：终端能跑通 `claude`（装好并登录过一次）。然后在 03_runner 目录下：
+python src/runner.py --json ../01_json/zh/ch01_the_hostage_zh.json --model claude-code
+```
+
+几点必须知道：
+
+- **底层模型跟随你在 Claude Code 里选的默认**（Opus / Sonnet 等），runner 不替你指定——想换模型就在 Claude Code 里换。
+- **实验有效性**：为守住"不联网、不用工具、只凭剧情文字决策 + 信息隔离"的口径，runner 调用时用 `--safe-mode`（禁用你的 `CLAUDE.md` / memory / skills / 插件等全部定制，避免个人配置污染被测玩家）叠加 `--tools ""`（禁全部工具），并在临时空目录里运行。
+- **慢，且消耗你的订阅额度**：每个节点都是一次独立的 CLI 调用，比直连 API 慢一个量级，用量计入你的 Claude 订阅。
+- **temperature 不适用**：CLI 不暴露温度，结果里如实记为 `"N/A (cli)"`。
+- **可以让 Claude Code agent 直接跑**：在本机原生 Claude Code 里让它执行上面的命令即可——它会 spawn 一个隔离的子 `claude` 进程当"玩家"，正常走你的登录态。仅在**某些托管/沙箱化的 agent 环境**（拿不到本地 keychain）会 401；遇到就改在普通终端里跑同一条命令。
+
+> **Codex 暂不支持**：`codex exec` 无法满足本项目的信息隔离要求——它的 `read-only` 沙箱仍允许读取任意文件（实测会读到 `system` 层数据），且没有"关闭全部工具"的开关，被测模型无法退化成纯叙事玩家。若将来 Codex 提供真正的"无工具 / 纯对话"模式，代码已按 `cli_kind` 留好扩展口子。
+
 ### 运行
 
 ```bash
 # 跑单章（第 1 章，中文版，default 模型槽位，默认人格，休闲难度）：
-python -m src.runner --json ../01_json/zh/ch01_the_hostage_zh.json --model default
+python src/runner.py --json ../01_json/zh/ch01_the_hostage_zh.json --model default
 
 # 跑全流程 campaign（ch01 → ch32 串联，跨章节状态自动传递）：
-python -m src.campaign_runner --chapters ../01_json/zh/ch*.json --model default
+python src/campaign_runner.py --chapters ../01_json/zh/ch*.json --model default
 ```
 
 具体参数（`--model` / `--persona` / `--difficulty` / `--temperature`）见 `02_setting/` 与各 `CLAUDE.md`。

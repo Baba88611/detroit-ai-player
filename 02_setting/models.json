@@ -35,6 +35,14 @@
       "api_key_env": "ANTHROPIC_API_KEY",
       "language": ["zh", "en"],
       "notes": "Claude Opus 4.6 via official Anthropic Messages API"
+    },
+    {
+      "id": "claude-code",
+      "provider": "cli",
+      "cli_kind": "claude",
+      "cli_model": null,
+      "language": ["zh", "en"],
+      "notes": "CLI 后端：调用本机已登录的 Claude Code（claude -p），用你的订阅会话跑，无需 API key。底层模型跟随你在 Claude Code 里选的默认；慢，且消耗订阅额度。"
     }
   ]
 }
