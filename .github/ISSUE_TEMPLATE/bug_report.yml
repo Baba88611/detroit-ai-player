@@ -1,0 +1,66 @@
+name: Bug report / 缺陷报告
+description: 报告一个可复现的程序问题；请勿包含密钥或未脱敏日志。
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢报告问题。部署咨询请改用 Discussions。不要粘贴 API key、`.env` 内容或认证 token。
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题概述
+      description: 实际发生了什么？你预期发生什么？
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: commit SHA 或 Release 版本，例如 v0.1.0。
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: 模型后端
+      options:
+        - OpenAI-compatible API / default
+        - Registered API model
+        - Claude Code CLI
+        - Dry run
+        - Not applicable
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境
+      description: 操作系统、Python 版本和相关 CLI 版本。
+      placeholder: macOS 15, Python 3.12, Claude Code ...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 提供最小步骤和已脱敏命令。
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 已脱敏日志
+      description: 删除 API key、token、`.env` 内容和个人路径后再粘贴。
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已经搜索现有 Issues 和 Discussions，没有发现重复问题。
+          required: true
+        - label: 我确认没有提交 API key、token、`.env` 内容或其他敏感信息。
+          required: true

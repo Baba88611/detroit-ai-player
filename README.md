@@ -1,5 +1,10 @@
 # Detroit AI Player — 让大模型自己玩《底特律：变人》
 
+[![Tests](https://github.com/Baba88611/detroit-ai-player/actions/workflows/tests.yml/badge.svg)](https://github.com/Baba88611/detroit-ai-player/actions/workflows/tests.yml)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Code License: MIT](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE)
+[![Data License: CC BY--NC 4.0](https://img.shields.io/badge/data-CC_BY--NC_4.0-lightgrey.svg)](docs/legal/CC-BY-NC-4.0.txt)
+
 > 用结构化的决策树，让**你的 AI**（DeepSeek、GPT、Claude 或任何 OpenAI 兼容模型）作为"玩家"
 > 自主跑通一款叙事游戏的全部剧情分支，观测它在人质谈判、生死抉择、武力与非暴力等道德困境中的决策倾向。
 >
@@ -7,6 +12,8 @@
 > comparing how they decide under moral dilemmas. English summary at the bottom.*
 
 ⚠️ 本项目为非商业研究，不含任何游戏素材，与 Quantic Dream / Sony 无关。请先阅读 **[DISCLAIMER.md](DISCLAIMER.md)**。
+
+**许可证边界**：运行代码采用 MIT；决策树、配置、文字与图表采用 CC BY-NC 4.0（非商用）。完整映射见 [docs/legal/README.md](docs/legal/README.md)。
 
 ---
 
@@ -186,7 +193,7 @@ Get-ChildItem ..\04_execution\results\campaign_*.json | Sort-Object LastWriteTim
 
 ## 参与开发 / 跑测试
 
-贡献者用开发依赖复现测试环境（普通用户运行不需要）：
+贡献者用开发依赖复现测试环境（普通用户运行不需要）。提交 Issue 或 Pull Request 前请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)：
 
 ```bash
 cd 03_runner
@@ -197,7 +204,7 @@ python -m pytest tests -v
 ## 分享你的结果
 
 跑出了有趣的结局、意外的决策分歧、或某个模型的"玩家性格"？欢迎发到本仓库的
-**Discussions / Issues** 交流——这个项目最有意思的部分，就是看不同的 AI（以及不同人格设定下的同一个 AI）
+[Discussions](https://github.com/Baba88611/detroit-ai-player/discussions) 交流；可复现的程序缺陷请提交 [Issues](https://github.com/Baba88611/detroit-ai-player/issues)——这个项目最有意思的部分，就是看不同的 AI（以及不同人格设定下的同一个 AI）
 在相同的道德困境面前走出多么不同的路。
 
 > 作者自己用三个模型跑完全部 32 章的分析（哪些章节出现分歧、各模型的决策风格），
@@ -208,7 +215,8 @@ python -m pytest tests -v
 ## 许可证
 
 - **代码**（`03_runner/` 下的脚本等）：[MIT](LICENSE)
-- **数据与内容**（决策树 JSON、数据格式说明、示意图等）：[CC-BY-NC-4.0](LICENSE-DATA)（非商用）
+- **数据与内容**（决策树 JSON、数据格式说明、示意图等）：[CC-BY-NC-4.0](docs/legal/CC-BY-NC-4.0.txt)（非商用）
+- 逐类文件适用范围：[docs/legal/README.md](docs/legal/README.md)
 - 《底特律：变人》相关权利归 Quantic Dream / Sony，详见 [DISCLAIMER.md](DISCLAIMER.md)
 
 ---

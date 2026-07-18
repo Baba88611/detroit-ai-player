@@ -1,0 +1,41 @@
+name: Feature request / 功能建议
+description: 提议一个新的运行能力、实验维度或文档改进。
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题
+      description: 当前用户遇到的具体限制是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 描述期望行为、命令或数据格式。
+    validations:
+      required: true
+  - type: textarea
+    id: isolation
+    attributes:
+      label: 信息隔离影响
+      description: 是否改变被测模型可见内容、工具、联网能力或 system 层访问？如果不涉及，请写“不涉及”。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 备选方案
+      description: 你考虑过哪些替代路径？
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: 边界确认
+      options:
+        - label: 建议不要求提交游戏原始剧本、逐字对白、截图或音视频素材。
+          required: true
+        - label: 建议不要求公开 API key、token 或其他敏感信息。
+          required: true

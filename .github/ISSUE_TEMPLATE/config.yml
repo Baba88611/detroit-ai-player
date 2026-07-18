@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Q&A / 部署与使用问题
+    url: https://github.com/Baba88611/detroit-ai-player/discussions/categories/q-a
+    about: 安装、配置、模型后端和运行问题请在 Discussions 提问。
+  - name: Show and tell / 分享实验结果
+    url: https://github.com/Baba88611/detroit-ai-player/discussions/categories/show-and-tell
+    about: 分享模型跑出的结局、分歧和人格表现。
+  - name: Security / 安全漏洞
+    url: https://github.com/Baba88611/detroit-ai-player/security/advisories/new
+    about: 涉及密钥、认证或信息隔离绕过的问题请私密报告。
