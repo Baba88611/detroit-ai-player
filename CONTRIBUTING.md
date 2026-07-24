@@ -1,16 +1,21 @@
-# Contributing / 参与贡献
+# Contributing
 
-感谢你帮助改进 Detroit AI Player。提交内容必须同时守住可复现性、信息隔离和版权边界。
+**English** | [简体中文](CONTRIBUTING.zh-CN.md)
 
-## 先选择正确入口
+Thank you for helping improve Detroit AI Player. Every contribution must preserve
+reproducibility, information isolation, and copyright boundaries.
 
-- 部署问题、模型使用问题和实验结果分享：使用
-  [Discussions](https://github.com/Baba88611/detroit-ai-player/discussions)。
-- 可复现的程序缺陷：使用 Bug report Issue 模板。
-- 新功能或研究设计建议：先使用 Feature request 模板说明动机与边界。
-- 安全问题或可能暴露密钥的问题：使用 [SECURITY.md](SECURITY.md) 中的私密入口。
+## Choose the right channel
 
-## 本地开发
+- For deployment questions, model usage, and experiment-result sharing, use
+  [Discussions](https://github.com/Baba88611/detroit-ai-player/discussions).
+- For reproducible program defects, use the Bug report Issue template.
+- For new features or research-design proposals, start with the Feature request
+  template and explain the motivation and boundaries.
+- For security issues or possible secret exposure, use the private reporting
+  channel described in [SECURITY.md](SECURITY.md).
+
+## Local development
 
 ```bash
 git clone https://github.com/Baba88611/detroit-ai-player.git
@@ -21,21 +26,38 @@ python -m pip install -r requirements-dev.txt
 python -m pytest tests -v
 ```
 
-Windows PowerShell 激活命令为 `.\.venv\Scripts\Activate.ps1`。
+On Windows PowerShell, activate the environment with
+`.\.venv\Scripts\Activate.ps1`.
 
-## Pull Request 要求
+## Keep both documentation languages in sync
 
-1. 每个 PR 聚焦一个问题，并说明用户可见的变化。
-2. 新行为必须有测试；修复缺陷时优先添加能复现旧问题的回归测试。
-3. 保持现有目录职责：`01_json` 数据、`02_setting` 配置、`03_runner` 运行器、
-   `04_execution` 结果说明。
-4. 不要提交 `.env`、API key、token、个人实验结果或包含密钥的日志。
-5. 不要给被测模型增加工具、联网能力或 `system` 层数据。任何可能改变
-   `player_facing` / `system` 隔离边界的改动，都必须在 PR 中单独说明并测试。
-6. 不要提交游戏原始剧本、逐字对白、截图、音视频或其他第三方游戏素材。
-7. 确认改动适用的许可证，参见 [docs/legal/README.md](docs/legal/README.md)。
+- `README.md` and `README.zh-CN.md` form one pair; `CONTRIBUTING.md` and
+  `CONTRIBUTING.zh-CN.md` form another.
+- A substantive change to either file in a pair must update its counterpart in
+  the same Pull Request.
+- Commands, paths, configuration names, information-isolation requirements, key
+  safety rules, and license boundaries must remain equivalent in both languages.
+  A spelling or wording correction may update only the affected language.
 
-提交前运行：
+## Pull Request requirements
+
+1. Keep each PR focused on one problem and describe the user-visible change.
+2. Add tests for new behavior. For a bug fix, prefer a regression test that
+   reproduces the previous failure.
+3. Preserve existing directory responsibilities: `01_json` for data,
+   `02_setting` for configuration, `03_runner` for the runner, and `04_execution`
+   for result documentation.
+4. Do not commit `.env`, API keys, tokens, personal experiment results, or logs
+   that contain secrets.
+5. Do not give the tested model tools, network access, or `system`-layer data.
+   Any change that may alter the `player_facing` / `system` isolation boundary
+   must be explained separately in the PR and covered by tests.
+6. Do not commit the original game script, verbatim dialogue, screenshots, audio,
+   video, or other third-party game assets.
+7. Confirm which license applies to your changes; see
+   [docs/legal/README.md](docs/legal/README.md).
+
+Before submitting, run:
 
 ```bash
 cd 03_runner
