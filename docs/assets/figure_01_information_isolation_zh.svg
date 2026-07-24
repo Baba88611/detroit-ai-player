@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">信息隔离：被测模型只看剧情，runner 执行隐藏规则</title>
+  <desc id="desc">player_facing 层对模型可见，system 层仅供 runner 使用，两者在信息边界两侧隔离。</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7f9fc; }
+      .eyebrow { font: 700 17px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; letter-spacing: 2px; fill: #667085; }
+      .title { font: 700 42px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #172033; }
+      .subtitle { font: 400 21px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #667085; }
+      .panel-title { font: 700 28px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #172033; }
+      .meta { font: 400 19px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #667085; }
+      .badge { font: 700 20px Arial, sans-serif; fill: #ffffff; text-anchor: middle; }
+      .code { font: 18px "SFMono-Regular", Menlo, Consolas, monospace; fill: #25324a; }
+      .label { font: 700 15px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; letter-spacing: 1px; }
+      .callout { font: 500 20px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #344054; }
+      .boundary-title { font: 700 18px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #172033; text-anchor: middle; }
+      .boundary-text { font: 400 16px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #667085; text-anchor: middle; }
+      .runner-title { font: 700 27px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #173b2a; }
+      .runner-subtitle { font: 400 18px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #557064; }
+      .step { font: 600 18px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #344054; text-anchor: middle; }
+      .blue-panel { fill: #edf6ff; stroke: #2f80d9; stroke-width: 3; }
+      .orange-panel { fill: #fff4ef; stroke: #e46141; stroke-width: 3; }
+      .code-box { fill: #ffffff; stroke: #d0d7e2; stroke-width: 2; }
+      .blue-note { fill: #dceeff; stroke: #9acaf4; stroke-width: 2; }
+      .orange-note { fill: #ffe4dc; stroke: #f1aa97; stroke-width: 2; }
+      .runner-panel { fill: #edf8f2; stroke: #3e9561; stroke-width: 3; }
+      .step-card { fill: #ffffff; stroke: #b8ddc6; stroke-width: 2; }
+      .shadow { filter: drop-shadow(0 10px 20px rgba(23,32,51,.09)); }
+      .wall { stroke: #243047; stroke-width: 6; stroke-dasharray: 16 14; stroke-linecap: round; }
+      .flow { stroke: #8b96a9; stroke-width: 3; fill: none; stroke-linecap: round; marker-end: url(#gray-arrow); }
+      .runner-flow { stroke: #3e9561; stroke-width: 4; fill: none; stroke-linecap: round; marker-end: url(#green-arrow); }
+    </style>
+    <marker id="gray-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2 2 L10 6 L2 10 Z" fill="#8b96a9"/>
+    </marker>
+    <marker id="green-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2 2 L10 6 L2 10 Z" fill="#3e9561"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1600" height="1000"/>
+
+  <text class="eyebrow" x="70" y="48">INFORMATION ISOLATION · 信息隔离</text>
+  <text class="title" x="70" y="98">被测模型只看剧情，runner 执行隐藏规则</text>
+  <text class="subtitle" x="70" y="137">模型只接收 player_facing；概率、状态与结局条件始终保留在 system 层。</text>
+
+  <rect class="blue-panel shadow" x="70" y="180" width="650" height="520" rx="24"/>
+  <circle cx="112" cy="225" r="24" fill="#2f80d9"/>
+  <text class="badge" x="112" y="232">1</text>
+  <text class="panel-title" x="153" y="220">模型可见：player_facing</text>
+  <text class="meta" x="153" y="254">场景 · 选项 · 对话历史</text>
+
+  <rect class="code-box" x="110" y="292" width="570" height="255" rx="16"/>
+  <text class="code" x="140" y="330">
+    <tspan x="140" dy="0">{</tspan>
+    <tspan x="164" dy="30">"context": "丹尼尔抱着艾玛站在天台边缘，</tspan>
+    <tspan x="164" dy="28">直升机的风压让他的声音发抖。",</tspan>
+    <tspan x="164" dy="30">"choices": [</tspan>
+    <tspan x="192" dy="28">"尝试安抚丹尼尔",</tspan>
+    <tspan x="192" dy="28">"走向受伤警察"</tspan>
+    <tspan x="164" dy="28">]</tspan>
+    <tspan x="140" dy="28">}</tspan>
+  </text>
+
+  <rect class="blue-note" x="110" y="570" width="570" height="82" rx="14"/>
+  <text class="label" x="138" y="600" fill="#236eae">模型体验</text>
+  <text class="callout" x="138" y="632">像第一次游玩，只依据当前叙事做选择。</text>
+
+  <line class="wall" x1="800" y1="205" x2="800" y2="700"/>
+  <rect x="733" y="384" width="134" height="132" rx="18" fill="#ffffff" stroke="#243047" stroke-width="3"/>
+  <text class="boundary-title" x="800" y="423">信息边界</text>
+  <text class="boundary-text" x="800" y="457">system 不进入</text>
+  <text class="boundary-text" x="800" y="484">模型上下文</text>
+
+  <rect class="orange-panel shadow" x="880" y="180" width="650" height="520" rx="24"/>
+  <circle cx="922" cy="225" r="24" fill="#e46141"/>
+  <text class="badge" x="922" y="232">2</text>
+  <text class="panel-title" x="963" y="220">仅 runner 可见：system</text>
+  <text class="meta" x="963" y="254">概率 · 状态变量 · 跨章节影响 · 结局条件</text>
+
+  <rect class="code-box" x="920" y="292" width="570" height="255" rx="16"/>
+  <text class="code" x="950" y="330">
+    <tspan x="950" dy="0">{</tspan>
+    <tspan x="974" dy="30">"effects": {</tspan>
+    <tspan x="1002" dy="28">"reassure": {</tspan>
+    <tspan x="1030" dy="28">"success_probability": 15</tspan>
+    <tspan x="1002" dy="28">},</tspan>
+    <tspan x="1002" dy="28">"save_cop": { "trust": -5 }</tspan>
+    <tspan x="974" dy="28">},</tspan>
+    <tspan x="974" dy="28">"ending_resolution": "state check"</tspan>
+  </text>
+
+  <rect class="orange-note" x="920" y="570" width="570" height="82" rx="14"/>
+  <text class="label" x="948" y="600" fill="#b94830">实验控制</text>
+  <text class="callout" x="948" y="632">runner 读取这些规则，但绝不发送给模型。</text>
+
+  <path class="flow" d="M520 700 C560 735 610 755 680 780"/>
+  <path class="flow" d="M1080 700 C1040 735 990 755 920 780"/>
+
+  <rect class="runner-panel shadow" x="130" y="780" width="1340" height="165" rx="22"/>
+  <circle cx="175" cy="822" r="22" fill="#3e9561"/>
+  <text class="badge" x="175" y="829">3</text>
+  <text class="runner-title" x="214" y="821">runner 执行链路</text>
+  <text class="runner-subtitle" x="445" y="820">读取两层数据，严格控制发送给模型的内容</text>
+
+  <rect class="step-card" x="175" y="855" width="250" height="58" rx="12"/>
+  <text class="step" x="300" y="891">发送 player_facing</text>
+  <path class="runner-flow" d="M433 884 L468 884"/>
+  <rect class="step-card" x="475" y="855" width="250" height="58" rx="12"/>
+  <text class="step" x="600" y="891">记录模型选择</text>
+  <path class="runner-flow" d="M733 884 L768 884"/>
+  <rect class="step-card" x="775" y="855" width="250" height="58" rx="12"/>
+  <text class="step" x="900" y="891">应用 system.effects</text>
+  <path class="runner-flow" d="M1033 884 L1068 884"/>
+  <rect class="step-card" x="1075" y="855" width="250" height="58" rx="12"/>
+  <text class="step" x="1200" y="891">推进节点或结局</text>
+</svg>

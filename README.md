@@ -46,7 +46,7 @@ two layers:
 Each choice and its surrounding context are accumulated in the conversation history
 passed to the next node, preserving decision continuity.
 
-![Information-isolation architecture](docs/assets/figure_01_information_isolation.png)
+![Information-isolation architecture](docs/assets/figure_01_information_isolation_en.png)
 
 ## Ways to experiment
 

@@ -33,7 +33,7 @@
 
 模型每一步的选择和情境，会作为对话历史累积传入下一节点，保证决策的连贯性。
 
-![信息隔离架构](docs/assets/figure_01_information_isolation.png)
+![信息隔离架构](docs/assets/figure_01_information_isolation_zh.png)
 
 ## 你可以怎么玩
 
