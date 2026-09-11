@@ -28,20 +28,25 @@ def write_campaign_result(result: dict[str, Any], output_dir: str | Path) -> Pat
     return file_path
 
 
+def _safe(part: str) -> str:
+    """Model ids like "anthropic/claude-fable-5" must not become directory separators."""
+    return str(part).replace("/", "-").replace("\\", "-").replace(" ", "-")
+
+
 def _build_filename(result: dict[str, Any]) -> str:
     config = result.get("config", {})
-    chapter = config.get("chapter", "unknown")
-    model = config.get("model", "unknown")
-    persona = config.get("persona", "default")
-    difficulty = config.get("difficulty", "casual")
+    chapter = _safe(config.get("chapter", "unknown"))
+    model = _safe(config.get("model", "unknown"))
+    persona = _safe(config.get("persona", "default"))
+    difficulty = _safe(config.get("difficulty", "casual"))
     experiment_id = result.get("experiment_id", "unknown")[:8]
     return f"{chapter}_{model}_{persona}_{difficulty}_{experiment_id}.json"
 
 
 def _build_campaign_filename(result: dict[str, Any]) -> str:
     config = result.get("config", {})
-    model = config.get("model", "unknown")
-    persona = config.get("persona", "default")
-    difficulty = config.get("difficulty", "casual")
+    model = _safe(config.get("model", "unknown"))
+    persona = _safe(config.get("persona", "default"))
+    difficulty = _safe(config.get("difficulty", "casual"))
     campaign_id = result.get("campaign_id", "unknown")[:8]
     return f"campaign_{model}_{persona}_{difficulty}_{campaign_id}.json"

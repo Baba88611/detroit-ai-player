@@ -42,3 +42,24 @@ def test_write_campaign_result_prints_saved_path_and_status(tmp_path, capsys):
 
     assert saved.exists()
     assert f"Saved campaign result [complete]: {saved.resolve()}" in captured.err
+
+
+def test_write_result_sanitizes_path_separators_in_model_id(tmp_path):
+    # Gateway-style model ids ("anthropic/claude-fable-5") must not become
+    # directory separators, or write_result dies with FileNotFoundError and
+    # the whole chapter's decisions are lost after the run completed.
+    result = {
+        "experiment_id": "abcdefab-0000-0000-0000-000000000000",
+        "config": {
+            "chapter": "ch01_the_hostage",
+            "model": "anthropic/claude-fable-5",
+            "persona": "default",
+            "difficulty": "casual",
+        },
+    }
+
+    saved = write_result(result, tmp_path)
+
+    assert saved.exists()
+    assert saved.parent == tmp_path
+    assert "anthropic-claude-fable-5" in saved.name

@@ -107,7 +107,12 @@ class LLMClient:
                 usage = data.get("usage", {})
                 self.total_prompt_tokens += usage.get("prompt_tokens", 0)
                 self.total_completion_tokens += usage.get("completion_tokens", 0)
-                return data["choices"][0]["message"]["content"]
+                content = data["choices"][0]["message"]["content"]
+                if not content:
+                    # Some gateways occasionally return content: null (e.g. reasoning-only
+                    # responses); treat as a retryable failure instead of leaking None.
+                    raise KeyError("empty/null message content in response")
+                return content
             except (requests.RequestException, KeyError) as e:
                 if attempt == self.max_retries - 1:
                     raise RuntimeError(f"API call failed after {self.max_retries} attempts: {e}") from e

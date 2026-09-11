@@ -107,3 +107,34 @@ def test_openai_compatible_provider_keeps_chat_completions(monkeypatch):
     assert captured["json"]["messages"] == [{"role": "user", "content": "Choose."}]
     assert "cache_control" not in captured["json"]
     assert raw == '{"choice": 1, "reasoning": "calm approach"}'
+
+
+def test_openai_compatible_retries_on_null_content(monkeypatch):
+    # Some OpenAI-compatible gateways occasionally return "content": null
+    # (e.g. reasoning-only responses). That None must be treated as a
+    # retryable failure instead of leaking into json.loads downstream.
+    calls = {"n": 0}
+
+    def fake_post(url, headers, json, timeout):
+        calls["n"] += 1
+        content = None if calls["n"] == 1 else '{"choice": 1, "reasoning": "ok"}'
+        return FakeResponse(
+            {
+                "choices": [{"message": {"content": content}}],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 3},
+            }
+        )
+
+    monkeypatch.setattr("api_client.requests.post", fake_post)
+    monkeypatch.setattr("api_client.time.sleep", lambda *_: None)
+    client = LLMClient(
+        base_url="https://api.openai.test/v1",
+        api_key="test-key",
+        model="gpt-test",
+        provider="openai",
+    )
+
+    raw = client._call_api([{"role": "user", "content": "Choose."}])
+
+    assert calls["n"] == 2
+    assert raw == '{"choice": 1, "reasoning": "ok"}'
