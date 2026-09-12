@@ -234,7 +234,8 @@ python src/runner.py --json ../01_json/en/ch01_the_hostage_en.json --model codex
 
 You may set `CODEX_MODEL` to a Codex model identifier before running. If it is
 unset, Codex chooses its configured default and `resolved_model` is recorded as
-`null` rather than guessed. Reasoning effort is fixed at `medium` for this backend.
+`null` rather than guessed. Reasoning effort is fixed at `medium` for this backend,
+and the `reasoning` text is explicitly constrained to the chapter language.
 
 The runner uses an ephemeral `codex exec` in an empty temporary directory, ignores
 user configuration and rules, requests schema-constrained JSON, disables known

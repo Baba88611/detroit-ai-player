@@ -386,6 +386,21 @@ class LLMClient:
         self._preflight_codex_cli(executable, child_env)
 
         system_prompt, transcript = self._split_cli_messages(messages)
+        is_zh = self._contains_chinese(system_prompt)
+        if is_zh:
+            language_instruction = (
+                "Write the reasoning field in Simplified Chinese, matching the game content."
+            )
+            reasoning_description = "使用简体中文简要说明选择理由。"
+        else:
+            language_instruction = (
+                "Write the reasoning field in English, matching the game content. "
+                "Do not switch to Chinese because of account or interface language preferences."
+            )
+            reasoning_description = "Briefly explain the choice in English."
+        developer_instructions = (
+            f"{CODEX_DEVELOPER_INSTRUCTIONS} {language_instruction}"
+        )
         prompt_parts = []
         if system_prompt:
             prompt_parts.append(f"[Game instructions and persona]\n{system_prompt}")
@@ -400,7 +415,10 @@ class LLMClient:
                     "minimum": 1,
                     "maximum": choice_count,
                 },
-                "reasoning": {"type": "string"},
+                "reasoning": {
+                    "type": "string",
+                    "description": reasoning_description,
+                },
             },
             "required": ["choice", "reasoning"],
             "additionalProperties": False,
@@ -429,7 +447,7 @@ class LLMClient:
                         schema_path,
                         "--json",
                         "-c",
-                        f"developer_instructions={json.dumps(CODEX_DEVELOPER_INSTRUCTIONS)}",
+                        f"developer_instructions={json.dumps(developer_instructions)}",
                         "-c",
                         'web_search="disabled"',
                         "-c",
@@ -631,7 +649,7 @@ class LLMClient:
         system prompt 是否含中文字符判定，与运行章节保持一致。"""
         system_parts = [m["content"] for m in messages if m["role"] == "system"]
         system_prompt = "\n\n".join(part for part in system_parts if part)
-        is_zh = any("一" <= ch <= "鿿" for ch in system_prompt)
+        is_zh = self._contains_chinese(system_prompt)
         if is_zh:
             header = "下面是你到目前为止的游戏经过，请对最后一个【场景】做出你的选择。"
             scene_label, choice_label = "【场景】", "【你的选择】"
@@ -649,6 +667,10 @@ class LLMClient:
                 blocks.append(f"{choice_label}\n{m['content']}")
         transcript = header + "\n\n" + "\n\n".join(blocks)
         return system_prompt, transcript
+
+    @staticmethod
+    def _contains_chinese(text: str) -> bool:
+        return any("一" <= character <= "鿿" for character in text)
 
     def _unwrap_claude_envelope(self, stdout: str) -> str:
         stdout = stdout.strip()

@@ -329,7 +329,13 @@ def test_codex_cli_uses_isolated_no_tool_jsonl_contract(monkeypatch):
     assert cmd.count("--disable") >= 10
     assert "shell_tool" in cmd and "browser_use" in cmd and "plugins" in cmd
     assert 'model_reasoning_effort="medium"' in cmd
-    assert any(value.startswith("developer_instructions=") for value in cmd)
+    developer_config = next(
+        value for value in cmd if value.startswith("developer_instructions=")
+    )
+    assert "Simplified Chinese" in developer_config
+    assert captured["schema"]["properties"]["reasoning"]["description"] == (
+        "使用简体中文简要说明选择理由。"
+    )
     assert "你是康纳" in captured["input"]
     assert "【场景】" in captured["input"] and "【你的选择】" in captured["input"]
     assert captured["input"].rstrip().endswith("场景二：你必须现在决定。")
@@ -347,6 +353,40 @@ def test_codex_cli_uses_isolated_no_tool_jsonl_contract(monkeypatch):
         "output_tokens": 40,
         "reasoning_output_tokens": 12,
     }
+
+
+def test_codex_cli_requires_english_reasoning_for_english_chapter(monkeypatch):
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        preflight = _fake_codex_preflight(cmd)
+        if preflight is not None:
+            return preflight
+        captured["cmd"] = cmd
+        schema_path = Path(cmd[cmd.index("--output-schema") + 1])
+        captured["schema"] = json.loads(schema_path.read_text(encoding="utf-8"))
+        return FakeCompletedProcess(stdout=_codex_jsonl())
+
+    monkeypatch.setattr("api_client.shutil.which", lambda name: "/usr/bin/codex")
+    monkeypatch.setattr("api_client.subprocess.run", fake_run)
+    client = LLMClient(provider="cli", cli_kind="codex", model="codex-cli")
+
+    client._call_api(
+        [
+            {"role": "system", "content": "You are Markus."},
+            {"role": "user", "content": "Choose where to walk."},
+        ],
+        choice_count=2,
+    )
+
+    developer_config = next(
+        value for value in captured["cmd"] if value.startswith("developer_instructions=")
+    )
+    assert "Write the reasoning field in English" in developer_config
+    assert "Do not switch to Chinese" in developer_config
+    assert captured["schema"]["properties"]["reasoning"]["description"] == (
+        "Briefly explain the choice in English."
+    )
 
 
 def test_codex_cli_uses_optional_model_and_scrubs_api_env(monkeypatch):

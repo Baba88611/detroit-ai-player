@@ -130,7 +130,7 @@ runner 是信息隔离的执行者。发送给被测 AI 的内容**只能来自�
 - **不读 `LLM_*` 环境变量、无需 API key**：shell 出去调本机已登录的 `claude`（`claude -p`）或 `codex`（`codex exec`），走用户登录会话。
 - **Claude 信息隔离**：`--safe-mode` 禁用 CLAUDE.md / memory / skills / plugins / hooks / MCP 等定制；`--tools ""` 禁全部内置工具；`--system-prompt` 全量替换系统提示；子进程 `cwd` 设临时空目录。**不要用 `--bare`**：它会杀掉 OAuth 登录态。
 - **Codex 信息隔离（失败关闭）**：使用 `--ephemeral --ignore-user-config --ignore-rules`、临时空目录、只读 sandbox，显式关闭 shell、web、browser、MCP/apps/plugins、skills、memory、multi-agent、image 等已知能力；最终回复受临时 JSON Schema 约束。解析 `--json` 的每一条 JSONL 事件，只允许 reasoning 和 agent message；出现工具类型或未知事件立即中止且不重试。
-- **Codex 是实验性后端**：Codex 的内置 developer 指令不能完整替换，只能通过 `developer_instructions` 追加叙事玩家约束。结果必须记录 `experimental_backend: true` 和 `instruction_mode: "additional_developer"`，不能把它与 API / Claude Code 当作严格等价条件。
+- **Codex 是实验性后端**：Codex 的内置 developer 指令不能完整替换，只能通过 `developer_instructions` 追加叙事玩家约束。这里还必须明确要求 `reasoning` 与章节语言一致，并在输出 schema 的字段描述中重复该要求，避免账户/界面语言偏好污染英文实验。结果必须记录 `experimental_backend: true` 和 `instruction_mode: "additional_developer"`，不能把它与 API / Claude Code 当作严格等价条件。
 - **消息拍平**：user/assistant 历史拍平成带标签的 transcript（标签语言按 system prompt 是否含中文判定）。Claude 的 system 消息走 `--system-prompt`，Codex 则把游戏 system/persona 与 transcript 一起放入 stdin，并用额外 developer 指令约束其只扮演玩家。红线「对话历史累积」照常满足。
 - **每个决策节点独立调用**：只有存在 choices、需要模型选择的节点才启动 CLI；叙事/强制节点不启动。人格、章内完整历史和跨章摘要会在每次调用中重放，不依赖常驻会话。
 - **temperature 不适用**：CLI 不暴露温度，结果 `config.temperature` 记 `"N/A (cli)"`，不假装设过（守可复现红线）。

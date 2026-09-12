@@ -163,7 +163,7 @@ codex login status
 python src/runner.py --json ../01_json/zh/ch01_the_hostage_zh.json --model codex-cli
 ```
 
-可以在运行前设置 `CODEX_MODEL` 来指定 Codex 模型；不设置则使用 Codex 默认模型，结果中的 `resolved_model` 记为 `null`，不会猜测默认模型名称。此后端的推理强度固定为 `medium`。
+可以在运行前设置 `CODEX_MODEL` 来指定 Codex 模型；不设置则使用 Codex 默认模型，结果中的 `resolved_model` 记为 `null`，不会猜测默认模型名称。此后端的推理强度固定为 `medium`，`reasoning` 文本会被明确约束为与章节相同的语言。
 
 runner 会在临时空目录中执行一次性的 `codex exec`，忽略用户配置和规则，以 JSON Schema 约束回复，关闭已知工具能力和联网搜索，并逐条审计 JSONL 事件。只要出现工具事件或未知事件，就立即失败，不会静默继续。
 
