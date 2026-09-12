@@ -56,7 +56,7 @@ You can vary:
 
 | Dimension | How to change it |
 |---|---|
-| Model | Register any OpenAI-compatible endpoint in `02_setting/models.json` (DeepSeek, GPT, Claude, GLM, a local model, and others), then set the matching key in `.env` |
+| Model | Register an API endpoint in `02_setting/models.json`, or use the built-in `claude-code` / experimental `codex-cli` Agent CLI backends |
 | Persona prompt | Use the included `default` / `machine` personas, or create one under `02_setting/personas/` and select it with `--persona <name>` |
 | Language | Point `--json` to `01_json/en/` or `01_json/zh/` (the two versions were written independently, not mechanically translated) |
 | Difficulty | Use `--difficulty casual / experienced / hardcore` to change QTE success probabilities |
@@ -125,15 +125,15 @@ docs/assets/    Architecture diagrams
 
 ## Install and run
 
-**Prerequisites:** Python 3.10+ and a model API key (unless you use the Claude Code
-backend described below).
+**Prerequisites:** Python 3.10+ and either a model API key, a signed-in Claude Code
+CLI, or a signed-in Codex CLI.
 
 ```bash
 git clone https://github.com/Baba88611/detroit-ai-player.git
 cd detroit-ai-player/03_runner
 python3 -m venv .venv && source .venv/bin/activate   # Optional; recommended for isolation
 pip install -r requirements.txt
-cp .env.example .env        # Only needed for API-key backends; skip for --model claude-code
+cp .env.example .env        # Only needed for API-key backends; skip for Agent CLI backends
 ```
 
 > **Windows users:** the workflow and program behavior are the same—the project is
@@ -172,7 +172,7 @@ Treat the key like a password and never commit it; `.env` is already excluded by
 > in your editor. The program reads the key at runtime, so it never needs to enter
 > the agent's conversation context. Do not send a key in chat or ask an agent to
 > `cat` your `.env` or print environment variables. If you have no API key, the
-> `--model claude-code` backend below does **not** require one.
+> `--model claude-code` and `--model codex-cli` backends below do **not** require one.
 
 > `--model default` is the generic OpenAI-compatible slot defined in
 > `02_setting/models.json`. It reads the `LLM_*` variables above. `default` is only
@@ -183,7 +183,15 @@ Treat the key like a password and never commit it; `.env` is already excluded by
 > `.env.example` to assign each model its own environment variables. A native
 > Anthropic Messages endpoint (`provider: anthropic`) must use this path.
 
-### No API key? Use Claude Code (Agent CLI backend)
+### No API key? Use an Agent CLI backend
+
+Both CLI backends start a fresh child process only at nodes that require the model
+to choose. Narrative and mandatory nodes do not call a model. Player identity and
+story continuity do not depend on a persistent CLI session: the runner replays the
+fixed persona, complete in-chapter history, and deterministic cross-chapter summary
+on every decision call.
+
+#### Claude Code
 
 If you have no model API key but have **[Claude Code](https://claude.com/claude-code)**
 installed and signed in, the runner can call your authenticated `claude` CLI and
@@ -213,12 +221,36 @@ Important details:
   keychain and returns `401`. If that happens, run the same command in a normal
   terminal instead of retrying in the sandbox.
 
-> **Codex is not currently supported as a player backend:** `codex exec` cannot
-> meet this project's information-isolation requirements. Its `read-only` sandbox
-> can still read arbitrary files (including `system`-layer data in testing), and it
-> does not provide a switch that disables all tools. If Codex later offers a true
-> no-tools, conversation-only mode, the code already has an extension point through
-> `cli_kind`.
+#### Codex CLI (experimental)
+
+If [Codex CLI](https://developers.openai.com/codex/cli) is installed and signed in,
+the runner can use its saved Codex/ChatGPT login without an API key:
+
+```bash
+# Check once; run `codex login` first if needed. Then run this from 03_runner:
+codex login status
+python src/runner.py --json ../01_json/en/ch01_the_hostage_en.json --model codex-cli
+```
+
+You may set `CODEX_MODEL` to a Codex model identifier before running. If it is
+unset, Codex chooses its configured default and `resolved_model` is recorded as
+`null` rather than guessed. Reasoning effort is fixed at `medium` for this backend.
+
+The runner uses an ephemeral `codex exec` in an empty temporary directory, ignores
+user configuration and rules, requests schema-constrained JSON, disables known
+tool-bearing features and web search, and audits every JSONL event. A tool event or
+unknown event fails the run immediately instead of silently continuing.
+
+Like Claude Code, this starts one process per decision node and consumes your
+subscription usage. Codex also carries substantial built-in instruction overhead,
+so a full campaign can be considerably slower and more usage-intensive than an API
+backend.
+
+> **Why experimental:** Codex's built-in developer instructions cannot be fully
+> replaced. The runner adds a narrative-player developer instruction, but this is
+> not strictly the same instruction condition as a direct API call or Claude Code's
+> full system-prompt replacement. Use the backend to explore Codex's play behavior,
+> but do not treat cross-backend comparisons as perfectly controlled experiments.
 
 ### Run
 
@@ -228,6 +260,8 @@ python src/runner.py --json ../01_json/en/ch01_the_hostage_en.json --model defau
 
 # Run the full campaign (ch01 → ch32 with cross-chapter state propagation):
 python src/campaign_runner.py --chapters ../01_json/en/ch*.json --model default
+
+# Replace `default` with `claude-code` or experimental `codex-cli` for a CLI backend.
 ```
 
 See `02_setting/` and the relevant `CLAUDE.md` files for options including

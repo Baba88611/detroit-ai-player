@@ -41,8 +41,23 @@
       "provider": "cli",
       "cli_kind": "claude",
       "cli_model": null,
+      "reasoning_effort": null,
+      "experimental_backend": false,
+      "instruction_mode": "system_prompt_replacement",
       "language": ["zh", "en"],
       "notes": "CLI 后端：调用本机已登录的 Claude Code（claude -p），用你的订阅会话跑，无需 API key。底层模型跟随你在 Claude Code 里选的默认；慢，且消耗订阅额度。"
+    },
+    {
+      "id": "codex-cli",
+      "provider": "cli",
+      "cli_kind": "codex",
+      "cli_model": null,
+      "cli_model_env": "CODEX_MODEL",
+      "reasoning_effort": "medium",
+      "experimental_backend": true,
+      "instruction_mode": "additional_developer",
+      "language": ["zh", "en"],
+      "notes": "实验性 CLI 后端：调用本机已登录的 Codex CLI（codex exec），用你的 Codex/ChatGPT 会话跑，无需 API key。可选 CODEX_MODEL 指定底层模型；未设置时跟随 Codex 默认。内置 Codex 指令无法被完全替换，不能与 API 或 Claude Code 做严格等价比较。"
     }
   ]
 }

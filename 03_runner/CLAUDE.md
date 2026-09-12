@@ -115,7 +115,7 @@ runner 是信息隔离的执行者。发送给被测 AI 的内容**只能来自�
 
 - `openai`（默认）：OpenAI 兼容接口 `/v1/chat/completions`，主流模型（GPT / GLM / DeepSeek 等）通用。
 - `anthropic`：原生 Anthropic Messages 接口 `/v1/messages`。
-- `cli`：**Agent CLI 后端**，供没有 API key、只装了 agent 工具的用户。目前支持 `cli_kind: "claude"`（Claude Code）。
+- `cli`：**Agent CLI 后端**，供没有 API key、只装了 agent 工具的用户。支持 `cli_kind: "claude"`（Claude Code）和实验性的 `cli_kind: "codex"`（Codex CLI）。
 
 配置项（openai / anthropic，从 02_setting 或运行参数传入）：
 - `base_url`：API 端点
@@ -127,13 +127,15 @@ runner 是信息隔离的执行者。发送给被测 AI 的内容**只能来自�
 
 **CLI 后端（provider: cli）的约束与实现要点：**
 
-- **不读 `LLM_*` 环境变量、无需 API key**：shell 出去调本机已登录的 `claude`（`claude -p`），走用户订阅会话。
-- **信息隔离靠四层拼出**：`--safe-mode`（禁用 CLAUDE.md / memory / skills / plugins / hooks / MCP 等全部定制，但认证与模型选择照常——这是挡住用户全局 `~/.claude/CLAUDE.md` 与项目 CLAUDE.md 注入的主防线，实测只靠临时 cwd 挡不住 memory）；`--tools ""` 禁全部内置工具（web/bash/文件读，同时挡住读 `system` 层 JSON）；`--system-prompt` 全量替换系统提示（让被测模型是"玩家"而非编码 agent）；子进程 `cwd` 设临时空目录（兜底，防意外文件访问）。**不要用 `--bare`**：它会杀掉 OAuth 登录态，逼用户回到 API key。
-- **消息拍平**：CLI 只吃单段文本。system 消息走 `--system-prompt`，user/assistant 历史拍平成带标签的 transcript 走 stdin（标签语言按 system_prompt 是否含中文判定）。红线「对话历史累积」照常满足。
+- **不读 `LLM_*` 环境变量、无需 API key**：shell 出去调本机已登录的 `claude`（`claude -p`）或 `codex`（`codex exec`），走用户登录会话。
+- **Claude 信息隔离**：`--safe-mode` 禁用 CLAUDE.md / memory / skills / plugins / hooks / MCP 等定制；`--tools ""` 禁全部内置工具；`--system-prompt` 全量替换系统提示；子进程 `cwd` 设临时空目录。**不要用 `--bare`**：它会杀掉 OAuth 登录态。
+- **Codex 信息隔离（失败关闭）**：使用 `--ephemeral --ignore-user-config --ignore-rules`、临时空目录、只读 sandbox，显式关闭 shell、web、browser、MCP/apps/plugins、skills、memory、multi-agent、image 等已知能力；最终回复受临时 JSON Schema 约束。解析 `--json` 的每一条 JSONL 事件，只允许 reasoning 和 agent message；出现工具类型或未知事件立即中止且不重试。
+- **Codex 是实验性后端**：Codex 的内置 developer 指令不能完整替换，只能通过 `developer_instructions` 追加叙事玩家约束。结果必须记录 `experimental_backend: true` 和 `instruction_mode: "additional_developer"`，不能把它与 API / Claude Code 当作严格等价条件。
+- **消息拍平**：user/assistant 历史拍平成带标签的 transcript（标签语言按 system prompt 是否含中文判定）。Claude 的 system 消息走 `--system-prompt`，Codex 则把游戏 system/persona 与 transcript 一起放入 stdin，并用额外 developer 指令约束其只扮演玩家。红线「对话历史累积」照常满足。
+- **每个决策节点独立调用**：只有存在 choices、需要模型选择的节点才启动 CLI；叙事/强制节点不启动。人格、章内完整历史和跨章摘要会在每次调用中重放，不依赖常驻会话。
 - **temperature 不适用**：CLI 不暴露温度，结果 `config.temperature` 记 `"N/A (cli)"`，不假装设过（守可复现红线）。
-- **底层模型跟随用户 CLI 默认**：不写死 `--model`。
-- **token/cost 照常入账**：从 `--output-format json` 信封的 `usage` 字段解析。
-- 新增 CLI 时（如后续 Codex）：主干 `_call_cli` / `_split_cli_messages` 复用，只需按 `cli_kind` 补该 CLI 的命令构造与信封剥壳，并**单独验证其工具隔离**（各 CLI 关工具机制不同）。
+- **底层模型**：Claude 跟随用户 CLI 默认；Codex 可选读取 `CODEX_MODEL` 并传给 `-m`，未设置时跟随 Codex 默认且 `resolved_model` 记 `null`。
+- **用量照常入账**：Claude 从 `--output-format json` 信封解析，Codex 从 `turn.completed.usage` 解析。
 
 ### logger.py — 实验记录
 
@@ -150,6 +152,13 @@ runner 是信息隔离的执行者。发送给被测 AI 的内容**只能来自�
   "timestamp": "ISO 8601",
   "config": {
     "model": "模型名",
+    "resolved_model": null,
+    "backend": "openai / anthropic / cli",
+    "cli_kind": null,
+    "cli_version": null,
+    "reasoning_effort": null,
+    "experimental_backend": false,
+    "instruction_mode": "direct_messages",
     "temperature": 0.7,
     "difficulty": "casual",
     "persona": "persona 名称",
