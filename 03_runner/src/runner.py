@@ -70,7 +70,11 @@ def recorded_backend_config(ai_client: Any, temperature: float) -> dict[str, Any
             "model": "scripted",
             "resolved_model": None,
             "backend": "scripted",
+            "cli_kind": None,
             "cli_version": None,
+            "reasoning_effort": None,
+            "experimental_backend": False,
+            "instruction_mode": "direct_messages",
             "temperature": temperature,
         }
 
@@ -80,7 +84,11 @@ def recorded_backend_config(ai_client: Any, temperature: float) -> dict[str, Any
         "model": getattr(ai_client, "model", "unknown"),
         "resolved_model": getattr(ai_client, "resolved_model", None),
         "backend": provider or "unknown",
+        "cli_kind": getattr(ai_client, "cli_kind", None) if is_cli else None,
         "cli_version": getattr(ai_client, "cli_version", None),
+        "reasoning_effort": getattr(ai_client, "reasoning_effort", None),
+        "experimental_backend": getattr(ai_client, "experimental_backend", False),
+        "instruction_mode": getattr(ai_client, "instruction_mode", "direct_messages"),
         "temperature": "N/A (cli)" if is_cli else temperature,
     }
 
@@ -261,11 +269,21 @@ def build_llm_client_from_model_registry(
     provider = model_config.get("provider", "openai")
     if provider == "cli":
         # CLI 后端不读 LLM_* 环境变量：走本机已登录的 agent CLI。
-        # 底层模型跟随用户在 CLI 里自己选的默认，不写死 --model。
+        # 可选 cli_model_env 只覆盖该 CLI 的底层模型；未设置时跟随 CLI 默认。
+        cli_model = model_config.get("cli_model")
+        cli_model_env = model_config.get("cli_model_env")
+        if cli_model_env:
+            import os
+
+            cli_model = os.environ.get(cli_model_env) or cli_model
         return LLMClient(
             provider="cli",
             cli_kind=model_config["cli_kind"],
-            model=model_config.get("cli_model") or model_config["id"],
+            model=model_config["id"],
+            cli_model=cli_model,
+            reasoning_effort=model_config.get("reasoning_effort"),
+            experimental_backend=model_config.get("experimental_backend"),
+            instruction_mode=model_config.get("instruction_mode"),
             temperature=temperature,
         )
 

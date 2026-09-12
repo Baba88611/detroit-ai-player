@@ -17,7 +17,7 @@
 
 ## models.json — 模型注册表
 
-每个模型注册一条记录，runner 通过 `--model <id>` 查找接入信息。**所有接入参数都以环境变量名的形式登记，真实值放在 `.env` 里**（红线：本文件不含任何密钥或明文端点）。
+每个模型注册一条记录，runner 通过 `--model <id>` 查找接入信息。API 接入参数以环境变量名登记，真实值放在 `.env`；CLI 后端只登记非敏感选项并复用本机登录状态（红线：本文件不含任何密钥或明文端点）。
 
 ```json
 {
@@ -39,6 +39,17 @@
       "api_key_env": "ANTHROPIC_API_KEY",
       "language": ["zh", "en"],
       "notes": "原生 Anthropic Messages 接口"
+    },
+    {
+      "id": "codex-cli",
+      "provider": "cli",
+      "cli_kind": "codex",
+      "cli_model_env": "CODEX_MODEL",
+      "reasoning_effort": "medium",
+      "experimental_backend": true,
+      "instruction_mode": "additional_developer",
+      "language": ["zh", "en"],
+      "notes": "实验性 Codex CLI 后端"
     }
   ]
 }
@@ -46,12 +57,21 @@
 
 字段说明：
 - `id`：runner 命令行 `--model` 参数对应的标识符
-- `provider`：调用格式。`openai`（及其他任何值）走 OpenAI 兼容的 `/chat/completions`；仅 `anthropic` 走原生 Anthropic Messages 接口
+- `provider`：调用格式。`openai`（及其他普通 API provider 值）走 OpenAI 兼容的 `/chat/completions`；`anthropic` 走原生 Messages 接口；`cli` 走 Agent CLI
 - `base_url_env` / `model_name_env` / `api_key_env`：分别是端点地址、实际模型名、API 密钥对应的**环境变量名**（真实值在 `.env` 中定义）
 - `language`：该条目适用的语言版本（zh 用中文 JSON，en 用英文 JSON）
 - `notes`：备注
 
-**新增一个模型**：在此文件加一条记录（指定一组 `*_env` 变量名），在 `.env` 里填好这些变量，即可用 `--model <新 id>` 运行——runner 不需要改代码。最简用法直接用预设的 `default` 槽位（读 `LLM_*`）。
+CLI 后端额外字段：
+
+- `cli_kind`：`claude` 或 `codex`
+- `cli_model`：固定的 CLI 底层模型；通常为 `null`
+- `cli_model_env`：可选模型覆盖对应的环境变量名；Codex 使用 `CODEX_MODEL`
+- `reasoning_effort`：CLI 推理强度；Codex 固定为 `medium`
+- `experimental_backend`：是否属于实验性、不可与其他后端严格等价比较的接入
+- `instruction_mode`：指令注入方式；Claude 为 `system_prompt_replacement`，Codex 为 `additional_developer`
+
+**新增一个 API 模型**：在此文件加一条记录（指定一组 `*_env` 变量名），在 `.env` 里填好这些变量，即可用 `--model <新 id>` 运行——runner 不需要改代码。最简用法直接用预设的 `default` 槽位（读 `LLM_*`）。新增 CLI 类型则必须在 `api_client.py` 中实现并验证独立的信息隔离策略。
 
 ## personas/ — 人格 prompt
 

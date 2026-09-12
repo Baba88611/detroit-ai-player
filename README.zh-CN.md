@@ -41,7 +41,7 @@
 
 | 维度 | 怎么调 |
 |---|---|
-| 模型 | 在 `02_setting/models.json` 注册任意 OpenAI 兼容端点（DeepSeek、GPT、Claude、GLM、本地模型……），`.env` 填对应 key |
+| 模型 | 在 `02_setting/models.json` 注册 API 端点，或使用内置的 `claude-code` / 实验性 `codex-cli` Agent CLI 后端 |
 | 人格 Prompt | 用自带的 `default` / `machine`，或在 `02_setting/personas/` 下写你自己的 persona（`--persona <名字>` 调用） |
 | 语言 | `--json` 指向 `01_json/zh/` 或 `01_json/en/`（两版独立撰写，非互译） |
 | 难度 | `--difficulty casual / experienced / hardcore`（影响 QTE 判定概率） |
@@ -93,14 +93,14 @@ docs/assets/    架构示意图
 
 ## 如何部署与运行
 
-**前置**：Python 3.10+，以及一个可用的模型 API key（下面教你怎么弄）。
+**前置**：Python 3.10+，以及以下任一项：可用的模型 API key、已登录的 Claude Code CLI、已登录的 Codex CLI。
 
 ```bash
 git clone https://github.com/Baba88611/detroit-ai-player.git
 cd detroit-ai-player/03_runner
 python3 -m venv .venv && source .venv/bin/activate   # 可选，推荐隔离环境
 pip install -r requirements.txt
-cp .env.example .env        # 仅走 API key 时需要；用 --model claude-code 可跳过
+cp .env.example .env        # 仅走 API key 时需要；使用 Agent CLI 后端可跳过
 ```
 
 > **Windows 用户**：整套流程和逻辑完全一致（纯 Python，无平台相关代码），只有个别命令的写法不同——把上面的 `cp` 换成 `copy`，其余按下表对应即可：
@@ -126,13 +126,17 @@ cp .env.example .env        # 仅走 API key 时需要；用 --model claude-code
 
 **怎么拿 API key**：去对应厂商的控制台申请（通常在「API Keys / 密钥管理」页新建）——DeepSeek 是 <https://platform.deepseek.com/>，OpenAI 是 <https://platform.openai.com/api-keys>。拿到的 key 粘到 `LLM_API_KEY`。key 等同密码，不要提交进 git（`.env` 已被 `.gitignore` 排除）。
 
-> **密钥安全**：如果你让 AI agent 帮你部署，**不必把 key 交给它**——让 agent 建好 `.env`，由你自己把 key 填进去即可。运行时是程序自行读取 key，它不需要进入 agent 的对话上下文；配置时也别在聊天里把 key 发给 agent、别让它 `cat` 你的 `.env`。若你根本没有 API key，用下一节的 `--model claude-code` 后端则**完全不涉及 key**。
+> **密钥安全**：如果你让 AI agent 帮你部署，**不必把 key 交给它**——让 agent 建好 `.env`，由你自己把 key 填进去即可。运行时是程序自行读取 key，它不需要进入 agent 的对话上下文；配置时也别在聊天里把 key 发给 agent、别让它 `cat` 你的 `.env`。若你根本没有 API key，用下一节的 `--model claude-code` 或 `--model codex-cli` 后端则**完全不涉及 key**。
 
 > `--model default` 是 `02_setting/models.json` 里预设的"通用 OpenAI 兼容槽位"，读取上面这组 `LLM_*` 变量。实际跑哪个模型由 `LLM_MODEL` 决定，`default` 只是槽位名。
 
 > **多模型对照（进阶）**：想用 `--model` 在几个模型间切换跑对比，见 `02_setting/models.json` 的注册表和 `.env.example` 里的 `OPENAI_* / ANTHROPIC_*` 模板——为每个模型配一组独立变量即可。原生 Anthropic Messages 接口（`provider: anthropic`）必须走这条路。
 
-### 没有 API key？用 Claude Code 跑（Agent CLI 后端）
+### 没有 API key？使用 Agent CLI 后端
+
+两种 CLI 后端都只在需要模型选择的**决策节点**启动新的子进程；叙事节点和强制节点不调用模型。AI 人格和故事连续性不依赖常驻 CLI 会话：runner 会在每次决策调用时重新传入固定人格、完整章内历史和确定性的跨章摘要。
+
+#### Claude Code
 
 如果你没有任何模型的 API key，但本机装了 **[Claude Code](https://claude.com/claude-code)** 并已登录，可以让它顶替 API：runner 会调用你已登录的 `claude` 命令行,用你自己的订阅会话逐节点做决策，**不需要填 `.env`、不需要任何 key**。
 
@@ -145,11 +149,27 @@ python src/runner.py --json ../01_json/zh/ch01_the_hostage_zh.json --model claud
 
 - **底层模型跟随你在 Claude Code 里选的默认**（Opus / Sonnet 等），runner 不替你指定——想换模型就在 Claude Code 里换。
 - **实验有效性**：为守住"不联网、不用工具、只凭剧情文字决策 + 信息隔离"的口径，runner 调用时用 `--safe-mode`（禁用你的 `CLAUDE.md` / memory / skills / 插件等全部定制，避免个人配置污染被测玩家）叠加 `--tools ""`（禁全部工具），并在临时空目录里运行。
-- **慢，且消耗你的订阅额度**：每个节点都是一次独立的 CLI 调用，比直连 API 慢一个量级，用量计入你的 Claude 订阅。
+- **慢，且消耗你的订阅额度**：每个需要模型选择的决策节点都是一次独立的 CLI 调用，比直连 API 慢一个量级，用量计入你的 Claude 订阅。
 - **temperature 不适用**：CLI 不暴露温度，结果里如实记为 `"N/A (cli)"`。
 - **可以让 Claude Code agent 直接跑**：在本机原生 Claude Code 里让它执行上面的命令即可——它会 spawn 一个隔离的子 `claude` 进程当"玩家"，正常走你的登录态。仅在**某些托管/沙箱化的 agent 环境**（拿不到本地 keychain）会 401；遇到就改在普通终端里跑同一条命令。
 
-> **Codex 暂不支持**：`codex exec` 无法满足本项目的信息隔离要求——它的 `read-only` 沙箱仍允许读取任意文件（实测会读到 `system` 层数据），且没有"关闭全部工具"的开关，被测模型无法退化成纯叙事玩家。若将来 Codex 提供真正的"无工具 / 纯对话"模式，代码已按 `cli_kind` 留好扩展口子。
+#### Codex CLI（实验性）
+
+如果本机已安装并登录 [Codex CLI](https://developers.openai.com/codex/cli)，runner 可以复用其 Codex/ChatGPT 登录状态，不需要 API key：
+
+```bash
+# 先检查；若未登录，先运行 `codex login`。然后在 03_runner 目录下运行：
+codex login status
+python src/runner.py --json ../01_json/zh/ch01_the_hostage_zh.json --model codex-cli
+```
+
+可以在运行前设置 `CODEX_MODEL` 来指定 Codex 模型；不设置则使用 Codex 默认模型，结果中的 `resolved_model` 记为 `null`，不会猜测默认模型名称。此后端的推理强度固定为 `medium`，`reasoning` 文本会被明确约束为与章节相同的语言。
+
+runner 会在临时空目录中执行一次性的 `codex exec`，忽略用户配置和规则，以 JSON Schema 约束回复，关闭已知工具能力和联网搜索，并逐条审计 JSONL 事件。只要出现工具事件或未知事件，就立即失败，不会静默继续。
+
+和 Claude Code 一样，它会在每个决策节点启动一次进程并消耗订阅额度。Codex 还会携带较多内置指令开销，因此完整 campaign 可能明显慢于 API 后端，额度消耗也更高。
+
+> **为何标为实验性**：Codex 自带的基础 developer 指令无法被完全替换。runner 会额外注入"叙事玩家"developer 指令，但其指令条件与直连 API、Claude Code 的完整 system prompt 替换并不严格相同。它适合观察 Codex 的游玩表现，不适合把跨后端差异视为完全受控的模型对比。
 
 ### 运行
 
@@ -159,6 +179,8 @@ python src/runner.py --json ../01_json/zh/ch01_the_hostage_zh.json --model defau
 
 # 跑全流程 campaign（ch01 → ch32 串联，跨章节状态自动传递）：
 python src/campaign_runner.py --chapters ../01_json/zh/ch*.json --model default
+
+# 使用 CLI 后端时，把 default 换成 claude-code 或实验性的 codex-cli。
 ```
 
 具体参数（`--model` / `--persona` / `--difficulty` / `--temperature`）见 `02_setting/` 与各 `CLAUDE.md`。

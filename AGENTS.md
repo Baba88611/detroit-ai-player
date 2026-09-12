@@ -9,7 +9,7 @@
 
 ## 这是什么
 
-一个让 LLM 作为"玩家"自主跑通一款叙事游戏决策树的实验框架。你的任务通常是：**装好依赖 → 选一个模型后端 → 跑起来 → 把结果目录指给用户**。你不是"玩家"本身——真正做决策的是被 runner 调用的模型（API 或一个隔离的子 `claude` 进程）。
+一个让 LLM 作为"玩家"自主跑通一款叙事游戏决策树的实验框架。你的任务通常是：**装好依赖 → 选一个模型后端 → 跑起来 → 把结果目录指给用户**。你不是"玩家"本身——真正做决策的是被 runner 调用的模型（API 或一个隔离的 Agent CLI 子进程）。
 
 ## 前置检查
 
@@ -51,11 +51,22 @@ python src/runner.py --json ../01_json/zh/ch01_the_hostage_zh.json --model claud
 - **例外**：若你运行在某些托管/沙箱化环境里、子进程拿不到本地 keychain，会返回 `401 Invalid authentication credentials`。此时不要重试，改为把这条命令交给用户，让他在**普通终端**里运行。
 - 先决条件：终端能跑通 `claude`（用户装过并登录过一次）。
 
-### C. 两者都没有
+### C. 用户没有 API key，但本机装了 Codex CLI 并已登录（实验性）
 
-无法运行。告诉用户：需要**一个模型 API key**（走 A），**或**安装并登录 [Claude Code](https://claude.com/claude-code)（走 B）二选一。
+用 `--model codex-cli`，走用户的 Codex/ChatGPT 登录会话，**无需 `.env`、无需任何 key**：
 
-> **Codex 不能当玩家后端**：其 `read-only` 沙箱仍允许读任意文件、且无法关闭工具执行，破坏本项目的信息隔离。Codex 可以当"编排你部署"的 agent，但跑实验请用 A 或 B。
+```bash
+python src/runner.py --json ../01_json/zh/ch01_the_hostage_zh.json --model codex-cli
+```
+
+- 先运行 `codex login status`；未登录时运行 `codex login`。
+- 可选设置 `CODEX_MODEL` 指定底层模型；未设置时跟随 Codex 默认，结果中的 `resolved_model` 记为 `null`，不猜测名称。
+- runner 在临时空目录中执行一次性的 `codex exec`，忽略用户配置和规则，关闭已知工具能力，并逐条审计 JSONL 事件；出现工具或未知事件立即失败。
+- **实验性限制**：Codex 自带的基础 developer 指令无法被完全替换，因此可研究其游玩表现，但不能与 API 或 Claude Code 结果视为严格等价实验条件。
+
+### D. 三者都没有
+
+无法运行。告诉用户：需要**一个模型 API key**（走 A），或安装并登录 [Claude Code](https://claude.com/claude-code)（走 B），或安装并登录 [Codex CLI](https://developers.openai.com/codex/cli)（走 C）。
 
 ## 跑起来
 
@@ -67,7 +78,7 @@ python src/runner.py --json ../01_json/zh/ch01_the_hostage_zh.json --model defau
 python src/campaign_runner.py --chapters ../01_json/zh/ch*.json --model default
 ```
 
-（用 claude-code 后端时把 `--model default` 换成 `--model claude-code`。英文版把 `zh/` 换成 `en/`。）
+（使用 CLI 后端时把 `--model default` 换成 `--model claude-code` 或 `--model codex-cli`。英文版把 `zh/` 换成 `en/`。）
 
 常用可选参数：`--persona <名字>`（人格，见 `02_setting/personas/`）、`--difficulty casual|experienced|hardcore`、`--temperature`。
 
@@ -82,7 +93,8 @@ python src/campaign_runner.py --chapters ../01_json/zh/ch*.json --model default
 
 ## 硬约束（务必遵守，否则实验无效）
 
-- **不要给被测模型任何工具、不要开联网搜索**：不要把 `LLM_BASE_URL` 指向自带 web search 的聚合网关；claude-code 后端已用 `--safe-mode --tools ""` 强制隔离，**不要去掉这些开关或加工具**。
+- **不要给被测模型任何工具、不要开联网搜索**：不要把 `LLM_BASE_URL` 指向自带 web search 的聚合网关；`claude-code` 用 `--safe-mode --tools ""` 隔离，`codex-cli` 显式关闭能力并审计 JSONL 事件，**不要去掉这些防线或加工具**。
+- **CLI 不是常驻会话**：Claude Code 和 Codex CLI 都只在需要模型选择的决策节点启动一次子进程；叙事/强制节点不调用模型。runner 每次重放固定人格、章内完整历史和跨章摘要来保持连续性。
 - **信息隔离是最高红线**：被测模型只能看到 `player_facing` 层的叙事文本，绝不能接触 `system` 层（概率、状态、结局条件）。这由 runner 保证，你不要绕过。
 - **密钥不入库、不进日志**。
 

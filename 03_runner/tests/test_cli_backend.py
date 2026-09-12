@@ -2,6 +2,8 @@ from pathlib import Path
 import json
 import sys
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = ROOT.parent
@@ -12,6 +14,7 @@ from runner import build_llm_client_from_model_registry  # noqa: E402
 
 
 CLI_VERSION = "2.1.207 (Claude Code)"
+CODEX_VERSION = "codex-cli 0.153.4"
 
 
 class FakeCompletedProcess:
@@ -44,6 +47,54 @@ def _is_version_probe(cmd):
     # _call_claude_cli 会先跑一次 `claude --version`；测试里各 fake_run 用它区分，
     # 别把版本探测和正式调用混在一起。
     return "--version" in cmd
+
+
+def _codex_jsonl(result_text='{"choice": 1, "reasoning": "stay calm"}', usage=None):
+    events = [
+        {"type": "thread.started", "thread_id": "thread-1"},
+        {"type": "turn.started"},
+        {
+            "type": "item.completed",
+            "item": {"id": "item-1", "type": "reasoning", "text": "brief analysis"},
+        },
+        {
+            "type": "item.completed",
+            "item": {"id": "item-2", "type": "agent_message", "text": result_text},
+        },
+        {
+            "type": "turn.completed",
+            "usage": usage
+            or {
+                "input_tokens": 200,
+                "cached_input_tokens": 50,
+                "output_tokens": 40,
+                "reasoning_output_tokens": 12,
+            },
+        },
+    ]
+    return "\n".join(json.dumps(event) for event in events)
+
+
+def _fake_codex_preflight(cmd):
+    if cmd[1:] == ["--version"]:
+        return FakeCompletedProcess(stdout=CODEX_VERSION)
+    if cmd[1:] == ["exec", "--help"]:
+        return FakeCompletedProcess(
+            stdout=" ".join(
+                [
+                    "--strict-config",
+                    "--ephemeral",
+                    "--ignore-user-config",
+                    "--ignore-rules",
+                    "--output-schema",
+                    "--json",
+                    "--disable",
+                ]
+            )
+        )
+    if cmd[1:] == ["login", "status"]:
+        return FakeCompletedProcess(stdout="Logged in using ChatGPT")
+    return None
 
 
 def test_cli_client_calls_claude_headless_with_tools_disabled(monkeypatch):
@@ -222,3 +273,304 @@ def test_build_cli_client_from_registry_needs_no_env(monkeypatch):
     assert client.cli_kind == "claude"
     assert client.base_url is None and client.api_key is None
     assert client.model == "claude-code"
+
+
+def test_codex_cli_uses_isolated_no_tool_jsonl_contract(monkeypatch):
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        preflight = _fake_codex_preflight(cmd)
+        if preflight is not None:
+            return preflight
+        captured["cmd"] = cmd
+        captured["input"] = kwargs.get("input")
+        captured["cwd"] = kwargs.get("cwd")
+        captured["env"] = kwargs.get("env")
+        schema_path = Path(cmd[cmd.index("--output-schema") + 1])
+        captured["schema"] = json.loads(schema_path.read_text(encoding="utf-8"))
+        return FakeCompletedProcess(
+            stdout=_codex_jsonl('{"choice": 2, "reasoning": "protect the child"}')
+        )
+
+    monkeypatch.setattr("api_client.shutil.which", lambda name: "/usr/bin/codex")
+    monkeypatch.setattr("api_client.subprocess.run", fake_run)
+
+    client = LLMClient(
+        provider="cli",
+        cli_kind="codex",
+        model="codex-cli",
+        reasoning_effort="medium",
+    )
+    raw = client._call_api(
+        [
+            {"role": "system", "content": "你是康纳，一个仿生人警探。"},
+            {"role": "user", "content": "场景一：人质在天台边缘。"},
+            {"role": "assistant", "content": '{"choice": 1, "reasoning": "先稳住局面"}'},
+            {"role": "user", "content": "场景二：你必须现在决定。"},
+        ],
+        choice_count=3,
+    )
+
+    cmd = captured["cmd"]
+    assert cmd[:2] == ["/usr/bin/codex", "exec"]
+    for flag in (
+        "--strict-config",
+        "--ephemeral",
+        "--ignore-user-config",
+        "--ignore-rules",
+        "--skip-git-repo-check",
+        "--output-schema",
+        "--json",
+    ):
+        assert flag in cmd
+    assert cmd[cmd.index("--sandbox") + 1] == "read-only"
+    assert cmd[-1] == "-"
+    assert "-m" not in cmd
+    assert cmd.count("--disable") >= 10
+    assert "shell_tool" in cmd and "browser_use" in cmd and "plugins" in cmd
+    assert 'model_reasoning_effort="medium"' in cmd
+    developer_config = next(
+        value for value in cmd if value.startswith("developer_instructions=")
+    )
+    assert "Simplified Chinese" in developer_config
+    assert captured["schema"]["properties"]["reasoning"]["description"] == (
+        "使用简体中文简要说明选择理由。"
+    )
+    assert "你是康纳" in captured["input"]
+    assert "【场景】" in captured["input"] and "【你的选择】" in captured["input"]
+    assert captured["input"].rstrip().endswith("场景二：你必须现在决定。")
+    assert captured["cwd"] and captured["cwd"] != str(ROOT)
+    assert captured["schema"]["properties"]["choice"]["maximum"] == 3
+    assert captured["schema"]["additionalProperties"] is False
+    assert raw == '{"choice": 2, "reasoning": "protect the child"}'
+    assert client.cli_version == CODEX_VERSION
+    assert client.token_usage() == {
+        "prompt_tokens": 200,
+        "completion_tokens": 40,
+        "total_tokens": 240,
+        "input_tokens": 200,
+        "cached_input_tokens": 50,
+        "output_tokens": 40,
+        "reasoning_output_tokens": 12,
+    }
+
+
+def test_codex_cli_requires_english_reasoning_for_english_chapter(monkeypatch):
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        preflight = _fake_codex_preflight(cmd)
+        if preflight is not None:
+            return preflight
+        captured["cmd"] = cmd
+        schema_path = Path(cmd[cmd.index("--output-schema") + 1])
+        captured["schema"] = json.loads(schema_path.read_text(encoding="utf-8"))
+        return FakeCompletedProcess(stdout=_codex_jsonl())
+
+    monkeypatch.setattr("api_client.shutil.which", lambda name: "/usr/bin/codex")
+    monkeypatch.setattr("api_client.subprocess.run", fake_run)
+    client = LLMClient(provider="cli", cli_kind="codex", model="codex-cli")
+
+    client._call_api(
+        [
+            {"role": "system", "content": "You are Markus."},
+            {"role": "user", "content": "Choose where to walk."},
+        ],
+        choice_count=2,
+    )
+
+    developer_config = next(
+        value for value in captured["cmd"] if value.startswith("developer_instructions=")
+    )
+    assert "Write the reasoning field in English" in developer_config
+    assert "Do not switch to Chinese" in developer_config
+    assert captured["schema"]["properties"]["reasoning"]["description"] == (
+        "Briefly explain the choice in English."
+    )
+
+
+def test_codex_cli_uses_optional_model_and_scrubs_api_env(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-should-be-removed")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.example")
+    monkeypatch.setenv("CODEX_API_KEY", "key-should-be-removed")
+    monkeypatch.setenv("CODEX_HOME", "/tmp/codex-auth-home")
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        preflight = _fake_codex_preflight(cmd)
+        if preflight is not None:
+            return preflight
+        captured["cmd"] = cmd
+        captured["env"] = kwargs["env"]
+        return FakeCompletedProcess(stdout=_codex_jsonl())
+
+    monkeypatch.setattr("api_client.shutil.which", lambda name: "/usr/bin/codex")
+    monkeypatch.setattr("api_client.subprocess.run", fake_run)
+
+    client = LLMClient(
+        provider="cli",
+        cli_kind="codex",
+        model="codex-cli",
+        cli_model="gpt-test-codex",
+    )
+    client._call_api([{"role": "user", "content": "choose"}], choice_count=2)
+
+    assert captured["cmd"][captured["cmd"].index("-m") + 1] == "gpt-test-codex"
+    assert client.resolved_model == "gpt-test-codex"
+    assert "OPENAI_API_KEY" not in captured["env"]
+    assert "OPENAI_BASE_URL" not in captured["env"]
+    assert "CODEX_API_KEY" not in captured["env"]
+    assert captured["env"]["CODEX_HOME"] == "/tmp/codex-auth-home"
+
+
+def test_codex_cli_rejects_tool_event_without_retry(monkeypatch):
+    calls = {"exec": 0}
+
+    def fake_run(cmd, **kwargs):
+        preflight = _fake_codex_preflight(cmd)
+        if preflight is not None:
+            return preflight
+        calls["exec"] += 1
+        events = [
+            {"type": "thread.started", "thread_id": "thread-1"},
+            {"type": "turn.started"},
+            {
+                "type": "item.completed",
+                "item": {"type": "command_execution", "command": "pwd"},
+            },
+        ]
+        return FakeCompletedProcess(stdout="\n".join(json.dumps(event) for event in events))
+
+    monkeypatch.setattr("api_client.shutil.which", lambda name: "/usr/bin/codex")
+    monkeypatch.setattr("api_client.subprocess.run", fake_run)
+    client = LLMClient(provider="cli", cli_kind="codex", max_retries=3)
+
+    with pytest.raises(RuntimeError, match="information-isolation violation"):
+        client._call_api([{"role": "user", "content": "choose"}], choice_count=2)
+    assert calls["exec"] == 1
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "not-json",
+        '{"choice": 3, "reasoning": "unavailable"}',
+        '{"choice": 1, "reasoning": 42}',
+    ],
+)
+def test_codex_choice_parser_fails_closed_on_schema_mismatch(monkeypatch, raw):
+    client = LLMClient(provider="cli", cli_kind="codex")
+    monkeypatch.setattr(client, "_call_api", lambda messages, choice_count=None: raw)
+
+    with pytest.raises(ValueError, match="Codex returned"):
+        client.choose(
+            "n001",
+            "context",
+            [{"id": "one", "text": "One"}, {"id": "two", "text": "Two"}],
+            [{"role": "user", "content": "choose"}],
+        )
+
+
+@pytest.mark.parametrize(
+    ("stdout", "message"),
+    [
+        ("not-jsonl", "invalid Codex JSONL"),
+        (
+            "\n".join(
+                json.dumps(event)
+                for event in [
+                    {"type": "thread.started", "thread_id": "thread-1"},
+                    {"type": "turn.failed", "error": {"message": "model failed"}},
+                ]
+            ),
+            "turn.failed",
+        ),
+        (
+            "\n".join(
+                json.dumps(event)
+                for event in [
+                    {"type": "thread.started", "thread_id": "thread-1"},
+                    {
+                        "type": "item.completed",
+                        "item": {"type": "error", "message": "runtime unavailable"},
+                    },
+                ]
+            ),
+            "item error",
+        ),
+        (
+            "\n".join(
+                json.dumps(event)
+                for event in [
+                    {"type": "thread.started", "thread_id": "thread-1"},
+                    {"type": "turn.completed", "usage": {}},
+                ]
+            ),
+            "missing completed agent message",
+        ),
+    ],
+)
+def test_codex_cli_retries_then_reports_invalid_jsonl(monkeypatch, stdout, message):
+    calls = {"exec": 0}
+
+    def fake_run(cmd, **kwargs):
+        preflight = _fake_codex_preflight(cmd)
+        if preflight is not None:
+            return preflight
+        calls["exec"] += 1
+        return FakeCompletedProcess(stdout=stdout)
+
+    monkeypatch.setattr("api_client.shutil.which", lambda name: "/usr/bin/codex")
+    monkeypatch.setattr("api_client.subprocess.run", fake_run)
+    monkeypatch.setattr("api_client.time.sleep", lambda _s: None)
+    client = LLMClient(provider="cli", cli_kind="codex", max_retries=2)
+
+    with pytest.raises(RuntimeError, match=message):
+        client._call_api([{"role": "user", "content": "choose"}], choice_count=2)
+    assert calls["exec"] == 2
+
+
+def test_codex_cli_preflight_requires_login_and_isolation_flags(monkeypatch):
+    def missing_flag_run(cmd, **kwargs):
+        if cmd[1:] == ["--version"]:
+            return FakeCompletedProcess(stdout=CODEX_VERSION)
+        if cmd[1:] == ["exec", "--help"]:
+            return FakeCompletedProcess(stdout="--json --output-schema")
+        raise AssertionError(f"unexpected command: {cmd}")
+
+    monkeypatch.setattr("api_client.shutil.which", lambda name: "/usr/bin/codex")
+    monkeypatch.setattr("api_client.subprocess.run", missing_flag_run)
+    client = LLMClient(provider="cli", cli_kind="codex")
+    with pytest.raises(RuntimeError, match="版本不兼容"):
+        client._call_api([{"role": "user", "content": "choose"}], choice_count=2)
+
+    def logged_out_run(cmd, **kwargs):
+        preflight = _fake_codex_preflight(cmd)
+        if cmd[1:] == ["login", "status"]:
+            return FakeCompletedProcess(stderr="Not logged in", returncode=1)
+        if preflight is not None:
+            return preflight
+        raise AssertionError(f"unexpected command: {cmd}")
+
+    monkeypatch.setattr("api_client.subprocess.run", logged_out_run)
+    client = LLMClient(provider="cli", cli_kind="codex")
+    with pytest.raises(RuntimeError, match="codex login"):
+        client._call_api([{"role": "user", "content": "choose"}], choice_count=2)
+
+
+def test_build_codex_cli_client_from_registry_uses_optional_model_env(monkeypatch):
+    registry = PROJECT_ROOT / "02_setting" / "models.json"
+    monkeypatch.delenv("CODEX_MODEL", raising=False)
+    client = build_llm_client_from_model_registry("codex-cli", registry, temperature=0.7)
+    assert client.model == "codex-cli"
+    assert client.cli_kind == "codex"
+    assert client.cli_model is None
+    assert client.resolved_model is None
+    assert client.reasoning_effort == "medium"
+    assert client.experimental_backend is True
+    assert client.instruction_mode == "additional_developer"
+
+    monkeypatch.setenv("CODEX_MODEL", "gpt-test-codex")
+    client = build_llm_client_from_model_registry("codex-cli", registry, temperature=0.7)
+    assert client.cli_model == "gpt-test-codex"
+    assert client.resolved_model == "gpt-test-codex"

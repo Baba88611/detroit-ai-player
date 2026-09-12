@@ -11,6 +11,42 @@ from typing import Any
 import requests
 
 
+class CodexIsolationError(RuntimeError):
+    """Codex emitted an event outside the narrative-only experiment contract."""
+
+
+CODEX_DISABLED_FEATURES = (
+    "apps",
+    "browser_use",
+    "browser_use_external",
+    "browser_use_full_cdp_access",
+    "computer_use",
+    "goals",
+    "hooks",
+    "image_generation",
+    "in_app_browser",
+    "memories",
+    "multi_agent",
+    "plugins",
+    "shell_snapshot",
+    "shell_tool",
+    "skill_search",
+    "sleep_tool",
+    "tool_suggest",
+    "unified_exec",
+    "view_image",
+    "workspace_dependencies",
+)
+
+CODEX_DEVELOPER_INSTRUCTIONS = (
+    "You are the decision engine for an interactive narrative experiment. "
+    "Do not act as a coding agent. Use no tools, access no files or network, and "
+    "rely only on the game instructions and playthrough transcript supplied via "
+    "stdin. Preserve the stated persona and story continuity. Return only JSON "
+    "matching the provided output schema."
+)
+
+
 class LLMClient:
     def __init__(
         self,
@@ -21,9 +57,22 @@ class LLMClient:
         temperature: float = 0.7,
         max_retries: int = 3,
         cli_kind: str | None = None,
+        cli_model: str | None = None,
+        reasoning_effort: str | None = None,
+        experimental_backend: bool | None = None,
+        instruction_mode: str | None = None,
     ):
         self.provider = provider
         self.cli_kind = cli_kind
+        self.cli_model = cli_model
+        self.reasoning_effort = reasoning_effort
+        self.experimental_backend = (
+            cli_kind == "codex" if experimental_backend is None else experimental_backend
+        )
+        self.instruction_mode = instruction_mode or {
+            "claude": "system_prompt_replacement",
+            "codex": "additional_developer",
+        }.get(cli_kind, "direct_messages")
         if provider == "cli":
             # CLI 后端驱动本机已登录的 agent（如 Claude Code），走用户自己的
             # 订阅会话，不需要 base_url / api_key / LLM_* 环境变量。
@@ -48,6 +97,12 @@ class LLMClient:
         self.total_output_tokens = 0
         self.total_cache_creation_input_tokens = 0
         self.total_cache_read_input_tokens = 0
+        self.total_cached_input_tokens = 0
+        self.total_reasoning_output_tokens = 0
+        self._cli_preflight_complete = False
+        if provider == "cli" and cli_kind == "codex" and cli_model:
+            # Codex 的 JSONL 事件目前不保证回报模型名；显式 -m 是可复核的解析值。
+            self.resolved_model = cli_model
 
     def choose(
         self,
@@ -56,7 +111,9 @@ class LLMClient:
         choices: list[dict[str, str]],
         messages: list[dict[str, str]],
     ) -> dict[str, Any]:
-        raw_text = self._call_api(messages)
+        raw_text = self._call_api(messages, choice_count=len(choices))
+        if self.provider == "cli" and self.cli_kind == "codex":
+            return self._parse_codex_response(raw_text, node_id, choices)
         return self._parse_response(raw_text, node_id, choices)
 
     def token_usage(self) -> dict[str, int]:
@@ -65,6 +122,22 @@ class LLMClient:
             "completion_tokens": self.total_completion_tokens,
             "total_tokens": self.total_prompt_tokens + self.total_completion_tokens,
         }
+        if (
+            getattr(self, "provider", None) == "cli"
+            and getattr(self, "cli_kind", None) == "codex"
+        ):
+            usage.update(
+                {
+                    "input_tokens": getattr(self, "total_input_tokens", 0),
+                    "cached_input_tokens": getattr(self, "total_cached_input_tokens", 0),
+                    "output_tokens": getattr(self, "total_output_tokens", 0),
+                    "reasoning_output_tokens": getattr(
+                        self, "total_reasoning_output_tokens", 0
+                    ),
+                }
+            )
+            return usage
+
         input_tokens = getattr(self, "total_input_tokens", 0)
         cache_creation_tokens = getattr(self, "total_cache_creation_input_tokens", 0)
         cache_read_tokens = getattr(self, "total_cache_read_input_tokens", 0)
@@ -80,9 +153,13 @@ class LLMClient:
             usage.update(anthropic_usage)
         return usage
 
-    def _call_api(self, messages: list[dict[str, str]]) -> str:
+    def _call_api(
+        self,
+        messages: list[dict[str, str]],
+        choice_count: int | None = None,
+    ) -> str:
         if self.provider == "cli":
-            return self._call_cli(messages)
+            return self._call_cli(messages, choice_count=choice_count)
         if self.provider == "anthropic":
             return self._call_anthropic_api(messages)
         return self._call_openai_compatible_api(messages)
@@ -188,9 +265,17 @@ class LLMClient:
     # 一段 prompt，shell 出去调本机已登录的 CLI，拿它的文本输出当作模型回复。
     # 共用主干在 _call_cli；每个 CLI 的命令与输出剥壳各自一小段。
     # ------------------------------------------------------------------
-    def _call_cli(self, messages: list[dict[str, str]]) -> str:
+    def _call_cli(
+        self,
+        messages: list[dict[str, str]],
+        choice_count: int | None = None,
+    ) -> str:
         if self.cli_kind == "claude":
             return self._call_claude_cli(messages)
+        if self.cli_kind == "codex":
+            if choice_count is None or choice_count < 1:
+                raise ValueError("Codex CLI requires a positive choice_count")
+            return self._call_codex_cli(messages, choice_count)
         raise RuntimeError(f"Unsupported cli_kind: {self.cli_kind!r}")
 
     def _call_claude_cli(self, messages: list[dict[str, str]]) -> str:
@@ -281,14 +366,290 @@ class LLMClient:
 
         raise RuntimeError("Claude CLI call failed unexpectedly")
 
+    def _call_codex_cli(
+        self,
+        messages: list[dict[str, str]],
+        choice_count: int,
+    ) -> str:
+        executable = shutil.which("codex")
+        if executable is None:
+            raise RuntimeError(
+                "未找到 Codex CLI（'codex' 不在 PATH 上）。请先安装并运行 "
+                "'codex login' 登录，再重试。"
+            )
+
+        child_env = {
+            key: value
+            for key, value in os.environ.items()
+            if key not in ("OPENAI_API_KEY", "OPENAI_BASE_URL", "CODEX_API_KEY")
+        }
+        self._preflight_codex_cli(executable, child_env)
+
+        system_prompt, transcript = self._split_cli_messages(messages)
+        is_zh = self._contains_chinese(system_prompt)
+        if is_zh:
+            language_instruction = (
+                "Write the reasoning field in Simplified Chinese, matching the game content."
+            )
+            reasoning_description = "使用简体中文简要说明选择理由。"
+        else:
+            language_instruction = (
+                "Write the reasoning field in English, matching the game content. "
+                "Do not switch to Chinese because of account or interface language preferences."
+            )
+            reasoning_description = "Briefly explain the choice in English."
+        developer_instructions = (
+            f"{CODEX_DEVELOPER_INSTRUCTIONS} {language_instruction}"
+        )
+        prompt_parts = []
+        if system_prompt:
+            prompt_parts.append(f"[Game instructions and persona]\n{system_prompt}")
+        prompt_parts.append(transcript)
+        prompt = "\n\n".join(prompt_parts)
+
+        schema = {
+            "type": "object",
+            "properties": {
+                "choice": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": choice_count,
+                },
+                "reasoning": {
+                    "type": "string",
+                    "description": reasoning_description,
+                },
+            },
+            "required": ["choice", "reasoning"],
+            "additionalProperties": False,
+        }
+
+        for attempt in range(self.max_retries):
+            try:
+                with tempfile.TemporaryDirectory(prefix="detroit_codex_cli_") as workdir:
+                    schema_path = os.path.join(workdir, "choice.schema.json")
+                    with open(schema_path, "w", encoding="utf-8") as schema_file:
+                        json.dump(schema, schema_file, ensure_ascii=False)
+
+                    cmd = [
+                        executable,
+                        "exec",
+                        "--strict-config",
+                        "--ephemeral",
+                        "--ignore-user-config",
+                        "--ignore-rules",
+                        "--skip-git-repo-check",
+                        "-C",
+                        workdir,
+                        "--sandbox",
+                        "read-only",
+                        "--output-schema",
+                        schema_path,
+                        "--json",
+                        "-c",
+                        f"developer_instructions={json.dumps(developer_instructions)}",
+                        "-c",
+                        'web_search="disabled"',
+                        "-c",
+                        f'model_reasoning_effort="{self.reasoning_effort or "medium"}"',
+                    ]
+                    for feature in CODEX_DISABLED_FEATURES:
+                        cmd += ["--disable", feature]
+                    if self.cli_model:
+                        cmd += ["-m", self.cli_model]
+                    cmd.append("-")
+
+                    proc = subprocess.run(
+                        cmd,
+                        input=prompt,
+                        capture_output=True,
+                        text=True,
+                        cwd=workdir,
+                        env=child_env,
+                        timeout=300,
+                    )
+                if proc.returncode != 0:
+                    detail = proc.stderr.strip() or proc.stdout.strip()
+                    raise RuntimeError(
+                        f"codex CLI exited with code {proc.returncode}: {detail[:500]}"
+                    )
+                return self._unwrap_codex_events(proc.stdout)
+            except CodexIsolationError:
+                # 工具/未知事件意味着该次实验已越过信息隔离边界，不能用重试掩盖。
+                raise
+            except (subprocess.SubprocessError, RuntimeError, ValueError, KeyError) as e:
+                if attempt == self.max_retries - 1:
+                    raise RuntimeError(
+                        f"Codex CLI call failed after {self.max_retries} attempts: {e}"
+                    ) from e
+                time.sleep(2 ** attempt)
+
+        raise RuntimeError("Codex CLI call failed unexpectedly")
+
+    def _preflight_codex_cli(self, executable: str, child_env: dict[str, str]) -> None:
+        if self._cli_preflight_complete:
+            return
+
+        try:
+            version_proc = subprocess.run(
+                [executable, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env=child_env,
+            )
+            if version_proc.returncode != 0:
+                raise RuntimeError("无法读取 Codex CLI 版本")
+            self.cli_version = version_proc.stdout.strip() or None
+
+            help_proc = subprocess.run(
+                [executable, "exec", "--help"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env=child_env,
+            )
+            required_flags = (
+                "--strict-config",
+                "--ephemeral",
+                "--ignore-user-config",
+                "--ignore-rules",
+                "--output-schema",
+                "--json",
+                "--disable",
+            )
+            help_text = help_proc.stdout + help_proc.stderr
+            missing = [flag for flag in required_flags if flag not in help_text]
+            if help_proc.returncode != 0 or missing:
+                missing_text = ", ".join(missing) or "exec --help"
+                raise RuntimeError(
+                    "Codex CLI 版本不兼容，缺少信息隔离所需能力：" + missing_text
+                )
+
+            login_proc = subprocess.run(
+                [executable, "login", "status"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env=child_env,
+            )
+            if login_proc.returncode != 0:
+                detail = login_proc.stderr.strip() or login_proc.stdout.strip()
+                raise RuntimeError(
+                    "Codex CLI 尚未登录或登录状态不可用；请先运行 'codex login'。"
+                    + (f" 详情：{detail[:300]}" if detail else "")
+                )
+        except (subprocess.SubprocessError, OSError) as e:
+            raise RuntimeError(f"Codex CLI 前置检查失败：{e}") from e
+
+        self._cli_preflight_complete = True
+
+    def _unwrap_codex_events(self, stdout: str) -> str:
+        lines = [line for line in stdout.splitlines() if line.strip()]
+        if not lines:
+            raise ValueError("codex CLI returned empty JSONL output")
+
+        allowed_events = {
+            "thread.started",
+            "turn.started",
+            "turn.completed",
+            "item.started",
+            "item.updated",
+            "item.completed",
+        }
+        allowed_items = {"agent_message", "reasoning"}
+        agent_messages: list[str] = []
+        completed_usage: dict[str, Any] | None = None
+
+        for line_number, line in enumerate(lines, start=1):
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"invalid Codex JSONL at line {line_number}: {e}") from e
+
+            event_type = event.get("type")
+            if event_type in {"error", "turn.failed"}:
+                detail = event.get("message") or event.get("error") or event
+                raise RuntimeError(f"codex CLI reported {event_type}: {detail}")
+            if event_type not in allowed_events:
+                raise CodexIsolationError(
+                    f"Codex information-isolation violation: unexpected event {event_type!r}"
+                )
+
+            if event_type.startswith("item."):
+                item = event.get("item") or {}
+                item_type = item.get("type")
+                if item_type == "error":
+                    detail = item.get("message") or item.get("text") or item
+                    raise RuntimeError(f"codex CLI reported item error: {detail}")
+                if item_type not in allowed_items:
+                    raise CodexIsolationError(
+                        "Codex information-isolation violation: "
+                        f"unexpected item type {item_type!r}"
+                    )
+                if event_type == "item.completed" and item_type == "agent_message":
+                    text = item.get("text")
+                    if isinstance(text, str) and text.strip():
+                        agent_messages.append(text.strip())
+
+            if event_type == "turn.completed":
+                usage = event.get("usage") or {}
+                if not isinstance(usage, dict):
+                    raise ValueError("codex turn.completed usage must be an object")
+                completed_usage = usage
+
+        if completed_usage is None:
+            raise ValueError("codex JSONL missing turn.completed event")
+        if not agent_messages:
+            raise ValueError("codex JSONL missing completed agent message")
+
+        input_tokens = int(completed_usage.get("input_tokens", 0))
+        cached_input_tokens = int(completed_usage.get("cached_input_tokens", 0))
+        output_tokens = int(completed_usage.get("output_tokens", 0))
+        reasoning_output_tokens = int(completed_usage.get("reasoning_output_tokens", 0))
+        self.total_prompt_tokens += input_tokens
+        self.total_completion_tokens += output_tokens
+        self.total_input_tokens += input_tokens
+        self.total_cached_input_tokens += cached_input_tokens
+        self.total_output_tokens += output_tokens
+        self.total_reasoning_output_tokens += reasoning_output_tokens
+        return agent_messages[-1]
+
+    def _parse_codex_response(
+        self,
+        raw_text: str,
+        node_id: str,
+        choices: list[dict[str, str]],
+    ) -> dict[str, Any]:
+        """Codex uses an output schema, so a schema violation must fail closed."""
+        try:
+            parsed = json.loads(raw_text)
+            choice_number = parsed["choice"]
+            reasoning = parsed["reasoning"]
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            raise ValueError(f"Codex returned invalid choice JSON at node {node_id}: {e}") from e
+
+        if isinstance(choice_number, bool) or not isinstance(choice_number, int):
+            raise ValueError(f"Codex returned non-integer choice at node {node_id}")
+        if not isinstance(reasoning, str):
+            raise ValueError(f"Codex returned non-text reasoning at node {node_id}")
+        if not 1 <= choice_number <= len(choices):
+            raise ValueError(f"Codex returned unavailable choice at node {node_id}")
+
+        return {
+            "choice_id": choices[choice_number - 1]["id"],
+            "reasoning": reasoning,
+            "raw": raw_text,
+        }
+
     def _split_cli_messages(self, messages: list[dict[str, str]]) -> tuple[str, str]:
-        """把 messages 拆成 system_prompt（走 --system-prompt）和一段拍平的
-        对话历史 transcript（走 stdin）。CLI 只吃单段文本，所以用带标签的
-        transcript 保留"哪些是场景、哪些是我此前的选择、最后一段是当前场景"。
-        标签语言按 system_prompt 是否含中文字符判定，与运行章节保持一致。"""
+        """把 messages 拆成 system prompt 和一段拍平的对话历史 transcript。
+        各 CLI adapter 决定 system 内容的承载方式；带标签的 transcript 保留
+        "哪些是场景、哪些是我此前的选择、最后一段是当前场景"。标签语言按
+        system prompt 是否含中文字符判定，与运行章节保持一致。"""
         system_parts = [m["content"] for m in messages if m["role"] == "system"]
         system_prompt = "\n\n".join(part for part in system_parts if part)
-        is_zh = any("一" <= ch <= "鿿" for ch in system_prompt)
+        is_zh = self._contains_chinese(system_prompt)
         if is_zh:
             header = "下面是你到目前为止的游戏经过，请对最后一个【场景】做出你的选择。"
             scene_label, choice_label = "【场景】", "【你的选择】"
@@ -306,6 +667,10 @@ class LLMClient:
                 blocks.append(f"{choice_label}\n{m['content']}")
         transcript = header + "\n\n" + "\n\n".join(blocks)
         return system_prompt, transcript
+
+    @staticmethod
+    def _contains_chinese(text: str) -> bool:
+        return any("一" <= character <= "鿿" for character in text)
 
     def _unwrap_claude_envelope(self, stdout: str) -> str:
         stdout = stdout.strip()

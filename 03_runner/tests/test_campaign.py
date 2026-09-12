@@ -429,8 +429,42 @@ def test_cli_campaign_records_non_applicable_temperature_and_resolved_model(tmp_
     assert campaign["config"]["model"] == "claude-code"
     assert campaign["config"]["resolved_model"] == "claude-opus-4-6"
     assert campaign["config"]["backend"] == "cli"
+    assert campaign["config"]["cli_kind"] == "claude"
     assert campaign["config"]["cli_version"] == "2.1.207"
+    assert campaign["config"]["reasoning_effort"] is None
+    assert campaign["config"]["experimental_backend"] is False
+    assert campaign["config"]["instruction_mode"] == "system_prompt_replacement"
     assert campaign["config"]["temperature"] == "N/A (cli)"
+
+
+class MetadataOnlyCodexClient(MetadataOnlyCLIClient):
+    def __init__(self):
+        LLMClient.__init__(
+            self,
+            provider="cli",
+            cli_kind="codex",
+            model="codex-cli",
+            reasoning_effort="medium",
+            experimental_backend=True,
+            instruction_mode="additional_developer",
+        )
+        self.cli_version = "codex-cli 0.153.4"
+
+
+def test_codex_campaign_records_experimental_instruction_metadata(tmp_path):
+    campaign = run_campaign(
+        chapter_paths=[CH03_ZH],
+        ai_client=MetadataOnlyCodexClient(),
+        output_dir=tmp_path,
+        dry_run=True,
+    )
+
+    assert campaign["config"]["model"] == "codex-cli"
+    assert campaign["config"]["resolved_model"] is None
+    assert campaign["config"]["cli_kind"] == "codex"
+    assert campaign["config"]["reasoning_effort"] == "medium"
+    assert campaign["config"]["experimental_backend"] is True
+    assert campaign["config"]["instruction_mode"] == "additional_developer"
 
 
 class FailOnChapterThreeAI(ScriptedAI):
