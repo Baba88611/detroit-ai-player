@@ -288,14 +288,17 @@ def test_effects_applied_replay_equivalence_property():
     import random
 
     from state import apply_effects
-    from runner import _effects_applied
+    from runner import _effects_applied, _same_value
 
     random.seed(20260914)
     names = ["a", "b", "c"]
-    pool = [0, 5, None, "x", [], True, 2.5]
+    # 取值刻意混入 0/1 与 True/False，以及含布尔的嵌套容器
+    pool = [0, 1, 5, None, "x", [], True, False, 2.5, [True]]
 
     def random_value():
-        return random.choice([random.randint(-5, 5), "s1", [1], True, False, 1.5])
+        return random.choice(
+            [random.randint(-5, 5), "s1", [1], [True, 0], {"k": True}, True, False, 1.5, None, 0, 1]
+        )
 
     for _ in range(2000):
         init = {name: random.choice(pool) for name in names}
@@ -316,4 +319,54 @@ def test_effects_applied_replay_equivalence_property():
         replayed = apply_effects(copy.deepcopy(init), record)
         touched = {k[: -len("_override")] if k.endswith("_override") else k for k in record}
         for name in touched:
-            assert replayed[name] == after[name], (init, groups, record)
+            # 必须用区分布尔的比较：`True == 1` 会让这条断言形同虚设
+            assert _same_value(replayed[name], after[name]), (init, groups, record, name)
+
+
+def test_same_value_distinguishes_bool_from_number():
+    """`True == 1` 在 Python 里成立，等价判断必须自己区分。"""
+    from runner import _same_value
+
+    assert not _same_value(True, 1)
+    assert not _same_value(False, 0)
+    assert not _same_value(1, True)
+    assert _same_value(True, True)
+    assert _same_value(1, 1)
+    # 容器要递归，否则列表/字典里的布尔同样漏判
+    assert not _same_value([True], [1])
+    assert not _same_value({"k": False}, {"k": 0})
+    assert _same_value([True, 2], [True, 2])
+    assert _same_value({"k": [False]}, {"k": [False]})
+
+
+def test_effects_applied_keeps_boolean_type_after_override():
+    """布尔赋值不能被记成整数，否则后续状态更新会走上不同分支。
+
+    初始 x=0，执行 x_override=True，真实状态是布尔 True。
+    若记录成 {"x": True}，重放时 apply_effects 见当前 0 是数值、True 也算数值，
+    会算成 0 + True = 1（整数）。差异还会在后续步骤放大：再执行 x:2 时，
+    真实链路（当前是布尔→替换）得 2，错误链路（当前是数值→相加）得 3。
+    """
+    import copy
+
+    from state import apply_effects
+    from runner import _effects_applied, _same_value
+
+    init = {"x": 0}
+    groups = [{"x_override": True}]
+
+    after = copy.deepcopy(init)
+    for group in groups:
+        apply_effects(after, group)
+    assert after["x"] is True
+
+    record = _effects_applied(groups, copy.deepcopy(init), after)
+    replayed = apply_effects(copy.deepcopy(init), record)
+    assert _same_value(replayed["x"], after["x"])
+    assert replayed["x"] is True
+
+    # 后续再走一步增量，两条链路必须仍然一致
+    apply_effects(after, {"x": 2})
+    apply_effects(replayed, {"x": 2})
+    assert _same_value(replayed["x"], after["x"])
+    assert after["x"] == 2

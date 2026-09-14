@@ -366,6 +366,29 @@ def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _same_value(left: Any, right: Any) -> bool:
+    """判断两个状态值是否真的相同，区分布尔与数值。
+
+    不能直接用 `==`：Python 里 `True == 1`、`False == 0`。而 apply_effects 恰恰
+    按「当前值是不是数值」来决定相加还是替换，布尔和数值在后续更新中行为不同
+    （当前是布尔就替换，是数值就相加）。用 `==` 判断重放是否正确会放过这类错误，
+    差异还会在后续步骤里继续放大。容器要递归比较，否则列表里的布尔同样漏判。
+    """
+    if isinstance(left, bool) or isinstance(right, bool):
+        return isinstance(left, bool) and isinstance(right, bool) and left is right
+    if isinstance(left, dict) or isinstance(right, dict):
+        if not (isinstance(left, dict) and isinstance(right, dict)):
+            return False
+        return left.keys() == right.keys() and all(_same_value(left[k], right[k]) for k in left)
+    if isinstance(left, (list, tuple)) or isinstance(right, (list, tuple)):
+        if not (isinstance(left, (list, tuple)) and isinstance(right, (list, tuple))):
+            return False
+        if type(left) is not type(right) or len(left) != len(right):
+            return False
+        return all(_same_value(a, b) for a, b in zip(left, right))
+    return left == right
+
+
 def _effects_applied(groups: list[dict[str, Any]], before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     """算出「本步实际生效了什么」，用于结果记录与界面展示。
 
@@ -392,7 +415,7 @@ def _effects_applied(groups: list[dict[str, Any]], before: dict[str, Any], after
     def replays_correctly(key: str, value: Any, name: str) -> bool:
         probe = {name: copy.deepcopy(before.get(name))}
         apply_effects(probe, {key: value})
-        return probe.get(name) == after.get(name)
+        return _same_value(probe.get(name), after.get(name))
 
     out: dict[str, Any] = {}
     for name in touched:
