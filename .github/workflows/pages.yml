@@ -1,0 +1,40 @@
+# 把 05_viewer/ 作为纯静态回放页发布到 GitHub Pages（需在仓库 Settings → Pages 里选择 "GitHub Actions" 作为来源）。
+# 静态页没有 /api，只能回放 05_viewer/samples/ 里的样例结果；实时游玩请本地运行 python 05_viewer/serve.py。
+name: Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "05_viewer/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload viewer as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 05_viewer
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

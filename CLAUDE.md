@@ -21,7 +21,8 @@ Detroit/
 ├── 01_json/               ← 决策树 JSON 数据（中英双语 32 章、跨章节变量登记）
 ├── 02_setting/            ← 被测 AI 的 system prompt、模型注册、实验矩阵
 ├── 03_runner/             ← 执行脚本的开发与测试
-└── 04_execution/          ← 实验结果输出（你自己跑出的原始记录落在这里）
+├── 04_execution/          ← 实验结果输出（你自己跑出的原始记录落在这里）
+└── 05_viewer/             ← 可视化界面：本地服务器 + 单文件前端，实时观看与回放
 ```
 
 每个文件夹内有独立的 CLAUDE.md，定义该阶段的具体约束、操作规范和产出要求。本文件只负责项目全貌和全局红线，不涉及各阶段的实现细节。
@@ -34,6 +35,7 @@ Detroit/
 01_json     ──→  03_runner（runner 读取 JSON 文件驱动实验）
 02_setting  ──→  03_runner（runner 加载 prompt 和模型配置）
 03_runner   ──→  04_execution（实验依赖 runner 脚本执行）
+03_runner   ──→  05_viewer（viewer 拉起 runner 并消费其 --events 事件流）
 ```
 
 推进顺序为 **03 → 02 → 01 → 04**，具体来说：

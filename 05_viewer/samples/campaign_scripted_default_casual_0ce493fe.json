@@ -1,0 +1,33 @@
+{
+  "campaign_id": "0ce493fe-8a91-44a5-903f-df8b06bcebf9",
+  "timestamp": "2026-07-13T02:45:19.728679+00:00",
+  "config": {
+    "model": "scripted",
+    "temperature": 0.7,
+    "difficulty": "casual",
+    "persona": "default",
+    "dry_run": true,
+    "chapter_count": 1
+  },
+  "chapters": [
+    {
+      "chapter_index": 1,
+      "chapter": "ch01_the_hostage",
+      "experiment_id": "82c3157e-28a8-4a19-9fa0-3fbb7c5d1ab1",
+      "ending_id": "ending_snipers_shot",
+      "token_usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    }
+  ],
+  "final_cross_chapter_state": {
+    "cop_saved_ch01": true,
+    "software_instability": 2,
+    "connor_death_count": 0,
+    "ch01_ending": "ending_snipers_shot",
+    "emma_alive": true
+  },
+  "full_memory_summary": "康纳被派往菲利普斯公寓的人质事件现场，处理一起由家用仿生人丹尼尔引发的危机。他在进入谈判前彻底搜查了公寓，掌握了尽可能多的线索。他把厨房里发现的手枪藏在了身上。谈判开始前，他冒着激怒丹尼尔的风险去救助了阳台上的受伤警察。最终，艾玛获救；丹尼尔放开人质后被狙击手击毙。"
+}

@@ -44,12 +44,18 @@
   "decisions": [
     {
       "node_id": "节点 ID",
+      "phase": "节点所属阶段",
+      "node_type": "choice / mandatory / narrative / qte_converted",
+      "timestamp": "本步完成时刻（ISO 8601）",
       "context_shown": "发送给 AI 的场景描述",
       "choices_shown": ["选项文字列表"],
       "ai_response_raw": "AI 原始回复",
       "ai_choice_id": "选项 ID",
       "ai_choice_text": "选项文字",
       "ai_reasoning": "AI 的决策理由",
+      "latency_ms": "模型响应耗时（毫秒；无选项节点为 null）",
+      "resolution_result": "QTE / 结局判定结果，无则 null",
+      "effects_applied": { "本步实际生效的效果（runner 内部数据，仅供分析与展示）" },
       "state_after": { "决策后的状态快照" },
       "messages_sent": null
     }
@@ -106,7 +112,12 @@ campaign_{model}_{persona}_{difficulty}_{campaign_id_short}.json
 
 汇总文件同样遵守只读、不删除的约束。
 
+## runs/ 目录（05_viewer 产物）
+
+用 `05_viewer/serve.py` 从浏览器开的每一局，会在 `04_execution/runs/<run_id>/` 留下 `meta.json`、`events.jsonl`（逐步事件流）、`stdout.log`、`stderr.log`。这些只服务于实时展示与排错，不入库（已 gitignore），不作为分析数据；权威结果仍是本目录的 JSON。
+
 ## 依赖关系
 
 - **由 `03_runner/` 写入：** runner 和 campaign_runner 执行实验后将结果 JSON 输出到本目录
 - **被 `04_execution/` 的分析脚本和报告引用：** 对比分析、推文内容创作均基于此目录中的数据
+- **被 `05_viewer/` 读取：** 可视化界面列出并回放本目录的结果文件

@@ -86,6 +86,8 @@ python src/campaign_runner.py --chapters ../01_json/zh/ch*.json --model default
 
 结果写在 `04_execution/results/`，runner 每写一个文件都会把绝对路径打到 stderr。
 
+如果用户想**看着 AI 玩**而不是读 JSON：在仓库根目录运行 `python 05_viewer/serve.py`（仅标准库，无需额外安装），浏览器会打开本机界面，可在里面选模型开一局或回放已有结果。
+
 - **单章运行**：生成 1 个 `ch*.json`。
 - **完整 32 章 campaign**：生成 32 个 `ch*.json` + 1 个 `campaign_*.json`（共 33 个）。
 
