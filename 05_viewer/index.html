@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Detroit AI Player</title>
+<style>
+  :root {
+    --bg: #0b0f14; --bg-2: #111821; --bg-3: #18222d; --line: #223040;
+    --text: #e6edf3; --muted: #8b9bb0; --accent: #38bdf8; --accent-2: #0ea5e9;
+    --ok: #34d399; --warn: #fbbf24; --bad: #f87171; --tragic: #fb923c;
+    --radius: 12px; --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.6; }
+  a { color: var(--accent); }
+  button, select, input { font: inherit; color: inherit; }
+  button { background: var(--bg-3); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent-2); border-color: var(--accent-2); color: #04111a; font-weight: 600; }
+  button.primary:disabled { opacity: .5; cursor: not-allowed; }
+  button.danger { border-color: var(--bad); color: var(--bad); }
+  select, input[type=number], input[type=text] { background: var(--bg-3); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; width: 100%; }
+  select:disabled, input:disabled { opacity: .5; }
+  .hidden { display: none !important; }
+
+  header.top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: rgba(11,15,20,.92); border-bottom: 1px solid var(--line); }
+  header.top h1 { font-size: 16px; margin: 0; letter-spacing: .04em; font-weight: 600; }
+  header.top h1 span { color: var(--accent); }
+  header.top .spacer { flex: 1; }
+  header.top .status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+  .dot.running { background: var(--accent); box-shadow: 0 0 0 0 rgba(56,189,248,.6); animation: pulse 1.4s infinite; }
+  .dot.finished { background: var(--ok); } .dot.failed, .dot.interrupted { background: var(--bad); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(56,189,248,.6);} 70% { box-shadow: 0 0 0 8px rgba(56,189,248,0);} 100% { box-shadow: 0 0 0 0 rgba(56,189,248,0);} }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; user-select: none; }
+  .toggle input { accent-color: var(--accent); }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 22px 18px 80px; }
+  .home { display: grid; grid-template-columns: 1.1fr .9fr; gap: 22px; }
+  @media (max-width: 900px) { .home { grid-template-columns: 1fr; } }
+  .panel { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+  .panel h2 { margin: 0 0 12px; font-size: 15px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .field .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; padding: 6px 14px; }
+  .seg button.on { background: var(--accent-2); color: #04111a; font-weight: 600; }
+  .chapter-picker { max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; background: var(--bg-3); }
+  .chapter-picker label { display: flex; gap: 8px; align-items: center; padding: 2px 0; cursor: pointer; }
+  .chapter-picker .num { color: var(--muted); width: 24px; font-family: var(--mono); font-size: 12px; }
+  .badge { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-left: 6px; vertical-align: middle; }
+  .badge.exp { border-color: var(--warn); color: var(--warn); }
+  .badge.ok { border-color: var(--ok); color: var(--ok); }
+  .badge.no { border-color: var(--bad); color: var(--bad); }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-3); cursor: pointer; }
+  .item:hover { border-color: var(--accent); }
+  .item .meta { color: var(--muted); font-size: 12px; }
+  .item .grow { flex: 1; min-width: 0; }
+  .item .title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .drop { border: 1px dashed var(--line); border-radius: 10px; padding: 18px; text-align: center; color: var(--muted); font-size: 13px; margin-top: 12px; }
+  .drop.over { border-color: var(--accent); color: var(--accent); }
+  .error-box { background: rgba(248,113,113,.08); border: 1px solid var(--bad); color: #fecaca; padding: 10px 12px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; font-family: var(--mono); }
+
+  .run { display: grid; grid-template-columns: 250px 1fr; gap: 22px; align-items: start; }
+  @media (max-width: 900px) {
+    .run { grid-template-columns: 1fr; }
+    .side { display: none; }              /* 小屏只保留剧情流 */
+    header.top { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+    header.top h1 { font-size: 14px; white-space: nowrap; }
+    header.top .status, .toggle { white-space: nowrap; }
+    main { padding: 14px 10px 60px; }
+  }
+  .side { position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow: auto; }
+  .side .panel { padding: 12px; }
+  .side ul { list-style: none; margin: 0; padding: 0; }
+  .side li { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; font-size: 13px; cursor: pointer; color: var(--muted); }
+  .side li:hover { background: var(--bg-3); }
+  .side li.active { color: var(--text); background: var(--bg-3); }
+  .side li.done { color: var(--text); }
+  .side li .num { font-family: var(--mono); font-size: 11px; width: 22px; color: var(--muted); }
+  .side li .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .side .phase { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 8px 6px 2px; }
+
+  .feed { display: flex; flex-direction: column; gap: 14px; }
+  .config-bar { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+  .config-bar span { background: var(--bg-3); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; color: var(--muted); }
+  .config-bar span b { color: var(--text); font-weight: 500; }
+  .chapter-head { margin-top: 10px; padding: 12px 16px; border-left: 3px solid var(--accent); background: linear-gradient(90deg, rgba(56,189,248,.08), transparent); border-radius: 0 var(--radius) var(--radius) 0; }
+  .chapter-head .k { font-size: 12px; color: var(--accent); letter-spacing: .1em; text-transform: uppercase; }
+  .chapter-head h2 { margin: 2px 0 0; font-size: 20px; }
+  .chapter-head .sub { color: var(--muted); font-size: 13px; }
+
+  .card { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; animation: rise .25s ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: none;} }
+  .card .node-meta { display: flex; gap: 10px; font-size: 11px; color: var(--muted); font-family: var(--mono); margin-bottom: 8px; }
+  .card .context { white-space: pre-wrap; font-size: 15.5px; line-height: 1.75; }
+  .choices { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .choices li { position: relative; padding: 8px 12px 8px 40px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); transition: all .25s; }
+  .choices li .n { position: absolute; left: 12px; top: 8px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .choices li.chosen { border-color: var(--accent); color: var(--text); background: rgba(56,189,248,.07); }
+  .choices li.chosen .n { color: var(--accent); }
+  .choices li.chosen::after { content: "✓"; position: absolute; right: 12px; top: 6px; color: var(--accent); font-weight: 700; }
+  .thinking { margin-top: 12px; display: flex; align-items: center; gap: 10px; color: var(--accent); font-size: 13px; }
+  .thinking .spin { width: 14px; height: 14px; border: 2px solid rgba(56,189,248,.25); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .reasoning { margin-top: 12px; padding: 10px 14px; border-left: 3px solid var(--accent); background: var(--bg-3); border-radius: 0 8px 8px 0; }
+  .reasoning .lbl { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); display: flex; justify-content: space-between; }
+  .reasoning .lbl .lat { color: var(--muted); font-family: var(--mono); letter-spacing: 0; text-transform: none; }
+  .reasoning p { margin: 4px 0 0; white-space: pre-wrap; }
+  .outcome { margin-top: 10px; font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .outcome .lbl { color: var(--muted); letter-spacing: .08em; text-transform: uppercase; font-size: 11px; margin-right: 4px; }
+  .eff { font-family: var(--mono); padding: 1px 8px; border-radius: 6px; background: var(--bg-3); border: 1px solid var(--line); color: var(--muted); }
+  .eff.up { color: var(--ok); } .eff.down { color: var(--bad); } .eff.res { color: var(--warn); border-color: rgba(251,191,36,.4); }
+  body.no-god .outcome { display: none; }
+
+  .ending { border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; background: radial-gradient(120% 100% at 0% 0%, rgba(56,189,248,.12), var(--bg-2) 60%); }
+  .ending .k { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+  .ending h3 { margin: 4px 0 8px; font-size: 20px; }
+  .ending .narr { white-space: pre-wrap; color: #cfd8e3; }
+  .ending .people { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+  .ending .people span { padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); }
+  .ending .people .alive { border-color: rgba(52,211,153,.5); color: var(--ok); }
+  .ending .people .dead { border-color: rgba(248,113,113,.5); color: var(--bad); text-decoration: line-through; }
+  .tier { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; margin-left: 8px; vertical-align: middle; }
+  .tier.best, .tier.good, .tier.high { color: var(--ok); } .tier.neutral, .tier.mid, .tier.moderate, .tier.mixed { color: var(--muted); }
+  .tier.tragic, .tier.bad, .tier.low, .tier.dark { color: var(--tragic); } .tier.worst, .tier.fatal { color: var(--bad); }
+  .tokens { margin-top: 10px; font-size: 12px; color: var(--muted); font-family: var(--mono); display: flex; flex-wrap: wrap; gap: 10px; }
+  table.summary { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.summary th, table.summary td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  table.summary th { color: var(--muted); font-weight: 500; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+  .replay-ctl { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
+  .step-hidden { display: none; }
+  footer.note { color: var(--muted); font-size: 12px; text-align: center; margin-top: 40px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1><span>DETROIT</span> AI PLAYER</h1>
+  <button id="btn-home" class="hidden" data-i18n="home">← 首页</button>
+  <div class="spacer"></div>
+  <div id="status" class="status hidden"><span class="dot"></span><span id="status-text"></span></div>
+  <label class="toggle"><input type="checkbox" id="god-toggle" checked> <span data-i18n="god">上帝视角</span></label>
+  <div class="seg"><button id="lang-zh">中文</button><button id="lang-en">EN</button></div>
+</header>
+
+<main>
+  <!-- 首页：开局 + 回放 -->
+  <section id="home" class="home">
+    <div class="panel" id="start-panel">
+      <h2 data-i18n="new_run">开始一局</h2>
+      <div id="static-notice" class="hidden" style="color:var(--muted);font-size:13px" data-i18n="static_notice">
+        当前是静态回放模式（没有本地服务器）。要让 AI 实时玩，请在仓库根目录运行 <code>python 05_viewer/serve.py</code>。
+      </div>
+      <div id="start-form">
+        <div class="field">
+          <label data-i18n="mode">模式</label>
+          <div class="seg" id="mode-seg"><button data-v="chapter" class="on" data-i18n="mode_chapter">单章</button><button data-v="campaign" data-i18n="mode_campaign">整局（多章连续）</button></div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label data-i18n="language">剧本语言</label>
+            <div class="seg" id="lang-seg"><button data-v="zh" class="on">中文</button><button data-v="en">English</button></div>
+          </div>
+          <div class="field">
+            <label data-i18n="difficulty">难度</label>
+            <select id="f-difficulty"></select>
+          </div>
+        </div>
+        <div class="field">
+          <label data-i18n="model">模型</label>
+          <select id="f-model"></select>
+          <div class="hint" id="model-hint"></div>
+          <label class="toggle" style="margin-top:6px"><input type="checkbox" id="f-dryrun"> <span data-i18n="dryrun">dry-run 演示（不调模型，脚本自动选第一项，用来看界面）</span></label>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label data-i18n="persona">人格 (persona)</label>
+            <select id="f-persona"></select>
+            <div class="hint" id="persona-hint"></div>
+          </div>
+          <div class="field">
+            <label data-i18n="temperature">temperature</label>
+            <input type="number" id="f-temperature" min="0" max="2" step="0.1" value="0.7">
+            <div class="hint" id="temp-hint"></div>
+          </div>
+        </div>
+        <div class="field" id="chapter-single-field">
+          <label data-i18n="chapter">章节</label>
+          <select id="f-chapter"></select>
+        </div>
+        <div class="field hidden" id="chapter-multi-field">
+          <label data-i18n="chapters">章节（按顺序连续执行，跨章记忆自动传递）</label>
+          <div style="display:flex;gap:8px;margin-bottom:6px">
+            <button id="ch-all" data-i18n="select_all">全选</button><button id="ch-none" data-i18n="select_none">清空</button>
+          </div>
+          <div class="chapter-picker" id="f-chapters"></div>
+        </div>
+        <div id="start-error" class="error-box hidden"></div>
+        <button id="btn-start" class="primary" data-i18n="start">▶ 开始</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel" id="runs-panel">
+        <h2 data-i18n="recent_runs">最近的运行</h2>
+        <div id="runs-list" class="list"></div>
+      </div>
+      <div class="panel" style="margin-top:18px">
+        <h2 data-i18n="replay">回放结果文件</h2>
+        <div id="results-list" class="list"></div>
+        <div id="drop" class="drop">
+          <span data-i18n="drop_hint">把结果 JSON（ch*.json / campaign_*.json）拖到这里，或</span>
+          <label style="color:var(--accent);cursor:pointer"><span data-i18n="choose_file">选择文件</span><input type="file" id="file-input" accept=".json" multiple class="hidden"></label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 运行视图 -->
+  <section id="run" class="run hidden">
+    <aside class="side">
+      <div class="panel">
+        <div id="run-actions" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"></div>
+        <ul id="side-list"></ul>
+      </div>
+    </aside>
+    <div class="feed" id="feed"></div>
+  </section>
+  <footer class="note" data-i18n="footer">被测 AI 只看到情境与选项；效果数值、判定与结局条件只呈现给你（上帝视角），不进入模型上下文。</footer>
+</main>
+
+<script>
+// ---------------------------------------------------------------------------
+// 章节元信息（来自 01_json，用于回放时补标题）
+// ---------------------------------------------------------------------------
+const CHAPTERS = [{"id": "ch01_the_hostage", "n": 1, "title": "The Hostage", "title_zh": "人质", "protagonist": "Connor"}, {"id": "ch02_opening", "n": 2, "title": "Opening", "title_zh": "开场", "protagonist": "Kara"}, {"id": "ch03_shades_of_color", "n": 3, "title": "Shades of Color", "title_zh": "异色", "protagonist": "Markus"}, {"id": "ch04_a_new_home", "n": 4, "title": "A New Home", "title_zh": "新家", "protagonist": "Kara"}, {"id": "ch05_the_painter", "n": 5, "title": "The Painter", "title_zh": "画家", "protagonist": "Markus"}, {"id": "ch06_partners", "n": 6, "title": "Partners", "title_zh": null, "protagonist": "Connor"}, {"id": "ch07_stormy_night", "n": 7, "title": "Stormy Night", "title_zh": null, "protagonist": "Kara"}, {"id": "ch08_broken", "n": 8, "title": "Broken", "title_zh": null, "protagonist": "Markus"}, {"id": "ch09_the_interrogation", "n": 9, "title": "The Interrogation", "title_zh": null, "protagonist": "Connor"}, {"id": "ch10_fugitives", "n": 10, "title": "Fugitives", "title_zh": null, "protagonist": "Kara"}, {"id": "ch11_from_the_dead", "n": 11, "title": "From the Dead", "title_zh": null, "protagonist": "Markus"}, {"id": "ch12_waiting_for_hank", "n": 12, "title": "Waiting for Hank...", "title_zh": null, "protagonist": "Connor"}, {"id": "ch13_on_the_run", "n": 13, "title": "逃亡", "title_zh": null, "protagonist": ["Kara", "Connor"]}, {"id": "ch14_jericho", "n": 14, "title": "Jericho", "title_zh": null, "protagonist": "Markus"}, {"id": "ch15_the_nest", "n": 15, "title": "巢穴", "title_zh": null, "protagonist": "Connor"}, {"id": "ch16_time_to_decide", "n": 16, "title": "抉择时刻", "title_zh": null, "protagonist": "Markus"}, {"id": "ch17_zlatko", "n": 17, "title": "兹拉特科", "title_zh": null, "protagonist": "Kara"}, {"id": "ch18_russian_roulette", "n": 18, "title": "俄罗斯轮盘", "title_zh": null, "protagonist": "Connor"}, {"id": "ch19_spare_parts", "n": 19, "title": "零件", "title_zh": null, "protagonist": "Markus"}, {"id": "ch20_the_eden_club", "n": 20, "title": "伊甸园俱乐部", "title_zh": null, "protagonist": "Connor"}, {"id": "ch21_the_pirates_cove", "n": 21, "title": "海盗湾", "title_zh": null, "protagonist": "Kara"}, {"id": "ch22_the_bridge", "n": 22, "title": "天桥", "title_zh": null, "protagonist": "Connor"}, {"id": "ch23_the_stratford_tower", "n": 23, "title": "斯特拉福德大厦", "title_zh": null, "protagonist": "Markus"}, {"id": "ch24_public_enemy", "n": 24, "title": "全民公敌", "title_zh": null, "protagonist": "Connor"}, {"id": "ch25_midnight_train", "n": 25, "title": "午夜列车", "title_zh": null, "protagonist": "Kara"}, {"id": "ch26_capitol_park", "n": 26, "title": "国会公园", "title_zh": null, "protagonist": "Markus"}, {"id": "ch27_meet_kamski", "n": 27, "title": "Meet Kamski", "title_zh": null, "protagonist": "Connor"}, {"id": "ch28_freedom_march", "n": 28, "title": "Freedom March", "title_zh": null, "protagonist": "Markus"}, {"id": "ch29_last_chance_connor", "n": 29, "title": "Last Chance, Connor", "title_zh": null, "protagonist": "Connor"}, {"id": "ch30_crossroads", "n": 30, "title": "十字路口", "title_zh": null, "protagonist": ["Kara", "Markus", "Connor"]}, {"id": "ch31_night_of_the_soul", "n": 31, "title": "Night of the Soul", "title_zh": null, "protagonist": ["Markus", "Connor"]}, {"id": "ch32_battle_for_detroit", "n": 32, "title": "Battle for Detroit", "title_zh": null, "protagonist": ["Connor", "Markus", "Kara"]}];
+const CHAPTER_BY_ID = Object.fromEntries(CHAPTERS.map(c => [c.id, c]));
+
+const I18N = {
+  zh: {
+    home: '← 首页', god: '上帝视角', new_run: '开始一局', mode: '模式', mode_chapter: '单章', mode_campaign: '整局（多章连续）',
+    language: '剧本语言', difficulty: '难度', model: '模型', persona: '人格 (persona)', temperature: 'temperature', chapter: '章节',
+    chapters: '章节（按顺序连续执行，跨章记忆自动传递）', select_all: '全选', select_none: '清空', start: '▶ 开始',
+    dryrun: 'dry-run 演示（不调模型，脚本自动选第一项，用来看界面）', recent_runs: '最近的运行', replay: '回放结果文件',
+    drop_hint: '把结果 JSON（ch*.json / campaign_*.json）拖到这里，或', choose_file: '选择文件',
+    static_notice: '当前是静态回放模式（没有本地服务器）。要让 AI 实时玩，请在仓库根目录运行 python 05_viewer/serve.py。',
+    footer: '被测 AI 只看到情境与选项；效果数值、判定与结局条件只呈现给你（上帝视角），不进入模型上下文。',
+    not_configured: '未配置', experimental: '实验性', cli_temp: 'CLI 后端不支持 temperature，结果中记为 N/A', dry_temp: 'dry-run 不调用模型',
+    status_running: '运行中', status_finished: '已完成', status_failed: '失败', status_interrupted: '已中断', status_replay: '回放',
+    thinking: 'AI 正在思考', reasoning: 'AI 的思考', outcome: '结果', ending: '结局', chapter_ending: '本章结局', survivors: '生还', deaths: '死亡',
+    tokens: 'token 用量', campaign_summary: '整局回顾', col_chapter: '章节', col_ending: '结局', col_tier: '评价', stop: '■ 停止',
+    step_play: '▶ 逐步回放', show_all: '⏭ 全部展示', no_runs: '还没有运行记录', no_results: '结果目录为空', samples: '样例',
+    loading: '加载中…', node: '节点', narrative_only: '（剧情节点，无需选择）', started: '开始于', error: '错误', stderr: 'runner 输出（stderr）',
+    campaign_failed: '整局中断', missing_chapters: '缺少以下章节的结果文件，请一并拖入：', chapters_of: '章', decisions: '步',
+    campaign: '整局', single: '单章', dryrun_short: 'dry-run', cli_needed: '需要本机安装并登录',
+  },
+  en: {
+    home: '← Home', god: "God's-eye view", new_run: 'New run', mode: 'Mode', mode_chapter: 'Single chapter', mode_campaign: 'Campaign (multi-chapter)',
+    language: 'Script language', difficulty: 'Difficulty', model: 'Model', persona: 'Persona', temperature: 'temperature', chapter: 'Chapter',
+    chapters: 'Chapters (run in order, cross-chapter memory carries over)', select_all: 'All', select_none: 'None', start: '▶ Start',
+    dryrun: 'dry-run demo (no model call; a script picks option 1 — just to see the UI)', recent_runs: 'Recent runs', replay: 'Replay a result file',
+    drop_hint: 'Drop result JSON files (ch*.json / campaign_*.json) here, or', choose_file: 'choose files',
+    static_notice: 'Static replay mode (no local server). To let an AI play live, run python 05_viewer/serve.py from the repo root.',
+    footer: "The AI under test only sees scenes and options; effect values, checks and ending conditions are shown to you only (god's-eye view) and never enter the model context.",
+    not_configured: 'not configured', experimental: 'experimental', cli_temp: 'CLI backends ignore temperature (recorded as N/A)', dry_temp: 'dry-run makes no model calls',
+    status_running: 'running', status_finished: 'finished', status_failed: 'failed', status_interrupted: 'interrupted', status_replay: 'replay',
+    thinking: 'AI is thinking', reasoning: "AI's reasoning", outcome: 'Outcome', ending: 'Ending', chapter_ending: 'Chapter ending', survivors: 'Survived', deaths: 'Died',
+    tokens: 'token usage', campaign_summary: 'Campaign recap', col_chapter: 'Chapter', col_ending: 'Ending', col_tier: 'Tier', stop: '■ Stop',
+    step_play: '▶ Step replay', show_all: '⏭ Show all', no_runs: 'No runs yet', no_results: 'Results directory is empty', samples: 'Samples',
+    loading: 'Loading…', node: 'node', narrative_only: '(narrative node, no choice)', started: 'started', error: 'Error', stderr: 'runner output (stderr)',
+    campaign_failed: 'Campaign interrupted', missing_chapters: 'Missing chapter result files — please drop them too:', chapters_of: 'ch', decisions: 'steps',
+    campaign: 'campaign', single: 'chapter', dryrun_short: 'dry-run', cli_needed: 'requires the CLI installed and logged in',
+  },
+};
+let uiLang = 'zh';
+try { uiLang = localStorage.getItem('detroit.uiLang') || (navigator.language.startsWith('zh') ? 'zh' : 'en'); } catch (e) {}
+const t = key => (I18N[uiLang] && I18N[uiLang][key]) || I18N.zh[key] || key;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = id => document.getElementById(id);
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  $('lang-zh').classList.toggle('on', uiLang === 'zh');
+  $('lang-en').classList.toggle('on', uiLang === 'en');
+  document.documentElement.lang = uiLang === 'zh' ? 'zh-CN' : 'en';
+}
+function setUiLang(lang) {
+  uiLang = lang;
+  try { localStorage.setItem('detroit.uiLang', lang); } catch (e) {}
+  applyI18n();
+  if (app.meta) renderForm();
+  renderRunsList(); renderResultsList();
+  if (app.run) { renderSide(); }
+}
+$('lang-zh').onclick = () => setUiLang('zh');
+$('lang-en').onclick = () => setUiLang('en');
+
+// 上帝视角开关：只影响效果/判定的显示，AI 侧从来看不到这些。
+let godView = true;
+try { godView = localStorage.getItem('detroit.god') !== '0'; } catch (e) {}
+$('god-toggle').checked = godView;
+document.body.classList.toggle('no-god', !godView);
+$('god-toggle').onchange = e => {
+  godView = e.target.checked;
+  document.body.classList.toggle('no-god', !godView);
+  try { localStorage.setItem('detroit.god', godView ? '1' : '0'); } catch (err) {}
+};
+
+// ---------------------------------------------------------------------------
+// 应用状态
+// ---------------------------------------------------------------------------
+const app = {
+  mode: 'unknown',          // local | static
+  meta: null,
+  form: { mode: 'chapter', language: 'zh' },
+  runs: [], results: [], samples: [],
+  run: null,                // 当前展示的运行（实时或回放）
+  poll: null,
+  pool: {},                 // 回放用：experiment_id → 章节结果 JSON
+};
+
+async function api(path, options) {
+  const response = await fetch(path, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `${response.status} ${response.statusText}`);
+  return data;
+}
+
+async function boot() {
+  applyI18n();
+  try {
+    app.meta = await api('/api/meta');
+    app.mode = 'local';
+  } catch (e) {
+    app.mode = 'static';
+  }
+  if (app.mode === 'local') {
+    renderForm();
+    await Promise.all([refreshRuns(), refreshResults()]);
+  } else {
+    $('start-form').classList.add('hidden');
+    $('static-notice').classList.remove('hidden');
+    $('runs-panel').classList.add('hidden');
+    try { app.samples = (await (await fetch('samples/index.json')).json()).samples || []; } catch (e) { app.samples = []; }
+    renderResultsList();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 首页：开局表单
+// ---------------------------------------------------------------------------
+function seg(id, onChange) {
+  const box = $(id);
+  box.querySelectorAll('button').forEach(btn => {
+    btn.onclick = () => { box.querySelectorAll('button').forEach(b => b.classList.remove('on')); btn.classList.add('on'); onChange(btn.dataset.v); };
+  });
+}
+seg('mode-seg', v => { app.form.mode = v; renderForm(); });
+seg('lang-seg', v => { app.form.language = v; renderForm(); });
+
+function renderForm() {
+  const m = app.meta;
+  const diff = $('f-difficulty');
+  const keepDiff = diff.value;
+  diff.innerHTML = m.difficulties.map(d => `<option value="${d}">${d}</option>`).join('');
+  if (keepDiff) diff.value = keepDiff;
+
+  const model = $('f-model');
+  const keepModel = model.value;
+  model.innerHTML = m.models.map(x => {
+    const tag = x.configured ? '' : ` — ${t('not_configured')}`;
+    const exp = x.experimental_backend ? ` [${t('experimental')}]` : '';
+    return `<option value="${esc(x.id)}" ${x.configured ? '' : 'disabled'}>${esc(x.id)}${exp}${tag}</option>`;
+  }).join('');
+  if (keepModel) model.value = keepModel;
+  if (!model.value || model.selectedOptions[0]?.disabled) {
+    const first = m.models.find(x => x.configured);
+    if (first) model.value = first.id;
+  }
+  model.onchange = updateModelHint;
+
+  const persona = $('f-persona');
+  const keepPersona = persona.value;
+  persona.innerHTML = m.personas.map(p => `<option value="${esc(p.id)}">${esc(p.id)}</option>`).join('');
+  if (keepPersona) persona.value = keepPersona;
+  persona.onchange = () => { $('persona-hint').textContent = (m.personas.find(p => p.id === persona.value) || {}).preview || ''; };
+  persona.onchange();
+
+  const chapters = m.chapters[app.form.language] || [];
+  const single = $('f-chapter');
+  const keepChapter = single.value;
+  single.innerHTML = chapters.map(c => `<option value="${esc(c.id)}">${chapterLabel(c)}</option>`).join('');
+  if (keepChapter) single.value = keepChapter;
+  const multi = $('f-chapters');
+  const checked = new Set([...multi.querySelectorAll('input:checked')].map(i => i.value));
+  const firstRender = multi.childElementCount === 0;
+  multi.innerHTML = chapters.map(c => `<label><input type="checkbox" value="${esc(c.id)}" ${firstRender || checked.has(c.id) ? 'checked' : ''}><span class="num">${c.chapter_number}</span><span>${chapterLabel(c)}</span></label>`).join('');
+  $('chapter-single-field').classList.toggle('hidden', app.form.mode !== 'chapter');
+  $('chapter-multi-field').classList.toggle('hidden', app.form.mode !== 'campaign');
+  $('ch-all').onclick = () => multi.querySelectorAll('input').forEach(i => i.checked = true);
+  $('ch-none').onclick = () => multi.querySelectorAll('input').forEach(i => i.checked = false);
+  $('f-dryrun').onchange = updateModelHint;
+  updateModelHint();
+}
+function chapterLabel(c) {
+  const zh = c.title_zh && c.title_zh !== c.title ? ` · ${c.title_zh}` : '';
+  const prot = Array.isArray(c.protagonist) ? c.protagonist.join('/') : (c.protagonist || '');
+  return `${String(c.chapter_number).padStart(2, '0')} ${esc(c.title)}${esc(zh)}${prot ? ` (${esc(prot)})` : ''}`;
+}
+function updateModelHint() {
+  const m = app.meta; if (!m) return;
+  const dry = $('f-dryrun').checked;
+  const modelSel = $('f-model');
+  const entry = m.models.find(x => x.id === modelSel.value) || {};
+  modelSel.disabled = dry;
+  const isCli = entry.provider === 'cli';
+  $('f-temperature').disabled = dry || isCli;
+  $('temp-hint').textContent = dry ? t('dry_temp') : (isCli ? t('cli_temp') : '');
+  const unconfigured = m.models.filter(x => !x.configured);
+  $('model-hint').innerHTML = [
+    entry.notes ? esc(entry.notes) : '',
+    unconfigured.length ? `<br>${unconfigured.map(x => `<span class="badge no">${esc(x.id)}</span> ${esc(x.missing.join(', '))}`).join('&nbsp; ')}` : '',
+  ].join('');
+  $('btn-start').disabled = !dry && !entry.configured;
+}
+
+$('btn-start').onclick = async () => {
+  const dry = $('f-dryrun').checked;
+  const body = {
+    mode: app.form.mode,
+    language: app.form.language,
+    difficulty: $('f-difficulty').value,
+    persona: $('f-persona').value,
+    temperature: parseFloat($('f-temperature').value || '0.7'),
+    dry_run: dry,
+    model: dry ? null : $('f-model').value,
+    chapter_ids: app.form.mode === 'chapter' ? [$('f-chapter').value] : [...$('f-chapters').querySelectorAll('input:checked')].map(i => i.value),
+  };
+  $('start-error').classList.add('hidden');
+  $('btn-start').disabled = true;
+  try {
+    const run = await api('/api/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    openLiveRun(run.run_id);
+  } catch (e) {
+    $('start-error').textContent = e.message; $('start-error').classList.remove('hidden');
+  } finally { $('btn-start').disabled = false; }
+};
+
+// ---------------------------------------------------------------------------
+// 首页：运行列表 / 结果列表
+// ---------------------------------------------------------------------------
+async function refreshRuns() { try { app.runs = (await api('/api/runs')).runs; } catch (e) { app.runs = []; } renderRunsList(); }
+async function refreshResults() { try { app.results = (await api('/api/results')).results; } catch (e) { app.results = []; } renderResultsList(); }
+
+function renderRunsList() {
+  const box = $('runs-list');
+  if (app.mode !== 'local') return;
+  if (!app.runs.length) { box.innerHTML = `<div class="item" style="cursor:default;color:var(--muted)">${t('no_runs')}</div>`; return; }
+  box.innerHTML = app.runs.slice(0, 12).map(r => `
+    <div class="item" data-run="${r.run_id}">
+      <span class="dot ${r.status}"></span>
+      <div class="grow">
+        <div class="title">${r.mode === 'campaign' ? t('campaign') : t('single')} · ${esc(r.model)} · ${esc(r.persona)} · ${esc(r.difficulty)} · ${r.language}${r.dry_run ? ` <span class="badge">${t('dryrun_short')}</span>` : ''}</div>
+        <div class="meta">${r.chapter_ids.length} ${t('chapters_of')} · ${t('status_' + r.status) || r.status} · ${fmtTime(r.created_at)}</div>
+      </div>
+    </div>`).join('');
+  box.querySelectorAll('[data-run]').forEach(el => el.onclick = () => openLiveRun(el.dataset.run));
+}
+
+function renderResultsList() {
+  const box = $('results-list');
+  const items = app.mode === 'local' ? app.results : app.samples;
+  if (!items.length) { box.innerHTML = `<div class="item" style="cursor:default;color:var(--muted)">${t('no_results')}</div>`; return; }
+  box.innerHTML = items.filter(r => r.kind !== 'chapter' || !r.campaign_member).slice(0, 40).map(r => `
+    <div class="item" data-name="${esc(r.name)}">
+      <div class="grow">
+        <div class="title">${r.kind === 'campaign' ? t('campaign') : chapterTitle(r.chapter)} · ${esc(r.model)} · ${esc(r.persona)} · ${esc(r.difficulty)}</div>
+        <div class="meta">${r.kind === 'campaign' ? `${(r.chapters || []).length} ${t('chapters_of')} · ${esc(r.status || '')}` : `${esc(r.ending_title || r.ending_id || '')}${r.tier ? ` · ${esc(r.tier)}` : ''} · ${r.decision_count ?? ''} ${t('decisions')}`} · ${fmtTime(r.timestamp)}</div>
+      </div>
+    </div>`).join('');
+  box.querySelectorAll('[data-name]').forEach(el => el.onclick = () => openResultByName(el.dataset.name));
+}
+function chapterTitle(id) {
+  const c = CHAPTER_BY_ID[id];
+  if (!c) return id || '';
+  if (uiLang === 'zh' && c.title_zh) return `${String(c.n).padStart(2, '0')} ${c.title_zh}`;
+  return `${String(c.n).padStart(2, '0')} ${c.title}`;
+}
+function fmtTime(iso) { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString(); }
+
+// 拖拽 / 选择文件回放
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => loadFiles(e.dataTransfer.files));
+$('file-input').onchange = e => loadFiles(e.target.files);
+async function loadFiles(files) {
+  const loaded = [];
+  for (const file of files) {
+    try { loaded.push(JSON.parse(await file.text())); } catch (e) { alert(`${file.name}: ${e.message}`); }
+  }
+  loaded.forEach(d => { if (d.experiment_id) app.pool[d.experiment_id] = d; });
+  const campaign = loaded.find(d => d.campaign_id);
+  if (campaign) return openReplay(campaignToEvents(campaign));
+  if (loaded[0]) openReplay(chapterToEvents(loaded[0]));
+}
+
+async function openResultByName(name) {
+  const base = app.mode === 'local' ? '/api/results/' : 'samples/';
+  const data = await (await fetch(base + encodeURIComponent(name))).json();
+  if (data.campaign_id) {
+    // 预取该 campaign 的章节文件
+    const listing = app.mode === 'local' ? app.results : app.samples;
+    const byExp = Object.fromEntries(listing.filter(r => r.experiment_id).map(r => [r.experiment_id, r.name]));
+    for (const ref of data.chapters || []) {
+      if (!app.pool[ref.experiment_id] && byExp[ref.experiment_id]) {
+        try { app.pool[ref.experiment_id] = await (await fetch(base + encodeURIComponent(byExp[ref.experiment_id]))).json(); } catch (e) {}
+      }
+    }
+    return openReplay(campaignToEvents(data));
+  }
+  app.pool[data.experiment_id] = data;
+  openReplay(chapterToEvents(data));
+}
+
+// ---------------------------------------------------------------------------
+// 结果 JSON → 事件序列（回放与实时共用同一套渲染）
+// ---------------------------------------------------------------------------
+function chapterToEvents(result, chapterIndex) {
+  const events = [];
+  const cfg = result.config || {};
+  const meta = CHAPTER_BY_ID[cfg.chapter] || { id: cfg.chapter, title: cfg.chapter };
+  const idx = chapterIndex ? { chapter_index: chapterIndex } : {};
+  events.push({ type: 'chapter_start', ...idx, experiment_id: result.experiment_id, chapter: { id: meta.id, title: meta.title, title_zh: meta.title_zh, chapter_number: meta.n, protagonist: meta.protagonist }, language: cfg.language, config: cfg });
+  let prevState = null;
+  for (const d of result.decisions || []) {
+    const choices = (d.choices_shown || []).map((text, i) => ({ id: d.ai_choice_id && text === d.ai_choice_text ? d.ai_choice_id : `opt${i + 1}`, text }));
+    events.push({ type: 'node_shown', ...idx, node_id: d.node_id, phase: d.phase, node_type: d.node_type || (choices.length ? 'choice' : 'mandatory'), context: d.context_shown, choices });
+    const effects = d.effects_applied ?? diffState(prevState, d.state_after, d.node_id);
+    prevState = d.state_after;
+    if (choices.length) {
+      events.push({ type: 'decision', ...idx, node_id: d.node_id, choice_id: d.ai_choice_id, choice_text: d.ai_choice_text, reasoning: d.ai_reasoning, raw: d.ai_response_raw, latency_ms: d.latency_ms, resolution_result: d.resolution_result, effects_applied: effects, state_after: d.state_after });
+    } else {
+      events.push({ type: 'narrative', ...idx, node_id: d.node_id, resolution_result: d.resolution_result, effects_applied: effects, state_after: d.state_after });
+    }
+  }
+  events.push({ type: 'chapter_end', ...idx, experiment_id: result.experiment_id, config: cfg, ending: result.ending, all_endings: result.all_endings || [result.ending], token_usage: result.token_usage, result_file: null });
+  return events;
+}
+function diffState(prev, next, nodeId) {
+  // 旧版结果文件没有 effects_applied 时用前后 state 之差近似；首个节点没有"之前"，不猜。
+  if (!next || !prev) return {};
+  const out = {};
+  for (const [k, v] of Object.entries(next)) {
+    if (k.startsWith('_') || k === nodeId) continue;
+    const before = prev ? prev[k] : undefined;
+    if (JSON.stringify(before) === JSON.stringify(v)) continue;
+    if (typeof v === 'number' && typeof before === 'number') out[k] = v - before; else out[k] = v;
+  }
+  return out;
+}
+function campaignToEvents(campaign) {
+  const cfg = campaign.config || {};
+  const refs = campaign.chapters || [];
+  const events = [{ type: 'campaign_start', campaign_id: campaign.campaign_id, config: cfg, chapters: refs.map(r => ({ index: r.chapter_index, id: r.chapter, title: (CHAPTER_BY_ID[r.chapter] || {}).title || r.chapter, title_zh: (CHAPTER_BY_ID[r.chapter] || {}).title_zh })) }];
+  const missing = [];
+  const endings = [];
+  for (const ref of refs) {
+    const data = app.pool[ref.experiment_id];
+    if (!data) { missing.push(ref.chapter); continue; }
+    events.push(...chapterToEvents(data, ref.chapter_index));
+    endings.push({ index: ref.chapter_index, id: ref.chapter, ending_id: data.ending?.id, ending_title: data.ending?.title, tier: data.ending?.tier });
+  }
+  if (missing.length) events.push({ type: 'error', message: `${t('missing_chapters')} ${missing.join(', ')}` });
+  events.push({ type: 'campaign_end', campaign_id: campaign.campaign_id, status: campaign.status, chapters: endings });
+  return events;
+}
+
+// ---------------------------------------------------------------------------
+// 运行视图
+// ---------------------------------------------------------------------------
+function newRun(kind, id, status) {
+  return { kind, id, status, config: null, plan: [], chapters: [], current: null, order: 0, thinking: null, stderr: [] };
+}
+function showRunView() {
+  $('home').classList.add('hidden'); $('run').classList.remove('hidden'); $('btn-home').classList.remove('hidden');
+  $('status').classList.remove('hidden');
+  $('feed').innerHTML = ''; $('side-list').innerHTML = ''; $('run-actions').innerHTML = '';
+  window.scrollTo(0, 0);
+}
+$('btn-home').onclick = goHome;
+function goHome() {
+  stopPolling(); stopThinkingTimer();
+  app.run = null;
+  $('run').classList.add('hidden'); $('home').classList.remove('hidden'); $('btn-home').classList.add('hidden'); $('status').classList.add('hidden');
+  if (app.mode === 'local') { refreshRuns(); refreshResults(); }
+}
+function setStatus(status, extra) {
+  const dot = $('status').querySelector('.dot');
+  dot.className = 'dot ' + status;
+  $('status-text').textContent = (t('status_' + status) || status) + (extra ? ` · ${extra}` : '');
+}
+
+async function openLiveRun(runId) {
+  app.run = newRun('chapter', runId, 'running');
+  app.run.lastSeq = 0;
+  showRunView();
+  setStatus('running');
+  $('run-actions').innerHTML = `<button id="btn-stop" class="danger">${t('stop')}</button>`;
+  $('btn-stop').onclick = async () => { try { await api(`/api/runs/${runId}/stop`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); } catch (e) { alert(e.message); } };
+  await pollOnce();
+  app.poll = setInterval(pollOnce, 1000);
+}
+function stopPolling() { if (app.poll) { clearInterval(app.poll); app.poll = null; } }
+async function pollOnce() {
+  const run = app.run; if (!run || run.kind === 'replay-static') return;
+  let payload;
+  try { payload = await api(`/api/runs/${run.id}/events?after=${run.lastSeq}`); } catch (e) { setStatus('failed', e.message); stopPolling(); return; }
+  for (const ev of payload.events) { applyEvent(ev); run.lastSeq = ev.seq; }
+  run.stderr = payload.stderr_tail || [];
+  if (payload.status !== 'running') {
+    stopPolling(); stopThinkingTimer();
+    setStatus(payload.status);
+    if (payload.status === 'failed' && run.stderr.length) appendError(`${t('stderr')}:\n${run.stderr.join('\n')}`);
+    $('btn-stop')?.remove();
+  } else {
+    setStatus('running', run.current ? chapterDisplayTitle(run.current) : '');
+  }
+}
+
+function openReplay(events) {
+  stopPolling();
+  app.run = newRun('replay', 'replay', 'replay');
+  showRunView();
+  setStatus('replay');
+  for (const ev of events) applyEvent(ev);
+  stopThinkingTimer();
+  // 逐步回放控制
+  const actions = $('run-actions');
+  actions.innerHTML = `<button id="btn-step">${t('step_play')}</button><button id="btn-all" class="hidden">${t('show_all')}</button>`;
+  let timer = null;
+  $('btn-step').onclick = () => {
+    const cards = [...document.querySelectorAll('#feed [data-order]')];
+    cards.forEach(c => c.classList.add('step-hidden'));
+    $('btn-step').classList.add('hidden'); $('btn-all').classList.remove('hidden');
+    let i = 0;
+    const reveal = () => {
+      if (i >= cards.length) { clearInterval(timer); $('btn-all').classList.add('hidden'); $('btn-step').classList.remove('hidden'); return; }
+      cards[i].classList.remove('step-hidden'); cards[i].scrollIntoView({ behavior: 'smooth', block: 'center' }); i++;
+    };
+    reveal(); timer = setInterval(reveal, 1600);
+  };
+  $('btn-all').onclick = () => { clearInterval(timer); document.querySelectorAll('#feed .step-hidden').forEach(c => c.classList.remove('step-hidden')); $('btn-all').classList.add('hidden'); $('btn-step').classList.remove('hidden'); };
+}
+
+// ---------------------------------------------------------------------------
+// 事件 → DOM
+// ---------------------------------------------------------------------------
+function applyEvent(ev) {
+  const run = app.run; if (!run) return;
+  switch (ev.type) {
+    case 'campaign_start':
+      run.kind = 'campaign'; run.config = ev.config; run.plan = ev.chapters || [];
+      renderConfigBar(); renderSide(); break;
+    case 'chapter_start': {
+      const ch = { index: ev.chapter_index || run.chapters.length + 1, id: ev.chapter.id, meta: ev.chapter, language: ev.language, config: ev.config, nodes: [], byId: {}, ending: null, status: 'running' };
+      run.chapters.push(ch); run.current = ch;
+      if (run.kind !== 'campaign') { run.config = ev.config; renderConfigBar(); }
+      appendChapterHead(ch); renderSide(); break;
+    }
+    case 'node_shown': {
+      const ch = chapterFor(ev); if (!ch) return;
+      const node = { id: ev.node_id, phase: ev.phase, type: ev.node_type, context: ev.context, choices: ev.choices || [], decision: null, narrative: null, shownAt: Date.now() };
+      ch.nodes.push(node); ch.byId[node.id] = node;
+      appendNodeCard(ch, node);
+      if (node.choices.length && run.kind !== 'replay') startThinkingTimer(ch, node);
+      renderSide(); break;
+    }
+    case 'decision': {
+      const ch = chapterFor(ev); const node = ch && ch.byId[ev.node_id]; if (!node) return;
+      node.decision = ev; stopThinkingTimer(); updateNodeCard(ch, node); break;
+    }
+    case 'narrative': {
+      const ch = chapterFor(ev); const node = ch && ch.byId[ev.node_id]; if (!node) return;
+      node.narrative = ev; updateNodeCard(ch, node); break;
+    }
+    case 'chapter_end': {
+      const ch = chapterFor(ev); if (!ch) return;
+      ch.ending = ev.ending; ch.all_endings = ev.all_endings; ch.token_usage = ev.token_usage; ch.result_file = ev.result_file; ch.status = 'done';
+      if (ev.config) ch.config = ev.config;
+      appendEndingCard(ch); renderSide(); break;
+    }
+    case 'campaign_end':
+      run.status = ev.status; appendCampaignSummary(ev); break;
+    case 'error':
+      appendError(`${t('error')}: ${ev.message}${ev.node_id ? ` (${t('node')} ${ev.node_id})` : ''}`); break;
+  }
+}
+function chapterFor(ev) {
+  const run = app.run;
+  if (ev.chapter_index) return run.chapters.find(c => c.index === ev.chapter_index) || run.current;
+  return run.current;
+}
+function chapterDisplayTitle(ch) {
+  const m = ch.meta || {};
+  const num = m.chapter_number ? `${String(m.chapter_number).padStart(2, '0')} ` : '';
+  if (uiLang === 'zh' && m.title_zh) return `${num}${m.title_zh}`;
+  return `${num}${m.title || ch.id}`;
+}
+function contentLangIsZh(ch) { return String((ch && ch.language) || (app.run.config || {}).language || 'zh').startsWith('zh'); }
+
+function renderConfigBar() {
+  const c = app.run.config || {};
+  let bar = $('config-bar');
+  if (!bar) { bar = document.createElement('div'); bar.id = 'config-bar'; bar.className = 'config-bar'; $('feed').prepend(bar); }
+  const pairs = [
+    ['model', c.model], ['backend', c.backend], ['resolved', c.resolved_model], ['persona', c.persona], ['difficulty', c.difficulty],
+    ['temperature', c.temperature], ['reasoning', c.reasoning_effort], ['lang', c.language],
+  ].filter(([, v]) => v !== null && v !== undefined && v !== '');
+  bar.innerHTML = pairs.map(([k, v]) => `<span>${k} <b>${esc(v)}</b></span>`).join('') + (c.experimental_backend ? `<span class="badge exp">${t('experimental')}</span>` : '');
+}
+
+function renderSide() {
+  const run = app.run; if (!run) return;
+  const list = $('side-list');
+  if (run.kind === 'campaign') {
+    const byIndex = Object.fromEntries(run.chapters.map(c => [c.index, c]));
+    const plan = run.plan.length ? run.plan : run.chapters.map(c => ({ index: c.index, id: c.id, title: c.meta.title, title_zh: c.meta.title_zh }));
+    list.innerHTML = plan.map(p => {
+      const ch = byIndex[p.index];
+      const cls = ch ? (ch.status === 'done' ? 'done' : 'active') : '';
+      const tier = ch && ch.ending ? tierClass(ch.ending.tier) : '';
+      const title = uiLang === 'zh' && p.title_zh ? p.title_zh : p.title;
+      return `<li class="${cls}" data-jump="ch-${p.index}"><span class="num">${String(p.index).padStart(2, '0')}</span><span class="name">${esc(title)}</span>${ch && ch.ending ? `<span class="dot ${tier}" style="background:currentColor" class="tier ${tier}"></span>` : ''}</li>`;
+    }).join('');
+  } else {
+    const ch = run.current;
+    if (!ch) { list.innerHTML = ''; return; }
+    let lastPhase = null; const parts = [];
+    ch.nodes.forEach((n, i) => {
+      if (n.phase && n.phase !== lastPhase) { parts.push(`<div class="phase">${esc(n.phase)}</div>`); lastPhase = n.phase; }
+      const done = n.decision || n.narrative;
+      const active = !done && i === ch.nodes.length - 1;
+      parts.push(`<li class="${done ? 'done' : ''} ${active ? 'active' : ''}" data-jump="card-${ch.index}-${n.id}"><span class="num">${i + 1}</span><span class="name">${esc(n.id.replace(/^n\d+_/, '').replace(/_/g, ' '))}</span></li>`);
+    });
+    if (ch.ending) parts.push(`<li class="done" data-jump="end-${ch.index}"><span class="num">★</span><span class="name">${esc(ch.ending.title)}</span></li>`);
+    list.innerHTML = parts.join('');
+  }
+  list.querySelectorAll('[data-jump]').forEach(li => li.onclick = () => $(li.dataset.jump)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+function tierClass(tier) {
+  if (!tier) return 'neutral';
+  const s = String(tier).toLowerCase();
+  if (/best|good|high|safe|escaped|won|saved/.test(s)) return 'best';
+  if (/worst|fatal|dead|died|capture|lose|lost/.test(s)) return 'worst';
+  if (/tragic|bad|low|dark|stalled/.test(s)) return 'tragic';
+  return 'neutral';
+}
+
+function appendChapterHead(ch) {
+  const el = document.createElement('div');
+  el.className = 'chapter-head'; el.id = `ch-${ch.index}`;
+  const m = ch.meta || {};
+  const prot = Array.isArray(m.protagonist) ? m.protagonist.join(' / ') : m.protagonist;
+  el.innerHTML = `<div class="k">${app.run.kind === 'campaign' ? `Chapter ${ch.index}` : 'Chapter'}</div><h2>${esc(chapterDisplayTitle(ch))}</h2><div class="sub">${esc(m.title_zh && uiLang !== 'zh' ? m.title_zh : (m.title_zh && m.title !== m.title_zh ? m.title : ''))}${prot ? ` · ${esc(prot)}` : ''}</div>`;
+  $('feed').appendChild(el);
+}
+
+function appendNodeCard(ch, node) {
+  const el = document.createElement('article');
+  el.className = 'card'; el.id = `card-${ch.index}-${node.id}`; el.dataset.order = ++app.run.order;
+  $('feed').appendChild(el);
+  updateNodeCard(ch, node);
+  autoScroll(el);
+}
+function updateNodeCard(ch, node) {
+  const el = $(`card-${ch.index}-${node.id}`); if (!el) return;
+  const zh = contentLangIsZh(ch);
+  const d = node.decision;
+  const choices = node.choices.map((c, i) => {
+    const chosen = d && (c.id === d.choice_id || c.text === d.choice_text);
+    return `<li class="${chosen ? 'chosen' : ''}"><span class="n">${i + 1}</span>${esc(c.text)}</li>`;
+  }).join('');
+  let tail = '';
+  if (node.choices.length && !d) {
+    tail = `<div class="thinking"><span class="spin"></span><span>${t('thinking')}… <span class="timer" data-node="${node.id}">0.0s</span></span></div>`;
+  } else if (d) {
+    tail = `<div class="reasoning"><div class="lbl"><span>${t('reasoning')}</span>${d.latency_ms != null ? `<span class="lat">${(d.latency_ms / 1000).toFixed(1)}s</span>` : ''}</div><p>${esc(d.reasoning || d.raw || '')}</p></div>`;
+  }
+  const outcome = renderOutcome(d || node.narrative);
+  el.innerHTML = `<div class="node-meta"><span>${esc(node.id)}</span>${node.phase ? `<span>${esc(node.phase)}</span>` : ''}${node.type && node.type !== 'choice' ? `<span>${esc(node.type)}</span>` : ''}</div>
+    <div class="context">${esc(node.context)}</div>
+    ${node.choices.length ? `<ul class="choices">${choices}</ul>` : `<div class="node-meta" style="margin-top:8px">${t('narrative_only')}</div>`}
+    ${tail}${outcome}`;
+}
+function renderOutcome(ev) {
+  if (!ev) return '';
+  const chips = [];
+  if (ev.resolution_result && !String(ev.resolution_result).startsWith('ending_')) chips.push(`<span class="eff res">${esc(String(ev.resolution_result).replace(/_/g, ' '))}</span>`);
+  for (const [k, v] of Object.entries(ev.effects_applied || {})) {
+    if (typeof v === 'number') chips.push(`<span class="eff ${v > 0 ? 'up' : v < 0 ? 'down' : ''}">${esc(k)} ${v > 0 ? '+' : ''}${v}</span>`);
+    else chips.push(`<span class="eff">${esc(k)} = ${esc(Array.isArray(v) ? v.join(', ') : String(v))}</span>`);
+  }
+  if (!chips.length) return '';
+  return `<div class="outcome"><span class="lbl">${t('outcome')}</span>${chips.join('')}</div>`;
+}
+
+function appendEndingCard(ch) {
+  const el = document.createElement('div');
+  el.className = 'ending'; el.id = `end-${ch.index}`; el.dataset.order = ++app.run.order;
+  const endings = ch.all_endings && ch.all_endings.length > 1 ? ch.all_endings : [ch.ending];
+  el.innerHTML = endings.map(e => `
+    <div class="k">${t('chapter_ending')}</div>
+    <h3>${esc(e.title)}${e.tier ? `<span class="tier ${tierClass(e.tier)}">${esc(e.tier)}</span>` : ''}</h3>
+    <div class="narr">${esc(e.narrative)}</div>
+    <div class="people">${(e.survivors || []).map(p => `<span class="alive">${esc(p)}</span>`).join('')}${(e.deaths || []).map(p => `<span class="dead">${esc(p)}</span>`).join('')}</div>
+  `).join('<hr style="border:0;border-top:1px solid var(--line);margin:14px 0">') + tokensLine(ch.token_usage);
+  $('feed').appendChild(el);
+  autoScroll(el);
+}
+function tokensLine(usage) {
+  const entries = Object.entries(usage || {}).filter(([, v]) => typeof v === 'number' && v > 0);
+  if (!entries.length) return '';
+  return `<div class="tokens"><span>${t('tokens')}</span>${entries.map(([k, v]) => `<span>${esc(k)} ${v.toLocaleString()}</span>`).join('')}</div>`;
+}
+function appendCampaignSummary(ev) {
+  const el = document.createElement('div');
+  el.className = 'ending'; el.dataset.order = ++app.run.order;
+  const rows = (ev.chapters || []).map(c => `<tr><td>${String(c.index).padStart(2, '0')} ${esc((uiLang === 'zh' && CHAPTER_BY_ID[c.id]?.title_zh) || CHAPTER_BY_ID[c.id]?.title || c.id)}</td><td>${esc(c.ending_title || c.ending_id || '')}</td><td>${c.tier ? `<span class="tier ${tierClass(c.tier)}">${esc(c.tier)}</span>` : ''}</td></tr>`).join('');
+  el.innerHTML = `<div class="k">${ev.status === 'complete' ? t('campaign_summary') : t('campaign_failed')}</div><table class="summary"><thead><tr><th>${t('col_chapter')}</th><th>${t('col_ending')}</th><th>${t('col_tier')}</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $('feed').appendChild(el);
+  autoScroll(el);
+}
+function appendError(message) {
+  const el = document.createElement('div'); el.className = 'error-box'; el.textContent = message; $('feed').appendChild(el); autoScroll(el);
+}
+function autoScroll(el) {
+  if (!app.run || app.run.kind === 'replay') return;
+  const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 400;
+  if (nearBottom) el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+// 「思考中」计时器
+let thinkingTimer = null;
+function startThinkingTimer(ch, node) {
+  stopThinkingTimer();
+  thinkingTimer = setInterval(() => {
+    const span = document.querySelector(`.timer[data-node="${node.id}"]`);
+    if (span) span.textContent = `${((Date.now() - node.shownAt) / 1000).toFixed(1)}s`;
+  }, 100);
+}
+function stopThinkingTimer() { if (thinkingTimer) { clearInterval(thinkingTimer); thinkingTimer = null; } }
+
+boot();
+</script>
+</body>
+</html>

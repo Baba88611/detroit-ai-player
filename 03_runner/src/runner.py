@@ -4,12 +4,14 @@ import argparse
 import copy
 import json
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from api_client import LLMClient
+from events import JsonlEventWriter, emit
 from logger import write_result
 from resolver import (
     ending_payload,
@@ -112,8 +114,16 @@ def run_experiment(
     persona_text: str | None = None,
     cross_chapter_state: dict[str, Any] | None = None,
     memory_summary: str | None = None,
+    on_event: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
+    """跑完一章。
+
+    on_event 可选：传入后 runner 在每个节点前后发出结构化事件（类型见 events.py），
+    供 05_viewer 实时展示。事件只是 system 层数据"给人看"的出口，不进入被测 AI 的
+    上下文。不传 on_event 时行为与旧版完全一致。
+    """
     chapter_data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    experiment_id = str(uuid.uuid4())
     state = initial_state(chapter_data)
     if cross_chapter_state:
         state.update(copy.deepcopy(cross_chapter_state))
@@ -128,6 +138,28 @@ def run_experiment(
     )
     system_content = f"{system_content}\n\n{anti_walkthrough}"
     messages = [{"role": "system", "content": system_content}]
+
+    def build_config() -> dict[str, Any]:
+        return {
+            **recorded_backend_config(ai_client, temperature),
+            "difficulty": difficulty,
+            "persona": persona_name,
+            "language": chapter_data.get("_meta", {}).get("language", "unknown"),
+            "chapter": chapter_data["chapter"]["id"],
+            "dry_run": dry_run,
+            "cross_chapter_state_injected": cross_chapter_state is not None,
+            "memory_summary_injected": memory_summary is not None,
+        }
+
+    emit(
+        on_event,
+        "chapter_start",
+        experiment_id=experiment_id,
+        chapter=_chapter_meta(chapter_data),
+        language=chapter_language,
+        config=build_config(),
+    )
+
     decisions: list[dict[str, Any]] = []
     token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
     token_usage_before = ai_client.token_usage() if isinstance(ai_client, LLMClient) else None
@@ -140,89 +172,144 @@ def run_experiment(
     )
     collected_endings: list[str] = []
     ended_tracks: set[str] = set()
+    current_node_id: str | None = None
 
-    for node in chapter_data["nodes"]:
-        node_track = _node_track(node, protagonist_tracks)
-        if node_track and node_track in ended_tracks:
-            # This protagonist's track already reached an ending; later nodes on
-            # the same track are alternative branches that must not run as well.
-            continue
-        if not node_condition_met(node, state):
-            continue
+    try:
+        for node in chapter_data["nodes"]:
+            current_node_id = node["id"]
+            node_track = _node_track(node, protagonist_tracks)
+            if node_track and node_track in ended_tracks:
+                # This protagonist's track already reached an ending; later nodes on
+                # the same track are alternative branches that must not run as well.
+                continue
+            if not node_condition_met(node, state):
+                continue
 
-        context = resolve_context(node, state)
-        choices = _resolve_optional_choices(node, state)
-        user_content = _format_user_content(context, choices, chapter_language)
-        trial_messages = messages + [{"role": "user", "content": user_content}]
-        _assert_no_system_leak(node, trial_messages)
+            context = resolve_context(node, state)
+            choices = _resolve_optional_choices(node, state)
+            user_content = _format_user_content(context, choices, chapter_language)
+            trial_messages = messages + [{"role": "user", "content": user_content}]
+            _assert_no_system_leak(node, trial_messages)
+            emit(
+                on_event,
+                "node_shown",
+                node_id=node["id"],
+                phase=node.get("phase"),
+                node_type=node.get("type"),
+                context=context,
+                choices=[{"id": choice["id"], "text": choice["text"]} for choice in choices],
+            )
 
-        if choices:
-            ai_result = ai_client.choose(node["id"], context, choices, copy.deepcopy(trial_messages))
-            choice_id = ai_result["choice_id"]
-            selected_choice = _choice_by_id(choices, choice_id)
-            messages = trial_messages + [{"role": "assistant", "content": ai_result["raw"]}]
-            effects = node.get("system", {}).get("effects", {}).get(choice_id, {})
-            apply_effects(state, effects)
-            _record_choice_aliases(state, node["id"], choice_id)
-            result = resolve_post_choice_result(node, choice_id, state, difficulty)
+            node_system = node.get("system", {})
+            effects_applied: dict[str, Any] = {}
+            latency_ms: int | None = None
+            if choices:
+                started = time.perf_counter()
+                ai_result = ai_client.choose(node["id"], context, choices, copy.deepcopy(trial_messages))
+                latency_ms = int((time.perf_counter() - started) * 1000)
+                choice_id = ai_result["choice_id"]
+                selected_choice = _choice_by_id(choices, choice_id)
+                messages = trial_messages + [{"role": "assistant", "content": ai_result["raw"]}]
+                effects = node_system.get("effects", {}).get(choice_id, {})
+                apply_effects(state, effects)
+                _merge_effects(effects_applied, effects)
+                _record_choice_aliases(state, node["id"], choice_id)
+                result = resolve_post_choice_result(node, choice_id, state, difficulty)
+                if result:
+                    resolution_effs = node_system.get("resolution_effects", {}).get(result, {})
+                    apply_effects(state, resolution_effs)
+                    _merge_effects(effects_applied, resolution_effs)
+                ai_raw = ai_result["raw"]
+                ai_reasoning = ai_result["reasoning"]
+                ai_choice_text = selected_choice["text"]
+            else:
+                choice_id = None
+                messages = trial_messages
+                effects = node_system.get("effects", {})
+                apply_effects(state, effects)
+                _merge_effects(effects_applied, effects)
+                result = _resolve_mandatory_result(node, state)
+                if result and result.startswith("ending_"):
+                    ending_effs = node_system.get("ending_effects", {}).get(result, {})
+                    apply_effects(state, ending_effs)
+                    _merge_effects(effects_applied, ending_effs)
+                ai_raw = None
+                ai_reasoning = None
+                ai_choice_text = None
+
             if result:
-                resolution_effs = node.get("system", {}).get("resolution_effects", {}).get(result, {})
-                apply_effects(state, resolution_effs)
-            ai_raw = ai_result["raw"]
-            ai_reasoning = ai_result["reasoning"]
-            ai_choice_text = selected_choice["text"]
-        else:
-            choice_id = None
-            messages = trial_messages
-            apply_effects(state, node.get("system", {}).get("effects", {}))
-            result = _resolve_mandatory_result(node, state)
-            if result and result.startswith("ending_"):
-                ending_effs = node.get("system", {}).get("ending_effects", {}).get(result, {})
-                apply_effects(state, ending_effs)
-            ai_raw = None
-            ai_reasoning = None
-            ai_choice_text = None
+                if result.startswith("ending_"):
+                    final_ending_id = result
+                else:
+                    state[f"_{node['id'].split('_', 1)[0]}_result"] = result
+                    state[f"_{node['id']}_result"] = result
+                    if node["id"] == "n011_final_choice":
+                        state["_n011_result"] = result
 
-        if result:
-            if result.startswith("ending_"):
-                final_ending_id = result
+            state_after = snapshot(state)
+            decisions.append(
+                {
+                    "node_id": node["id"],
+                    "phase": node.get("phase"),
+                    "node_type": node.get("type"),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "context_shown": context,
+                    "choices_shown": [choice["text"] for choice in choices],
+                    "ai_response_raw": ai_raw,
+                    "ai_choice_id": choice_id,
+                    "ai_choice_text": ai_choice_text,
+                    "ai_reasoning": ai_reasoning,
+                    "latency_ms": latency_ms,
+                    "resolution_result": result,
+                    "effects_applied": effects_applied,
+                    "state_after": state_after,
+                    "messages_sent": copy.deepcopy(trial_messages) if dry_run else None,
+                }
+            )
+            if choices:
+                emit(
+                    on_event,
+                    "decision",
+                    node_id=node["id"],
+                    choice_id=choice_id,
+                    choice_text=ai_choice_text,
+                    reasoning=ai_reasoning,
+                    raw=ai_raw,
+                    latency_ms=latency_ms,
+                    resolution_result=result,
+                    effects_applied=effects_applied,
+                    state_after=state_after,
+                )
             else:
-                state[f"_{node['id'].split('_', 1)[0]}_result"] = result
-                state[f"_{node['id']}_result"] = result
-                if node["id"] == "n011_final_choice":
-                    state["_n011_result"] = result
+                emit(
+                    on_event,
+                    "narrative",
+                    node_id=node["id"],
+                    resolution_result=result,
+                    effects_applied=effects_applied,
+                    state_after=state_after,
+                )
 
-        decisions.append(
-            {
-                "node_id": node["id"],
-                "context_shown": context,
-                "choices_shown": [choice["text"] for choice in choices],
-                "ai_response_raw": ai_raw,
-                "ai_choice_id": choice_id,
-                "ai_choice_text": ai_choice_text,
-                "ai_reasoning": ai_reasoning,
-                "state_after": snapshot(state),
-                "messages_sent": copy.deepcopy(trial_messages) if dry_run else None,
-            }
-        )
+            if final_ending_id:
+                if is_multi_protagonist:
+                    collected_endings.append(final_ending_id)
+                    if node_track:
+                        ended_tracks.add(node_track)
+                    final_ending_id = None
+                else:
+                    break
 
-        if final_ending_id:
-            if is_multi_protagonist:
-                collected_endings.append(final_ending_id)
-                if node_track:
-                    ended_tracks.add(node_track)
-                final_ending_id = None
-            else:
-                break
+        if final_ending_id is None and collected_endings:
+            final_ending_id = _pick_primary_ending(chapter_data, collected_endings)
 
-    if final_ending_id is None and collected_endings:
-        final_ending_id = _pick_primary_ending(chapter_data, collected_endings)
+        if final_ending_id is None:
+            final_ending_id = _single_ending_id(chapter_data)
 
-    if final_ending_id is None:
-        final_ending_id = _single_ending_id(chapter_data)
-
-    if final_ending_id is None:
-        raise RuntimeError("Run ended without an ending. Check JSON ending_resolution rules.")
+        if final_ending_id is None:
+            raise RuntimeError("Run ended without an ending. Check JSON ending_resolution rules.")
+    except Exception as exc:
+        emit(on_event, "error", message=str(exc), node_id=current_node_id)
+        raise
 
     # Multi-protagonist finales (Connor / Markus / Kara) reach one ending per track.
     # `ending` keeps the single primary for backward compatibility, while `all_endings`
@@ -231,28 +318,60 @@ def run_experiment(
     all_endings = [ending_payload(chapter_data, ending_id) for ending_id in ending_id_sequence]
 
     result_payload = {
-        "experiment_id": str(uuid.uuid4()),
+        "experiment_id": experiment_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "config": {
-            **recorded_backend_config(ai_client, temperature),
-            "difficulty": difficulty,
-            "persona": persona_name,
-            "language": chapter_data.get("_meta", {}).get("language", "unknown"),
-            "chapter": chapter_data["chapter"]["id"],
-            "dry_run": dry_run,
-            "cross_chapter_state_injected": cross_chapter_state is not None,
-            "memory_summary_injected": memory_summary is not None,
-        },
+        "config": build_config(),
         "decisions": decisions,
         "ending": ending_payload(chapter_data, final_ending_id),
         "all_endings": all_endings,
         "token_usage": _chapter_token_usage(ai_client, token_usage_before) if isinstance(ai_client, LLMClient) else token_usage,
     }
 
+    result_file: Path | None = None
     if output_dir:
-        write_result(result_payload, output_dir)
+        result_file = write_result(result_payload, output_dir)
+
+    emit(
+        on_event,
+        "chapter_end",
+        experiment_id=experiment_id,
+        config=result_payload["config"],
+        ending=result_payload["ending"],
+        all_endings=all_endings,
+        token_usage=result_payload["token_usage"],
+        result_file=str(result_file.resolve()) if result_file else None,
+    )
 
     return result_payload
+
+
+def _chapter_meta(chapter_data: dict[str, Any]) -> dict[str, Any]:
+    chapter = chapter_data.get("chapter", {})
+    return {
+        "id": chapter.get("id"),
+        "title": chapter.get("title"),
+        "title_zh": chapter.get("title_zh"),
+        "chapter_number": chapter.get("chapter_number"),
+        "protagonist": chapter.get("protagonist"),
+    }
+
+
+def _merge_effects(target: dict[str, Any], effects: dict[str, Any] | None) -> None:
+    """把一步里先后生效的多组 effects 合成一份记录（数值增量相加，其余后者覆盖）。
+    只用于结果记录与事件展示；真正的状态更新仍由 state.apply_effects 逐组完成。"""
+    if not effects:
+        return
+    for key, value in effects.items():
+        current = target.get(key)
+        if (
+            isinstance(current, (int, float))
+            and not isinstance(current, bool)
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)
+        ):
+            target[key] = current + value
+        else:
+            target[key] = copy.deepcopy(value)
 
 
 def build_llm_client_from_model_registry(
@@ -315,6 +434,7 @@ def main() -> None:
     parser.add_argument("--persona", default="default", help="Persona prompt name from ../02_setting/personas/")
     parser.add_argument("--output", default="../04_execution/results/")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--events", help="Optional JSONL path to append step-by-step events (used by 05_viewer)")
     args = parser.parse_args()
 
     personas_dir = Path(__file__).resolve().parents[2] / "02_setting" / "personas"
@@ -336,16 +456,22 @@ def main() -> None:
             temperature=args.temperature,
         )
 
-    result = run_experiment(
-        json_path=args.json,
-        ai_client=ai_client,
-        difficulty=args.difficulty,
-        output_dir=args.output,
-        dry_run=args.dry_run,
-        temperature=args.temperature,
-        persona_name=args.persona,
-        persona_text=persona_text,
-    )
+    event_writer = JsonlEventWriter(args.events) if args.events else None
+    try:
+        result = run_experiment(
+            json_path=args.json,
+            ai_client=ai_client,
+            difficulty=args.difficulty,
+            output_dir=args.output,
+            dry_run=args.dry_run,
+            temperature=args.temperature,
+            persona_name=args.persona,
+            persona_text=persona_text,
+            on_event=event_writer,
+        )
+    finally:
+        if event_writer:
+            event_writer.close()
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

@@ -114,6 +114,7 @@ python src/runner.py --json ../01_json/en/ch01_the_hostage_en.json --model defau
 03_runner/      Experiment runner (read JSON → call model → parse → update state → record)
 04_execution/   Experiment output (the repository does not include the author's results)
   └─ results/            ← Runner-generated result JSON (see its CLAUDE.md for the format)
+05_viewer/      Visual viewer: start a run from the browser, watch each scene / choice / reasoning / outcome live, or replay result files
 docs/assets/    Architecture diagrams
 ```
 
@@ -272,6 +273,22 @@ See `02_setting/` and the relevant `CLAUDE.md` files for options including
 > The tested AI decides only from the narrative content in the `player_facing`
 > layer. Do not point `base_url` to an aggregator endpoint that enables web search
 > by default; doing so invalidates the experiment.
+
+## Visual viewer: watch the AI play
+
+Rather than reading JSON in a terminal, start the built-in viewer from the repository root:
+
+```bash
+python 05_viewer/serve.py
+```
+
+It starts a small server bound to `127.0.0.1` only and opens your browser (default http://127.0.0.1:8765 ). From there you can:
+
+- **Start a run**: pick a model (unconfigured ones show which variable is missing), persona, difficulty, script language, and a single chapter or a whole campaign. The page then shows, step by step, the scene the AI sees, the options, what it picked, its stated reasoning, the effects of that choice, and the chapter ending. Tick *dry-run* to preview the interface without calling any model.
+- **Replay**: every result file in `04_execution/results/` is listed on the home page; click to replay, or drop any result JSON onto the page.
+- **God's-eye toggle**: switch it off to hide effect values and checks and see only what the AI saw.
+
+The server uses only the Python standard library. API keys are read by the runner subprocess from `.env` and never pass through the browser. A run started from the viewer writes exactly the same result files as a command-line run. Without a server (for example the static GitHub Pages build of `05_viewer/`), the same page falls back to read-only replay of bundled samples.
 
 ## Inspect results
 

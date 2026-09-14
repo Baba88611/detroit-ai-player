@@ -20,3 +20,6 @@ __pycache__/
 
 # 实验结果：本地产物，不入库（仅保留目录内的 CLAUDE.md 说明）
 04_execution/results/*.json
+
+# 05_viewer 本地服务器的运行记录（事件流、日志），本地产物不入库
+04_execution/runs/

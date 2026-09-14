@@ -7,8 +7,9 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
+from events import JsonlEventWriter, emit
 from logger import write_campaign_result
 from runner import (
     ScriptedAI,
@@ -153,27 +154,73 @@ def run_campaign(
     temperature: float = 0.7,
     persona_name: str = "default",
     persona_text: str | None = None,
+    on_event: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     campaign_id = str(uuid.uuid4())
     cross_chapter_state: dict[str, Any] = {}
     memory_segments: list[str] = []
     chapter_refs: list[dict[str, Any]] = []
+    chapter_endings: list[dict[str, Any]] = []
+
+    chapter_datas = [json.loads(Path(path).read_text(encoding="utf-8")) for path in chapter_paths]
+    emit(
+        on_event,
+        "campaign_start",
+        campaign_id=campaign_id,
+        config={
+            **recorded_backend_config(ai_client, temperature),
+            "difficulty": difficulty,
+            "persona": persona_name,
+            "dry_run": dry_run,
+            "chapter_count": len(chapter_paths),
+        },
+        chapters=[
+            {
+                "index": index,
+                "id": data.get("chapter", {}).get("id"),
+                "title": data.get("chapter", {}).get("title"),
+                "title_zh": data.get("chapter", {}).get("title_zh"),
+            }
+            for index, data in enumerate(chapter_datas, start=1)
+        ],
+    )
 
     for chapter_index, chapter_path in enumerate(chapter_paths, start=1):
-        chapter_data = json.loads(Path(chapter_path).read_text(encoding="utf-8"))
+        chapter_data = chapter_datas[chapter_index - 1]
         memory_summary = _build_memory_summary(chapter_data, memory_segments)
 
-        result = run_experiment(
-            json_path=chapter_path,
-            ai_client=ai_client,
-            difficulty=difficulty,
-            output_dir=output_dir,
-            dry_run=dry_run,
-            temperature=temperature,
-            persona_name=persona_name,
-            persona_text=persona_text,
-            cross_chapter_state=cross_chapter_state if cross_chapter_state else None,
-            memory_summary=memory_summary,
+        try:
+            result = run_experiment(
+                json_path=chapter_path,
+                ai_client=ai_client,
+                difficulty=difficulty,
+                output_dir=output_dir,
+                dry_run=dry_run,
+                temperature=temperature,
+                persona_name=persona_name,
+                persona_text=persona_text,
+                cross_chapter_state=cross_chapter_state if cross_chapter_state else None,
+                memory_summary=memory_summary,
+                on_event=_with_chapter_index(on_event, chapter_index),
+            )
+        except Exception:
+            # 单章 runner 已发出 error 事件；这里补一个 status=failed 的收尾，让 UI 能停下来。
+            emit(
+                on_event,
+                "campaign_end",
+                campaign_id=campaign_id,
+                status="failed",
+                chapters=chapter_endings,
+            )
+            raise
+        chapter_endings.append(
+            {
+                "index": chapter_index,
+                "id": result["config"]["chapter"],
+                "ending_id": result["ending"]["id"],
+                "ending_title": result["ending"]["title"],
+                "tier": result["ending"].get("tier"),
+            }
         )
 
         final_state = copy.deepcopy(result["decisions"][-1]["state_after"])
@@ -237,7 +284,29 @@ def run_campaign(
     if output_dir:
         write_campaign_result(campaign_result, output_dir)
 
+    emit(
+        on_event,
+        "campaign_end",
+        campaign_id=campaign_id,
+        status="complete",
+        chapters=chapter_endings,
+    )
+
     return campaign_result
+
+
+def _with_chapter_index(
+    on_event: Callable[[dict[str, Any]], None] | None,
+    chapter_index: int,
+) -> Callable[[dict[str, Any]], None] | None:
+    """给单章 runner 发出的每个事件补上 chapter_index，UI 才知道事件属于第几章。"""
+    if on_event is None:
+        return None
+
+    def sink(event: dict[str, Any]) -> None:
+        on_event({**event, "chapter_index": chapter_index})
+
+    return sink
 
 
 def main() -> None:
@@ -249,6 +318,7 @@ def main() -> None:
     parser.add_argument("--persona", default="default", help="Persona prompt name from ../02_setting/personas/")
     parser.add_argument("--output", default="../04_execution/results/")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--events", help="Optional JSONL path to append step-by-step events (used by 05_viewer)")
     args = parser.parse_args()
 
     personas_dir = Path(__file__).resolve().parents[2] / "02_setting" / "personas"
@@ -271,16 +341,22 @@ def main() -> None:
         )
 
     chapter_paths = expand_chapter_paths(args.chapters)
-    result = run_campaign(
-        chapter_paths=chapter_paths,
-        ai_client=ai_client,
-        difficulty=args.difficulty,
-        output_dir=args.output,
-        dry_run=args.dry_run,
-        temperature=args.temperature,
-        persona_name=args.persona,
-        persona_text=persona_text,
-    )
+    event_writer = JsonlEventWriter(args.events) if args.events else None
+    try:
+        result = run_campaign(
+            chapter_paths=chapter_paths,
+            ai_client=ai_client,
+            difficulty=args.difficulty,
+            output_dir=args.output,
+            dry_run=args.dry_run,
+            temperature=args.temperature,
+            persona_name=args.persona,
+            persona_text=persona_text,
+            on_event=event_writer,
+        )
+    finally:
+        if event_writer:
+            event_writer.close()
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

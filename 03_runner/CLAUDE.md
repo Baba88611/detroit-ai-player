@@ -15,10 +15,13 @@
 │   ├── state.py             ← 状态管理（初始化、effects 应用、condition 求值、跨章状态提取）
 │   ├── resolver.py          ← 动态内容解析（context_variants、choices_variants、ending_resolution）
 │   ├── api_client.py        ← 模型 API 调用（OpenAI 兼容接口，统一封装）
-│   └── logger.py            ← 实验记录（单章结果 JSON + campaign 汇总 JSON）
+│   ├── logger.py            ← 实验记录（单章结果 JSON + campaign 汇总 JSON）
+│   └── events.py            ← 事件流（JSONL 逐步写盘，供 05_viewer 实时展示）
 ├── tests/
 │   ├── test_with_ch01.py    ← 用第一章 JSON 跑通全链路的集成测试
-│   └── test_campaign.py     ← campaign 模式测试（跨章状态传递、摘要注入、模板拼接）
+│   ├── test_campaign.py     ← campaign 模式测试（跨章状态传递、摘要注入、模板拼接）
+│   ├── test_events.py       ← 事件流：顺序、字段、node_shown 不含 system 层
+│   └── test_viewer_server.py ← 05_viewer/serve.py 的接口与安全测试（dry-run 全链路）
 ├── requirements.txt
 └── .env.example             ← 环境变量模板（API key 占位符，不含真实密钥）
 ```
@@ -73,6 +76,12 @@ runner 是信息隔离的执行者。发送给被测 AI 的内容**只能来自�
 - `memory_summary: str | None` — 累积的前情提要文本，追加到 system message 末尾
 
 两个参数默认为 None，单章运行时行为不变。
+
+第三个可选参数 `on_event: Callable[[dict], None] | None` 用于事件流：传入后 runner 在每个节点**调用 AI 之前**发 `node_shown`、之后发 `decision` / `narrative`，章节首尾发 `chapter_start` / `chapter_end`，异常时发 `error` 再抛出。事件里带 effects、判定结果和 state 快照，是 system 层"给人看"的出口，不进入模型上下文。不传时行为不变。
+
+### events.py — 事件流
+
+`JsonlEventWriter(path)` 把事件逐行追加到 JSONL 文件（自动补 `seq`、`ts`，每条立即 flush），命令行用 `--events <path>` 启用。`read_events(path, after_seq)` 供 05_viewer 轮询增量读取。事件类型与字段见文件顶部注释；campaign 模式下每个事件额外带 `chapter_index`。
 
 ### campaign_runner.py — 多章连续执行
 
@@ -170,11 +179,17 @@ runner 是信息隔离的执行者。发送给被测 AI 的内容**只能来自�
   "decisions": [
     {
       "node_id": "n001_fish",
+      "phase": "arrival",
+      "node_type": "choice",
+      "timestamp": "ISO 8601（本步完成时刻）",
       "context_shown": "实际发送给 AI 的 context 文字",
       "choices_shown": ["选项文字列表"],
       "ai_response_raw": "AI 原始回复",
       "ai_choice_id": "save_fish",
       "ai_reasoning": "AI 的理由",
+      "latency_ms": 4452,
+      "resolution_result": "QTE / 结局判定结果，无则 null",
+      "effects_applied": { "本步实际生效的 effects（含 resolution/ending effects）" },
       "state_after": { "当前 state 快照" }
     }
   ],
@@ -208,6 +223,7 @@ python src/runner.py --json ../01_json/zh/ch01_the_hostage_zh.json --model gpt-4
 # --persona      人格 prompt 名称（对应 02_setting 中的 prompt 文件）
 # --temperature  温度参数（默认 0.7）
 # --output       结果输出目录（默认 ../04_execution/results/）
+# --events       可选，JSONL 路径；逐步追加事件供 05_viewer 实时展示
 
 # 多章连续实验（campaign 模式）
 python src/campaign_runner.py \
