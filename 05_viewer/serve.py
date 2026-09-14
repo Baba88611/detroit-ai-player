@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -170,6 +171,34 @@ def chapter_paths_by_id(config: AppConfig, language: str) -> dict[str, Path]:
 # ---------------------------------------------------------------------------
 
 
+def _terminate_process_group(proc: subprocess.Popen, grace_seconds: float = 5.0) -> None:
+    """终止整个进程组，而不只是 runner 自己。
+
+    runner 用 claude / codex 这类 CLI 后端时会再派生子进程；只对 runner 发信号会让
+    子进程变成孤儿继续运行。先对整组发 SIGTERM 给它清理的机会，超时后再 SIGKILL。
+    Windows 上没有进程组信号语义，退回到 terminate/kill。
+    """
+
+    def signal_group(sig: int) -> None:
+        if os.name == "nt":
+            proc.kill() if sig == signal.SIGKILL else proc.terminate()
+            return
+        try:
+            os.killpg(os.getpgid(proc.pid), sig)
+        except (ProcessLookupError, PermissionError):
+            # 组已经没了，或拿不到组 id，退回到只处理 runner 本身
+            try:
+                proc.kill() if sig == signal.SIGKILL else proc.terminate()
+            except ProcessLookupError:
+                pass
+
+    signal_group(signal.SIGTERM)
+    try:
+        proc.wait(timeout=grace_seconds)
+    except subprocess.TimeoutExpired:
+        signal_group(signal.SIGKILL)
+
+
 class RunManager:
     def __init__(self, config: AppConfig):
         self.config = config
@@ -254,12 +283,19 @@ class RunManager:
         stderr = (run_dir / "stderr.log").open("wb")
         env = {key: value for key, value in os.environ.items()}
         env["PYTHONUNBUFFERED"] = "1"
+        # 独立进程组：claude / codex 这类 CLI 后端由 runner 再派生子进程，
+        # 只 terminate runner 会留下孤儿进程继续跑并消耗额度，必须整组终止。
+        if os.name == "nt":
+            group_kwargs: dict[str, Any] = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+        else:
+            group_kwargs = {"start_new_session": True}
         proc = subprocess.Popen(
             command,
             cwd=str(self.config.runner_dir),
             stdout=stdout,
             stderr=stderr,
             env=env,
+            **group_kwargs,
         )
         with self._lock:
             self._procs[run_id] = proc
@@ -285,7 +321,7 @@ class RunManager:
             proc = self._procs.get(run_id)
         if proc is None or proc.poll() is not None:
             raise KeyError(run_id)
-        proc.terminate()
+        _terminate_process_group(proc)
         return {"run_id": run_id, "stopping": True}
 
     def describe(self, run_id: str) -> dict[str, Any]:
@@ -434,6 +470,26 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _check_same_origin(self) -> None:
+        """拒绝浏览器发来的跨站写请求。
+
+        没有 Origin 的请求（curl、测试、非浏览器客户端）放行；一旦带了 Origin，
+        就必须与本服务器自身的地址一致。服务器只监听 127.0.0.1，因此这条足以挡住
+        用户在浏览恶意页面时被诱发的跨站写操作。
+        """
+        origin = self.headers.get("Origin")
+        if not origin:
+            return
+        host, port = self.server.server_address[0], self.server.server_address[1]
+        allowed = {
+            f"http://127.0.0.1:{port}",
+            f"http://localhost:{port}",
+            f"http://[::1]:{port}",
+            f"http://{host}:{port}",
+        }
+        if origin not in allowed:
+            raise PermissionError(f"cross-site request rejected (Origin: {origin})")
+
     def _read_json_body(self) -> dict[str, Any]:
         if not self.headers.get("Content-Type", "").startswith("application/json"):
             raise ValueError("Content-Type must be application/json")
@@ -511,16 +567,22 @@ class ViewerHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
         try:
+            # 每个写接口都先过同源校验，停止接口也不例外
+            self._check_same_origin()
             if path == "/api/runs":
                 body = self._read_json_body()
                 return self._json(self.runs.start(body), 201)
             match = re.fullmatch(r"/api/runs/([a-f0-9]{8})/stop", path)
             if match:
+                # 停止同样要求 JSON 请求体，避免被当成简单请求跨站触发
+                self._read_json_body()
                 try:
                     return self._json(self.runs.stop(match.group(1)))
                 except KeyError:
                     return self._error(404, "run not found or already finished")
             return self._error(404, "not found")
+        except PermissionError as exc:
+            return self._error(403, str(exc))
         except ValueError as exc:
             return self._error(400, str(exc))
         except Exception as exc:  # noqa: BLE001

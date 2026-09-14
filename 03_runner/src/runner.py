@@ -357,11 +357,17 @@ def _chapter_meta(chapter_data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _merge_effects(target: dict[str, Any], effects: dict[str, Any] | None) -> None:
-    """把一步里先后生效的多组 effects 合成一份记录（数值增量相加，其余后者覆盖）。
+    """把一步里先后生效的多组 effects 合成一份记录。
+
+    合并语义必须与 state.apply_effects 一致：`*_override` 是赋值，同一步里后写的
+    直接盖掉先写的，绝不能相加；其余数值是增量，相加；非数值后者覆盖。
     只用于结果记录与事件展示；真正的状态更新仍由 state.apply_effects 逐组完成。"""
     if not effects:
         return
     for key, value in effects.items():
+        if key.endswith("_override"):
+            target[key] = copy.deepcopy(value)
+            continue
         current = target.get(key)
         if (
             isinstance(current, (int, float))

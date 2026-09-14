@@ -116,7 +116,11 @@
   .outcome .lbl { color: var(--muted); letter-spacing: .08em; text-transform: uppercase; font-size: 11px; margin-right: 4px; }
   .eff { font-family: var(--mono); padding: 1px 8px; border-radius: 6px; background: var(--bg-3); border: 1px solid var(--line); color: var(--muted); }
   .eff.up { color: var(--ok); } .eff.down { color: var(--bad); } .eff.res { color: var(--warn); border-color: rgba(251,191,36,.4); }
+  .eff.set { color: var(--fg); border-style: dashed; }
   body.no-god .outcome { display: none; }
+  /* tier 是 system 层对结局好坏的评价，被测 AI 看不到，关掉上帝视角时一并隐藏 */
+  body.no-god .tier, body.no-god .summary th:last-child, body.no-god .summary td:last-child { display: none; }
+  body.no-god #side-list .dot { display: none; }
 
   .ending { border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; background: radial-gradient(120% 100% at 0% 0%, rgba(56,189,248,.12), var(--bg-2) 60%); }
   .ending .k { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
@@ -256,7 +260,7 @@ const I18N = {
     tokens: 'token 用量', campaign_summary: '整局回顾', col_chapter: '章节', col_ending: '结局', col_tier: '评价', stop: '■ 停止',
     step_play: '▶ 逐步回放', show_all: '⏭ 全部展示', no_runs: '还没有运行记录', no_results: '结果目录为空', samples: '样例',
     loading: '加载中…', node: '节点', narrative_only: '（剧情节点，无需选择）', started: '开始于', error: '错误', stderr: 'runner 输出（stderr）',
-    campaign_failed: '整局中断', missing_chapters: '缺少以下章节的结果文件，请一并拖入：', chapters_of: '章', decisions: '步',
+    campaign_failed: '整局中断', campaign_unknown: '整局回顾（状态未记录）', missing_chapters: '缺少以下章节的结果文件，请一并拖入：', chapters_of: '章', decisions: '步',
     campaign: '整局', single: '单章', dryrun_short: 'dry-run', cli_needed: '需要本机安装并登录',
   },
   en: {
@@ -273,7 +277,7 @@ const I18N = {
     tokens: 'token usage', campaign_summary: 'Campaign recap', col_chapter: 'Chapter', col_ending: 'Ending', col_tier: 'Tier', stop: '■ Stop',
     step_play: '▶ Step replay', show_all: '⏭ Show all', no_runs: 'No runs yet', no_results: 'Results directory is empty', samples: 'Samples',
     loading: 'Loading…', node: 'node', narrative_only: '(narrative node, no choice)', started: 'started', error: 'Error', stderr: 'runner output (stderr)',
-    campaign_failed: 'Campaign interrupted', missing_chapters: 'Missing chapter result files — please drop them too:', chapters_of: 'ch', decisions: 'steps',
+    campaign_failed: 'Campaign interrupted', campaign_unknown: 'Campaign review (status not recorded)', missing_chapters: 'Missing chapter result files — please drop them too:', chapters_of: 'ch', decisions: 'steps',
     campaign: 'campaign', single: 'chapter', dryrun_short: 'dry-run', cli_needed: 'requires the CLI installed and logged in',
   },
 };
@@ -309,6 +313,8 @@ $('god-toggle').onchange = e => {
   godView = e.target.checked;
   document.body.classList.toggle('no-god', !godView);
   try { localStorage.setItem('detroit.god', godView ? '1' : '0'); } catch (err) {}
+  // 首页列表里的 tier 是纯文本，CSS 盖不住，切换时要重绘
+  if (!$('home').classList.contains('hidden')) renderResultsList();
 };
 
 // ---------------------------------------------------------------------------
@@ -480,7 +486,7 @@ function renderResultsList() {
     <div class="item" data-name="${esc(r.name)}">
       <div class="grow">
         <div class="title">${r.kind === 'campaign' ? t('campaign') : chapterTitle(r.chapter)} · ${esc(r.model)} · ${esc(r.persona)} · ${esc(r.difficulty)}</div>
-        <div class="meta">${r.kind === 'campaign' ? `${(r.chapters || []).length} ${t('chapters_of')} · ${esc(r.status || '')}` : `${esc(r.ending_title || r.ending_id || '')}${r.tier ? ` · ${esc(r.tier)}` : ''} · ${r.decision_count ?? ''} ${t('decisions')}`} · ${fmtTime(r.timestamp)}</div>
+        <div class="meta">${r.kind === 'campaign' ? `${(r.chapters || []).length} ${t('chapters_of')} · ${esc(r.status || '')}` : `${esc(r.ending_title || r.ending_id || '')}${r.tier && godView ? ` · ${esc(r.tier)}` : ''} · ${r.decision_count ?? ''} ${t('decisions')}`} · ${fmtTime(r.timestamp)}</div>
       </div>
     </div>`).join('');
   box.querySelectorAll('[data-name]').forEach(el => el.onclick = () => openResultByName(el.dataset.name));
@@ -577,7 +583,10 @@ function campaignToEvents(campaign) {
     endings.push({ index: ref.chapter_index, id: ref.chapter, ending_id: data.ending?.id, ending_title: data.ending?.title, tier: data.ending?.tier });
   }
   if (missing.length) events.push({ type: 'error', message: `${t('missing_chapters')} ${missing.join(', ')}` });
-  events.push({ type: 'campaign_end', campaign_id: campaign.campaign_id, status: campaign.status, chapters: endings });
+  // 旧版整局结果文件没有 status 字段。结果文件只在整局正常跑完时才写出，
+  // 因此每章都有结局即视为完成；否则标为未知，而不是一律报中断。
+  const inferred = endings.length && endings.every(e => e.ending_id) ? 'complete' : 'unknown';
+  events.push({ type: 'campaign_end', campaign_id: campaign.campaign_id, status: campaign.status || inferred, chapters: endings });
   return events;
 }
 
@@ -803,8 +812,14 @@ function renderOutcome(ev) {
   const chips = [];
   if (ev.resolution_result && !String(ev.resolution_result).startsWith('ending_')) chips.push(`<span class="eff res">${esc(String(ev.resolution_result).replace(/_/g, ' '))}</span>`);
   for (const [k, v] of Object.entries(ev.effects_applied || {})) {
-    if (typeof v === 'number') chips.push(`<span class="eff ${v > 0 ? 'up' : v < 0 ? 'down' : ''}">${esc(k)} ${v > 0 ? '+' : ''}${v}</span>`);
-    else chips.push(`<span class="eff">${esc(k)} = ${esc(Array.isArray(v) ? v.join(', ') : String(v))}</span>`);
+    // `x_override` 在 runner 里是「把 x 设为该值」，不是增量。显示真实变量名和等号，
+    // 否则 pressure_count_override: 4 会被误读成「压力 +4」。
+    const isOverride = k.endsWith('_override');
+    const name = isOverride ? k.slice(0, -'_override'.length) : k;
+    const text = Array.isArray(v) ? v.join(', ') : String(v);
+    if (isOverride) chips.push(`<span class="eff set">${esc(name)} = ${esc(text)}</span>`);
+    else if (typeof v === 'number') chips.push(`<span class="eff ${v > 0 ? 'up' : v < 0 ? 'down' : ''}">${esc(name)} ${v > 0 ? '+' : ''}${v}</span>`);
+    else chips.push(`<span class="eff">${esc(name)} = ${esc(text)}</span>`);
   }
   if (!chips.length) return '';
   return `<div class="outcome"><span class="lbl">${t('outcome')}</span>${chips.join('')}</div>`;
@@ -832,7 +847,8 @@ function appendCampaignSummary(ev) {
   const el = document.createElement('div');
   el.className = 'ending'; el.dataset.order = ++app.run.order;
   const rows = (ev.chapters || []).map(c => `<tr><td>${String(c.index).padStart(2, '0')} ${esc((uiLang === 'zh' && CHAPTER_BY_ID[c.id]?.title_zh) || CHAPTER_BY_ID[c.id]?.title || c.id)}</td><td>${esc(c.ending_title || c.ending_id || '')}</td><td>${c.tier ? `<span class="tier ${tierClass(c.tier)}">${esc(c.tier)}</span>` : ''}</td></tr>`).join('');
-  el.innerHTML = `<div class="k">${ev.status === 'complete' ? t('campaign_summary') : t('campaign_failed')}</div><table class="summary"><thead><tr><th>${t('col_chapter')}</th><th>${t('col_ending')}</th><th>${t('col_tier')}</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const headline = ev.status === 'complete' ? t('campaign_summary') : ev.status === 'failed' ? t('campaign_failed') : t('campaign_unknown');
+  el.innerHTML = `<div class="k">${headline}</div><table class="summary"><thead><tr><th>${t('col_chapter')}</th><th>${t('col_ending')}</th><th>${t('col_tier')}</th></tr></thead><tbody>${rows}</tbody></table>`;
   $('feed').appendChild(el);
   autoScroll(el);
 }

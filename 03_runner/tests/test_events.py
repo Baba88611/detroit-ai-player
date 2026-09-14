@@ -234,3 +234,39 @@ def test_runner_without_on_event_keeps_legacy_result_shape(tmp_path):
     }
     assert legacy_keys <= set(result["decisions"][0].keys())
     assert set(result.keys()) == {"experiment_id", "timestamp", "config", "decisions", "ending", "all_endings", "token_usage"}
+
+
+def test_merge_effects_treats_override_as_assignment_not_increment():
+    """`*_override` 在 state.apply_effects 里是赋值，合并记录时不能相加。
+
+    一步里 effects 和 resolution_effects 可能都写同一个 _override 键，
+    若按增量相加，结果文件和界面会显示出一个游戏里从未出现过的数值。
+    """
+    from runner import _merge_effects
+
+    merged = {}
+    _merge_effects(merged, {"pressure_count_override": 4, "success_probability": 10})
+    _merge_effects(merged, {"pressure_count_override": 2, "success_probability": -3})
+
+    assert merged["pressure_count_override"] == 2, "赋值应后者覆盖前者，不是 4+2"
+    assert merged["success_probability"] == 7, "普通数值仍按增量相加"
+
+
+def test_merge_effects_matches_apply_effects_for_override():
+    """合并出来的记录与真实状态更新结果必须一致。"""
+    from state import apply_effects
+    from runner import _merge_effects
+
+    state = {"pressure_count": 0, "success_probability": 50}
+    groups = [{"pressure_count_override": 4}, {"pressure_count_override": 2, "success_probability": 5}]
+
+    merged = {}
+    for group in groups:
+        apply_effects(state, group)
+        _merge_effects(merged, group)
+
+    assert state["pressure_count"] == 2
+    # 把合并记录重放到初始状态上，应得到同样的结果
+    replayed = apply_effects({"pressure_count": 0, "success_probability": 50}, merged)
+    assert replayed["pressure_count"] == state["pressure_count"]
+    assert replayed["success_probability"] == state["success_probability"]

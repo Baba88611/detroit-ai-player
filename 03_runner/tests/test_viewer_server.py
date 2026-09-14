@@ -52,11 +52,14 @@ def _get(base: str, path: str):
         return response.status, json.loads(response.read().decode("utf-8"))
 
 
-def _post(base: str, path: str, payload: dict, content_type: str = "application/json"):
+def _post(base: str, path: str, payload: dict, content_type: str = "application/json", origin: str | None = None):
+    headers = {"Content-Type": content_type}
+    if origin:
+        headers["Origin"] = origin
     request = urllib.request.Request(
         base + path,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": content_type},
+        headers=headers,
         method="POST",
     )
     try:
@@ -183,3 +186,67 @@ def test_result_and_sample_paths_reject_traversal(server):
     assert _status(base, "/samples/../serve.py") in (400, 404)
     assert _status(base, "/03_runner/.env") == 404
     assert _status(base, "/api/runs/zzzzzzzz") == 404
+
+
+def test_stop_endpoint_rejects_cross_site_and_non_json_requests(server):
+    """停止接口和开局接口一样要过同源与 JSON 校验。
+
+    text/plain 是浏览器的「简单请求」，不触发预检；停止接口早先没做校验，
+    恶意站点只要猜到 run id 就能打断实验。
+    """
+    base, _ = server
+    started = _post(base, "/api/runs", {"mode": "chapter", "dry_run": True, "chapter_ids": ["ch01_the_hostage"]})
+    assert started[0] == 201
+    run_id = started[1]["run_id"]
+    stop_path = f"/api/runs/{run_id}/stop"
+
+    # 跨站 Origin：拒绝
+    assert _post(base, stop_path, {}, origin="http://evil.example")[0] == 403
+    # 非 JSON Content-Type：拒绝
+    assert _post(base, stop_path, {}, content_type="text/plain")[0] == 400
+    # 开局接口同样拒绝跨站
+    assert _post(base, "/api/runs", {"mode": "chapter", "dry_run": True, "chapter_ids": ["ch01_the_hostage"]},
+                 origin="http://evil.example")[0] == 403
+    # 同源请求仍然放行
+    assert _post(base, stop_path, {}, origin=base)[0] in (200, 404)
+
+
+def test_stop_kills_the_whole_process_group(serve, tmp_path):
+    """停止必须连 runner 派生的子进程一起收掉。
+
+    claude / codex 后端由 runner 再 spawn 一个 CLI 子进程；只 terminate runner
+    会留下孤儿继续跑、继续烧额度。这里用一个「父进程派生子进程后自己退出」的
+    受控进程树复现该场景。
+    """
+    import os
+    import subprocess
+    import sys
+    import time
+
+    if os.name == "nt":
+        pytest.skip("进程组语义仅在 POSIX 上验证")
+
+    marker = tmp_path / "child_alive.txt"
+    # 父进程 spawn 一个长命子进程，然后自己保持运行；子进程持续写心跳文件
+    child_code = (
+        "import time,sys\n"
+        f"p=open({str(marker)!r},'a')\n"
+        "while True:\n"
+        "    p.write('x'); p.flush(); time.sleep(0.05)\n"
+    )
+    parent_code = (
+        "import subprocess,sys,time\n"
+        f"subprocess.Popen([sys.executable,'-c',{child_code!r}])\n"
+        "time.sleep(60)\n"
+    )
+    proc = subprocess.Popen([sys.executable, "-c", parent_code], start_new_session=True)
+    time.sleep(1.0)
+    assert marker.exists(), "子进程应当已经启动"
+
+    serve._terminate_process_group(proc, grace_seconds=2.0)
+    proc.wait(timeout=5)
+    time.sleep(0.5)
+
+    size_after_kill = marker.stat().st_size
+    time.sleep(0.7)
+    assert marker.stat().st_size == size_after_kill, "子进程在父进程被终止后仍在写入，说明没有整组终止"
