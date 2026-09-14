@@ -236,37 +236,84 @@ def test_runner_without_on_event_keeps_legacy_result_shape(tmp_path):
     assert set(result.keys()) == {"experiment_id", "timestamp", "config", "decisions", "ending", "all_endings", "token_usage"}
 
 
-def test_merge_effects_treats_override_as_assignment_not_increment():
-    """`*_override` 在 state.apply_effects 里是赋值，合并记录时不能相加。
+def test_effects_applied_matches_real_state_for_interleaved_increment_and_override():
+    """增量与赋值在同一步交错时，记录重放必须等于真实状态。
 
-    一步里 effects 和 resolution_effects 可能都写同一个 _override 键，
-    若按增量相加，结果文件和界面会显示出一个游戏里从未出现过的数值。
+    审查给出的用例：初始 0，先 +1，再「设为 4 并 +2」，真实结果是 6。
+    按字面合并 effects 字典会得出 4，与实际不符。
     """
-    from runner import _merge_effects
+    import copy
 
-    merged = {}
-    _merge_effects(merged, {"pressure_count_override": 4, "success_probability": 10})
-    _merge_effects(merged, {"pressure_count_override": 2, "success_probability": -3})
-
-    assert merged["pressure_count_override"] == 2, "赋值应后者覆盖前者，不是 4+2"
-    assert merged["success_probability"] == 7, "普通数值仍按增量相加"
-
-
-def test_merge_effects_matches_apply_effects_for_override():
-    """合并出来的记录与真实状态更新结果必须一致。"""
     from state import apply_effects
-    from runner import _merge_effects
+    from runner import _effects_applied
 
-    state = {"pressure_count": 0, "success_probability": 50}
-    groups = [{"pressure_count_override": 4}, {"pressure_count_override": 2, "success_probability": 5}]
+    init = {"pressure_count": 0}
+    groups = [{"pressure_count": 1}, {"pressure_count_override": 4, "pressure_count": 2}]
 
-    merged = {}
+    after = copy.deepcopy(init)
     for group in groups:
-        apply_effects(state, group)
-        _merge_effects(merged, group)
+        apply_effects(after, group)
+    assert after["pressure_count"] == 6
 
-    assert state["pressure_count"] == 2
-    # 把合并记录重放到初始状态上，应得到同样的结果
-    replayed = apply_effects({"pressure_count": 0, "success_probability": 50}, merged)
-    assert replayed["pressure_count"] == state["pressure_count"]
-    assert replayed["success_probability"] == state["success_probability"]
+    record = _effects_applied(groups, copy.deepcopy(init), after)
+    replayed = apply_effects(copy.deepcopy(init), record)
+    assert replayed["pressure_count"] == 6
+
+
+def test_effects_applied_keeps_plain_increments_readable():
+    """全程只有普通增量时仍记为增量，界面才能显示 +1 / −5。"""
+    import copy
+
+    from state import apply_effects
+    from runner import _effects_applied
+
+    init = {"success_probability": 50, "software_instability": 0}
+    groups = [{"success_probability": -5, "software_instability": 1}]
+    after = copy.deepcopy(init)
+    for group in groups:
+        apply_effects(after, group)
+
+    record = _effects_applied(groups, copy.deepcopy(init), after)
+    assert record == {"success_probability": -5, "software_instability": 1}
+    assert apply_effects(copy.deepcopy(init), record) == after
+
+
+def test_effects_applied_replay_equivalence_property():
+    """随机化属性测试：任意效果序列，记录重放后被触及的变量都要与真实状态一致。
+
+    合并不能只看 effects 字典——apply_effects 判断增量还是替换取决于当前状态值，
+    所以记录必须从真实前后状态推导。这条测试是该保证的看门人。
+    """
+    import copy
+    import random
+
+    from state import apply_effects
+    from runner import _effects_applied
+
+    random.seed(20260914)
+    names = ["a", "b", "c"]
+    pool = [0, 5, None, "x", [], True, 2.5]
+
+    def random_value():
+        return random.choice([random.randint(-5, 5), "s1", [1], True, False, 1.5])
+
+    for _ in range(2000):
+        init = {name: random.choice(pool) for name in names}
+        groups = []
+        for _ in range(random.randint(1, 4)):
+            group = {}
+            for _ in range(random.randint(1, 3)):
+                name = random.choice(names)
+                key = name + "_override" if random.random() < 0.4 else name
+                group[key] = random_value()
+            groups.append(group)
+
+        after = copy.deepcopy(init)
+        for group in groups:
+            apply_effects(after, group)
+
+        record = _effects_applied(groups, copy.deepcopy(init), after)
+        replayed = apply_effects(copy.deepcopy(init), record)
+        touched = {k[: -len("_override")] if k.endswith("_override") else k for k in record}
+        for name in touched:
+            assert replayed[name] == after[name], (init, groups, record)

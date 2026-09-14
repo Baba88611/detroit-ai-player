@@ -201,7 +201,9 @@ def run_experiment(
             )
 
             node_system = node.get("system", {})
-            effects_applied: dict[str, Any] = {}
+            # 记录本步之前的状态与各组 effects，用于事后推导「实际生效了什么」
+            state_before = snapshot(state)
+            effect_groups: list[dict[str, Any]] = []
             latency_ms: int | None = None
             if choices:
                 started = time.perf_counter()
@@ -212,13 +214,13 @@ def run_experiment(
                 messages = trial_messages + [{"role": "assistant", "content": ai_result["raw"]}]
                 effects = node_system.get("effects", {}).get(choice_id, {})
                 apply_effects(state, effects)
-                _merge_effects(effects_applied, effects)
+                effect_groups.append(effects)
                 _record_choice_aliases(state, node["id"], choice_id)
                 result = resolve_post_choice_result(node, choice_id, state, difficulty)
                 if result:
                     resolution_effs = node_system.get("resolution_effects", {}).get(result, {})
                     apply_effects(state, resolution_effs)
-                    _merge_effects(effects_applied, resolution_effs)
+                    effect_groups.append(resolution_effs)
                 ai_raw = ai_result["raw"]
                 ai_reasoning = ai_result["reasoning"]
                 ai_choice_text = selected_choice["text"]
@@ -227,12 +229,12 @@ def run_experiment(
                 messages = trial_messages
                 effects = node_system.get("effects", {})
                 apply_effects(state, effects)
-                _merge_effects(effects_applied, effects)
+                effect_groups.append(effects)
                 result = _resolve_mandatory_result(node, state)
                 if result and result.startswith("ending_"):
                     ending_effs = node_system.get("ending_effects", {}).get(result, {})
                     apply_effects(state, ending_effs)
-                    _merge_effects(effects_applied, ending_effs)
+                    effect_groups.append(ending_effs)
                 ai_raw = None
                 ai_reasoning = None
                 ai_choice_text = None
@@ -246,6 +248,7 @@ def run_experiment(
                     if node["id"] == "n011_final_choice":
                         state["_n011_result"] = result
 
+            effects_applied = _effects_applied(effect_groups, state_before, state)
             state_after = snapshot(state)
             decisions.append(
                 {
@@ -356,28 +359,57 @@ def _chapter_meta(chapter_data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _merge_effects(target: dict[str, Any], effects: dict[str, Any] | None) -> None:
-    """把一步里先后生效的多组 effects 合成一份记录。
+_OVERRIDE_SUFFIX = "_override"
 
-    合并语义必须与 state.apply_effects 一致：`*_override` 是赋值，同一步里后写的
-    直接盖掉先写的，绝不能相加；其余数值是增量，相加；非数值后者覆盖。
-    只用于结果记录与事件展示；真正的状态更新仍由 state.apply_effects 逐组完成。"""
-    if not effects:
-        return
-    for key, value in effects.items():
-        if key.endswith("_override"):
-            target[key] = copy.deepcopy(value)
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _effects_applied(groups: list[dict[str, Any]], before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    """算出「本步实际生效了什么」，用于结果记录与界面展示。
+
+    硬性保证：把这份记录重放到本步之前的状态上，被触及的变量必须与真实状态一致。
+
+    不能靠合并 effects 字典来得到这个记录。state.apply_effects 判断一个效果是增量
+    还是替换，取决于**当前状态里的值**（当前是数值才相加，否则整体替换），而且同一
+    变量的 `x` 与 `x_override` 在一步里可能交错。所以这里从真实前后状态推导，并对
+    每个变量挑选第一个**经过实测**能重放出正确结果的写法：
+
+    1. `<变量>: 差值` —— 最可读，界面上显示成 +1 / −5
+    2. `<变量>: 最终值` —— 普通替换，布尔标志、列表等走这条
+    3. `<变量>_override: 最终值` —— 兜底，语义上就是赋值，必然成立
+    """
+    touched: list[str] = []
+    seen: set[str] = set()
+    for group in groups:
+        for key in (group or {}):
+            name = key[: -len(_OVERRIDE_SUFFIX)] if key.endswith(_OVERRIDE_SUFFIX) else key
+            if name not in seen:
+                seen.add(name)
+                touched.append(name)
+
+    def replays_correctly(key: str, value: Any, name: str) -> bool:
+        probe = {name: copy.deepcopy(before.get(name))}
+        apply_effects(probe, {key: value})
+        return probe.get(name) == after.get(name)
+
+    out: dict[str, Any] = {}
+    for name in touched:
+        before_value, after_value = before.get(name), after.get(name)
+
+        if _is_number(before_value) and _is_number(after_value):
+            delta = after_value - before_value
+            if replays_correctly(name, delta, name):
+                out[name] = delta
+                continue
+
+        if replays_correctly(name, after_value, name):
+            out[name] = copy.deepcopy(after_value)
             continue
-        current = target.get(key)
-        if (
-            isinstance(current, (int, float))
-            and not isinstance(current, bool)
-            and isinstance(value, (int, float))
-            and not isinstance(value, bool)
-        ):
-            target[key] = current + value
-        else:
-            target[key] = copy.deepcopy(value)
+
+        out[f"{name}{_OVERRIDE_SUFFIX}"] = copy.deepcopy(after_value)
+    return out
 
 
 def build_llm_client_from_model_registry(

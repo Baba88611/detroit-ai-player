@@ -23,6 +23,7 @@ import signal
 import subprocess
 import sys
 import threading
+import time
 import uuid
 import webbrowser
 from datetime import datetime, timezone
@@ -171,32 +172,78 @@ def chapter_paths_by_id(config: AppConfig, language: str) -> dict[str, Path]:
 # ---------------------------------------------------------------------------
 
 
+def _group_is_alive(pgid: int | None) -> bool:
+    """进程组里是否还有活着的成员。signal 0 只做存在性探测，不真的发信号。"""
+    if pgid is None:
+        return False
+    try:
+        os.killpg(pgid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # 组还在，只是我们没权限发信号
+        return True
+
+
 def _terminate_process_group(proc: subprocess.Popen, grace_seconds: float = 5.0) -> None:
     """终止整个进程组，而不只是 runner 自己。
 
     runner 用 claude / codex 这类 CLI 后端时会再派生子进程；只对 runner 发信号会让
-    子进程变成孤儿继续运行。先对整组发 SIGTERM 给它清理的机会，超时后再 SIGKILL。
+    子进程变成孤儿继续运行。
+
+    两个容易踩的坑：
+    1. 组 id 必须在发信号**之前**取。父进程一旦退出并被回收，`os.getpgid` 就失败，
+       后面再想整组升级就没有目标了。
+    2. 宽限期要等**整组**结束，而不是只等父进程退出。子进程若忽略 SIGTERM 而父进程
+       立刻退出，只等父进程会让函数提前返回，SIGKILL 永远不会发出。
+
     Windows 上没有进程组信号语义，退回到 terminate/kill。
     """
+    pgid: int | None = None
+    if os.name != "nt":
+        try:
+            pgid = os.getpgid(proc.pid)
+        except (ProcessLookupError, PermissionError):
+            pgid = None
 
     def signal_group(sig: int) -> None:
-        if os.name == "nt":
-            proc.kill() if sig == signal.SIGKILL else proc.terminate()
+        if os.name == "nt" or pgid is None:
+            try:
+                proc.kill() if sig == signal.SIGKILL else proc.terminate()
+            except ProcessLookupError:
+                pass
             return
         try:
-            os.killpg(os.getpgid(proc.pid), sig)
+            os.killpg(pgid, sig)
         except (ProcessLookupError, PermissionError):
-            # 组已经没了，或拿不到组 id，退回到只处理 runner 本身
             try:
                 proc.kill() if sig == signal.SIGKILL else proc.terminate()
             except ProcessLookupError:
                 pass
 
     signal_group(signal.SIGTERM)
+
+    # 先把父进程收掉，避免僵尸占着组
     try:
         proc.wait(timeout=grace_seconds)
     except subprocess.TimeoutExpired:
+        pass
+
+    # 再等整组退干净；宽限期内还有成员存活就升级到 SIGKILL
+    deadline = time.monotonic() + grace_seconds
+    while time.monotonic() < deadline:
+        if not _group_is_alive(pgid):
+            break
+        time.sleep(0.1)
+
+    if _group_is_alive(pgid):
         signal_group(signal.SIGKILL)
+
+    try:
+        proc.wait(timeout=grace_seconds)
+    except subprocess.TimeoutExpired:
+        pass
 
 
 class RunManager:

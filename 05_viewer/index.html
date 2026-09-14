@@ -260,7 +260,7 @@ const I18N = {
     tokens: 'token 用量', campaign_summary: '整局回顾', col_chapter: '章节', col_ending: '结局', col_tier: '评价', stop: '■ 停止',
     step_play: '▶ 逐步回放', show_all: '⏭ 全部展示', no_runs: '还没有运行记录', no_results: '结果目录为空', samples: '样例',
     loading: '加载中…', node: '节点', narrative_only: '（剧情节点，无需选择）', started: '开始于', error: '错误', stderr: 'runner 输出（stderr）',
-    campaign_failed: '整局中断', campaign_unknown: '整局回顾（状态未记录）', missing_chapters: '缺少以下章节的结果文件，请一并拖入：', chapters_of: '章', decisions: '步',
+    campaign_failed: '整局中断', campaign_partial: '整局未完成（进行中的检查点）', campaign_unknown: '整局回顾（状态未记录）', missing_chapters: '缺少以下章节的结果文件，请一并拖入：', chapters_of: '章', decisions: '步',
     campaign: '整局', single: '单章', dryrun_short: 'dry-run', cli_needed: '需要本机安装并登录',
   },
   en: {
@@ -277,7 +277,7 @@ const I18N = {
     tokens: 'token usage', campaign_summary: 'Campaign recap', col_chapter: 'Chapter', col_ending: 'Ending', col_tier: 'Tier', stop: '■ Stop',
     step_play: '▶ Step replay', show_all: '⏭ Show all', no_runs: 'No runs yet', no_results: 'Results directory is empty', samples: 'Samples',
     loading: 'Loading…', node: 'node', narrative_only: '(narrative node, no choice)', started: 'started', error: 'Error', stderr: 'runner output (stderr)',
-    campaign_failed: 'Campaign interrupted', campaign_unknown: 'Campaign review (status not recorded)', missing_chapters: 'Missing chapter result files — please drop them too:', chapters_of: 'ch', decisions: 'steps',
+    campaign_failed: 'Campaign interrupted', campaign_partial: 'Campaign incomplete (in-progress checkpoint)', campaign_unknown: 'Campaign review (status not recorded)', missing_chapters: 'Missing chapter result files — please drop them too:', chapters_of: 'ch', decisions: 'steps',
     campaign: 'campaign', single: 'chapter', dryrun_short: 'dry-run', cli_needed: 'requires the CLI installed and logged in',
   },
 };
@@ -608,6 +608,9 @@ function goHome() {
   app.run = null;
   $('run').classList.add('hidden'); $('home').classList.remove('hidden'); $('btn-home').classList.add('hidden'); $('status').classList.add('hidden');
   if (app.mode === 'local') { refreshRuns(); refreshResults(); }
+  // 静态模式没有 refreshResults，仍要重绘：列表里的评价是纯文本，
+  // 上帝视角在回放页被切换过时，返回首页必须按最新状态重画。
+  else renderResultsList();
 }
 function setStatus(status, extra) {
   const dot = $('status').querySelector('.dot');
@@ -847,7 +850,12 @@ function appendCampaignSummary(ev) {
   const el = document.createElement('div');
   el.className = 'ending'; el.dataset.order = ++app.run.order;
   const rows = (ev.chapters || []).map(c => `<tr><td>${String(c.index).padStart(2, '0')} ${esc((uiLang === 'zh' && CHAPTER_BY_ID[c.id]?.title_zh) || CHAPTER_BY_ID[c.id]?.title || c.id)}</td><td>${esc(c.ending_title || c.ending_id || '')}</td><td>${c.tier ? `<span class="tier ${tierClass(c.tier)}">${esc(c.tier)}</span>` : ''}</td></tr>`).join('');
-  const headline = ev.status === 'complete' ? t('campaign_summary') : ev.status === 'failed' ? t('campaign_failed') : t('campaign_unknown');
+  // runner 每完成一章就覆盖写一次检查点，未跑完时 status 是 partial。
+  // 只有真正缺失或不认识的状态才用中性提示。
+  const headline = ev.status === 'complete' ? t('campaign_summary')
+    : ev.status === 'failed' ? t('campaign_failed')
+    : ev.status === 'partial' ? t('campaign_partial')
+    : t('campaign_unknown');
   el.innerHTML = `<div class="k">${headline}</div><table class="summary"><thead><tr><th>${t('col_chapter')}</th><th>${t('col_ending')}</th><th>${t('col_tier')}</th></tr></thead><tbody>${rows}</tbody></table>`;
   $('feed').appendChild(el);
   autoScroll(el);

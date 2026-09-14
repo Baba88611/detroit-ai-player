@@ -250,3 +250,52 @@ def test_stop_kills_the_whole_process_group(serve, tmp_path):
     size_after_kill = marker.stat().st_size
     time.sleep(0.7)
     assert marker.stat().st_size == size_after_kill, "子进程在父进程被终止后仍在写入，说明没有整组终止"
+
+
+def test_stop_kills_child_that_ignores_sigterm(serve, tmp_path):
+    """子进程忽略 SIGTERM、父进程立刻退出时，仍必须被 SIGKILL 收掉。
+
+    这是上一版的漏洞：宽限期只等父进程退出，父进程一走函数就返回，
+    永远不会升级到 SIGKILL，忽略 SIGTERM 的 CLI 子进程会一直跑下去。
+    """
+    import os
+    import subprocess
+    import sys
+    import time
+
+    if os.name == "nt":
+        pytest.skip("进程组语义仅在 POSIX 上验证")
+
+    marker = tmp_path / "stubborn.txt"
+    # 子进程显式忽略 SIGTERM；父进程收到 SIGTERM 立刻退出
+    child_code = (
+        "import signal,time\n"
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+        f"p=open({str(marker)!r},'a')\n"
+        "while True:\n"
+        "    p.write('x'); p.flush(); time.sleep(0.05)\n"
+    )
+    parent_code = (
+        "import subprocess,sys,time\n"
+        f"subprocess.Popen([sys.executable,'-c',{child_code!r}])\n"
+        "time.sleep(60)\n"
+    )
+    proc = subprocess.Popen([sys.executable, "-c", parent_code], start_new_session=True)
+    pgid = os.getpgid(proc.pid)
+    time.sleep(1.0)
+    assert marker.exists(), "子进程应当已经启动"
+
+    serve._terminate_process_group(proc, grace_seconds=1.5)
+
+    time.sleep(0.5)
+    size_after = marker.stat().st_size
+    time.sleep(0.8)
+    assert marker.stat().st_size == size_after, "忽略 SIGTERM 的子进程仍在写入，说明没有升级到 SIGKILL"
+
+    # 进程组必须已经空了
+    try:
+        os.killpg(pgid, 0)
+        alive = True
+    except ProcessLookupError:
+        alive = False
+    assert not alive, "进程组仍有成员存活"
