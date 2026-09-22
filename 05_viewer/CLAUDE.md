@@ -41,7 +41,13 @@ UI 开的一局与命令行开的一局产出完全相同的 `04_execution/resul
 
 ### 5. 样例来源
 
-`samples/` 里的结果文件必须由**当前**仓库的 `01_json/` 生成。旧版决策树（英文版去逐字台词改写之前）跑出的结果，其 `context_shown` 含旧文本，不得放进来。新增样例后运行 `python 05_viewer/samples/build_index.py` 重建清单。
+`samples/` 是公开站点唯一能回放的内容，只放**真实模型**跑出的结果：
+
+- 必须由**当前**仓库的 `01_json/` 生成。旧版决策树（英文版去逐字台词改写之前）跑出的结果，其 `context_shown` 含旧文本，不得放进来。
+- **不放 `scripted`（dry-run）产物。** 它是测试桩，永远选第 1 项、理由固定为 "scripted choice"，没有 AI 参与，放到公开站点会让人误以为那是 AI 的决策。dry-run 只用于本地验证链路。
+- 整局样例必须是完整跑完的（`status: complete`），且需连同它引用的各章结果文件一起放入，否则静态模式回放时会报缺章。
+
+新增样例后运行 `python 05_viewer/samples/build_index.py` 重建清单。界面会给 `scripted` 结果打上"演示桩"标记，但那是给本地 results 列表用的兜底，不是允许把它放进 samples 的理由。
 
 ## serve.py 接口
 
@@ -61,6 +67,8 @@ UI 开的一局与命令行开的一局产出完全相同的 `04_execution/resul
 运行状态：`running` / `finished` / `failed` / `interrupted`（服务器重启后仍标 running 的旧记录）。
 
 ## 事件流（由 runner 产出，UI 消费）
+
+JEV 的 decision_metadata.kind 为 typed_choice 时，卡片展示各选项概率和置信度，明确不提供文字理由；不能把 raw JSON 标成“AI 的思考”。实时与回放共用展示函数，回放优先使用结果中的 choices_with_ids 对齐概率。旧结果仍按原格式展示。
 
 `type` 取值与字段见 `03_runner/src/events.py` 顶部注释。前端把结果 JSON 也转换成同一套事件序列后渲染，实时与回放共用一条渲染路径；改事件 schema 时两侧同步。
 

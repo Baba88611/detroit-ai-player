@@ -1,6 +1,15 @@
 {
   "models": [
     {
+      "id": "jev",
+      "provider": "typesafe",
+      "base_url_env": "TYPESAFE_BASE_URL",
+      "model_name_env": "TYPESAFE_MODEL",
+      "api_key_env": "TYPESAFE_API_KEY",
+      "language": ["en", "zh"],
+      "notes": "TypeSafe JEV：Choice 决策、概率分布与置信度，无文字理由或温度参数。建议先测英文；中文能力需实测。"
+    },
+    {
       "id": "default",
       "provider": "openai",
       "base_url_env": "LLM_BASE_URL",

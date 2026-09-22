@@ -14,6 +14,7 @@ from typing import Any, Callable
 #   node_shown      {node_id, phase, node_type, context, choices:[{id,text}]}   —— 调 AI 之前发出
 #   decision        {node_id, choice_id, choice_text, reasoning, raw, latency_ms,
 #                    resolution_result, effects_applied, state_after}
+#                   decision_metadata? {kind:typed_choice, model, probabilities, confidence}
 #   narrative       {node_id, resolution_result, effects_applied, state_after}   —— 无选项节点
 #   chapter_end     {experiment_id, ending, all_endings, token_usage, result_file}
 #   campaign_end    {campaign_id, status, chapters:[{index,id,ending_id,ending_title,tier}]}

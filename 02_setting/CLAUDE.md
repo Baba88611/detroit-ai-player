@@ -56,6 +56,7 @@
 ```
 
 字段说明：
+- `typesafe` provider 调用 TypeSafe `/v1/systemone`，注册 ID 为 `jev`，变量为 `TYPESAFE_BASE_URL`、`TYPESAFE_MODEL`、`TYPESAFE_API_KEY`；新增协议必须先实现适配器，不能仅靠注册条目接入。
 - `id`：runner 命令行 `--model` 参数对应的标识符
 - `provider`：调用格式。`openai`（及其他普通 API provider 值）走 OpenAI 兼容的 `/chat/completions`；`anthropic` 走原生 Messages 接口；`cli` 走 Agent CLI
 - `base_url_env` / `model_name_env` / `api_key_env`：分别是端点地址、实际模型名、API 密钥对应的**环境变量名**（真实值在 `.env` 中定义）
@@ -71,7 +72,7 @@ CLI 后端额外字段：
 - `experimental_backend`：是否属于实验性、不可与其他后端严格等价比较的接入
 - `instruction_mode`：指令注入方式；Claude 为 `system_prompt_replacement`，Codex 为 `additional_developer`
 
-**新增一个 API 模型**：在此文件加一条记录（指定一组 `*_env` 变量名），在 `.env` 里填好这些变量，即可用 `--model <新 id>` 运行——runner 不需要改代码。最简用法直接用预设的 `default` 槽位（读 `LLM_*`）。新增 CLI 类型则必须在 `api_client.py` 中实现并验证独立的信息隔离策略。
+**新增一个使用已支持协议的 API 模型**：在此文件加一条记录（指定一组 `*_env` 变量名），在 `.env` 里填好这些变量，即可用 `--model <新 id>` 运行——runner 不需要改代码。最简用法直接用预设的 `default` 槽位（读 `LLM_*`）。全新协议需要适配器；新增 CLI 类型则必须在 `api_client.py` 中实现并验证独立的信息隔离策略。
 
 ## personas/ — 人格 prompt
 

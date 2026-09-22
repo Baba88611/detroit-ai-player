@@ -39,6 +39,8 @@ cp .env.example .env      # Windows: copy .env.example .env
 
 确认用户填好 key 后再运行。
 
+> TypeSafe JEV 使用独立后端：在本地 `.env` 中追加 `TYPESAFE_BASE_URL=https://api.typesafe.ai`、`TYPESAFE_MODEL=jev-1.13.0`，由用户自行填写 `TYPESAFE_API_KEY`，再用 `--model jev`。不能走 `default` 聊天接口。建议先试英文 ch01；JEV 的结果含概率和置信度，无文字理由，温度记为 N/A。详细说明见 README 的 TypeSafe JEV 小节。
+
 ### B. 用户没有 API key，但本机装了 Claude Code 并已登录
 
 用 `--model claude-code`，走用户的订阅会话，**无需 `.env`、无需任何 key**：

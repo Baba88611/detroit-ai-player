@@ -120,7 +120,11 @@ runner 是信息隔离的执行者。发送给被测 AI 的内容**只能来自�
 
 ### api_client.py — 模型调用
 
-按 `provider` 分派三条路径，统一封装在 `LLMClient`：
+**TypeSafe / JEV (`provider: typesafe`)：** 使用 HTTP `/v1/systemone` 的单个 Choice 问题；base URL 可为主机根路径或 `/v1`。只接收 runner 已筛选的消息与可用选项，不读取章节的 system 数据。候选项用从 1 开始的编号，避免模型看到内部选项 ID；角色、人格、完整章内历史和跨章摘要保留。Choice 指令明确覆盖原 prompt 的 JSON / reasoning 输出格式要求，保留其角色与行为约束。返回选择必须属于候选集且具有最高概率，概率值必须有限、在 0–1 内并合计为 1（容差 1e-5）；非法响应中止，不猜测或回退首项。429、529、其他 5xx 和网络故障指数退避，其他 4xx 不重试。
+
+JEV 不生成理由，`reasoning=null`；`raw` 保存完整 API JSON，`history_content` 仅包含选项编号与文字，用于后续对话。`decision_metadata` 保存 `kind=typed_choice`、实际模型版本、以游戏选项 ID 为键的 probabilities 和 confidence；结果与 decision 事件透传该对象。结果额外保存 `choices_with_ids`，保证回放能正确对齐概率。JEV 的 temperature 记 `N/A (typesafe)`，instruction_mode 记 `typed_choice`。模型名、用量由 API 返回记录。测试使用模拟 HTTP 响应，不需要真实 key。
+
+按 `provider` 分派，统一封装在 `LLMClient`（TypeSafe 路径见上文）：
 
 - `openai`（默认）：OpenAI 兼容接口 `/v1/chat/completions`，主流模型（GPT / GLM / DeepSeek 等）通用。
 - `anthropic`：原生 Anthropic Messages 接口 `/v1/messages`。
@@ -249,6 +253,11 @@ python src/campaign_runner.py \
 ```bash
 # 单章集成测试
 python -m pytest tests/test_with_ch01.py -v
+
+# TypeSafe 协议、错误响应、完整中英文 campaign（模拟 API，无需密钥）
+python -m pytest tests/test_typesafe.py -v
+# 查看器的 JEV 实时 / 回放、旧结果兼容与温度控件（Node.js 标准库）
+node tests/test_viewer_typesafe.cjs
 
 # campaign 模式测试（跨章状态传递、摘要注入、模板拼接）
 python -m pytest tests/test_campaign.py -v

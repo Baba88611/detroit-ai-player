@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -73,6 +74,8 @@ class LLMClient:
             "claude": "system_prompt_replacement",
             "codex": "additional_developer",
         }.get(cli_kind, "direct_messages")
+        if provider == "typesafe":
+            self.instruction_mode = "typed_choice"
         if provider == "cli":
             # CLI 后端驱动本机已登录的 agent（如 Claude Code），走用户自己的
             # 订阅会话，不需要 base_url / api_key / LLM_* 环境变量。
@@ -111,10 +114,100 @@ class LLMClient:
         choices: list[dict[str, str]],
         messages: list[dict[str, str]],
     ) -> dict[str, Any]:
+        if self.provider == "typesafe":
+            return self._choose_typesafe(node_id, choices, messages)
         raw_text = self._call_api(messages, choice_count=len(choices))
         if self.provider == "cli" and self.cli_kind == "codex":
             return self._parse_codex_response(raw_text, node_id, choices)
         return self._parse_response(raw_text, node_id, choices)
+
+    def _choose_typesafe(
+        self, node_id: str, choices: list[dict[str, str]], messages: list[dict[str, str]]
+    ) -> dict[str, Any]:
+        if not 1 <= len(choices) <= 255 or len({c["id"] for c in choices}) != len(choices):
+            raise ValueError("TypeSafe requires 1–255 uniquely identified choices")
+        # Only ordinal labels and player-facing text cross the API boundary.
+        criteria = {str(i): c["text"] for i, c in enumerate(choices, 1)}
+        system_text = "\n".join(m["content"] for m in messages if m["role"] == "system")
+        instructions = (
+            "你正在游玩叙事游戏。遵循 state.messages 中的角色、人格与行为约束，"
+            "根据完整历史，为最后一个场景选择你现在会采取的行动。"
+            "仅以本 Choice 的候选项作答；这取代消息中要求输出 JSON 或文字理由的格式指令。"
+            if self._contains_chinese(system_text) else
+            "You are playing a narrative game. Follow the role, persona and behavioral constraints "
+            "in state.messages. Using the full history, choose the action you would take in the "
+            "last scene. Answer this Choice using its supplied options; this replaces only the "
+            "messages' formatting instructions to output JSON or written reasoning."
+        )
+        payload = {
+            "model": self.model,
+            "state": {"messages": messages},
+            "questions": {"action": {
+                "type": "choice", "instructions": instructions, "criteria": criteria,
+            }},
+        }
+        root = self.base_url
+        url = f"{root}/systemone" if root.endswith("/v1") else f"{root}/v1/systemone"
+        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+        for attempt in range(self.max_retries):
+            status = None
+            try:
+                response = requests.post(url, headers=headers, json=payload, timeout=60)
+                status = response.status_code
+                response.raise_for_status()
+            except requests.RequestException:
+                # Do not echo server bodies, headers or exception URLs into logs.
+                retryable = status is None or status == 429 or status >= 500
+                if not retryable or attempt == self.max_retries - 1:
+                    detail = f"HTTP {status}" if status is not None else "network error"
+                    raise RuntimeError(f"TypeSafe API failed ({detail}) at node {node_id}") from None
+                time.sleep(2 ** attempt)
+                continue
+            try:
+                data = response.json()
+                answer = data["answers"]["action"]
+                chosen = answer["choice"]
+                probabilities = answer["probabilities"]
+                confidence = answer["confidence"]
+                version = data["model"]
+                usage = data["usage"]
+                input_tokens, output_tokens = usage["input_tokens"], usage["output_tokens"]
+                if answer["type"] != "choice" or not isinstance(chosen, str) or chosen not in criteria:
+                    raise ValueError("unavailable choice")
+                if not isinstance(probabilities, dict) or set(probabilities) != set(criteria):
+                    raise ValueError("incomplete probabilities")
+                values = [*probabilities.values(), confidence]
+                if any(type(v) not in (int, float) or not math.isfinite(v) or not 0 <= v <= 1 for v in values):
+                    raise ValueError("invalid probability or confidence")
+                if not math.isclose(sum(probabilities.values()), 1.0, rel_tol=0, abs_tol=1e-5):
+                    raise ValueError("probabilities do not sum to one")
+                if probabilities[chosen] < max(probabilities.values()):
+                    raise ValueError("choice is not highest probability")
+                if not isinstance(version, str) or not version.strip():
+                    raise ValueError("missing model version")
+                if any(type(v) is not int or v < 0 for v in (input_tokens, output_tokens)):
+                    raise ValueError("invalid usage")
+            except (ValueError, KeyError, TypeError, AttributeError, OverflowError):
+                raise ValueError(f"Invalid TypeSafe response at node {node_id}") from None
+
+            self.resolved_model = version
+            self.total_prompt_tokens += input_tokens
+            self.total_completion_tokens += output_tokens
+            selected = choices[int(chosen) - 1]
+            return {
+                "choice_id": selected["id"],
+                "reasoning": None,
+                "raw": json.dumps(data, ensure_ascii=False, allow_nan=False),
+                "history_content": json.dumps(
+                    {"choice": int(chosen), "text": selected["text"]}, ensure_ascii=False
+                ),
+                "decision_metadata": {
+                    "kind": "typed_choice", "model": version,
+                    "probabilities": {c["id"]: probabilities[str(i)] for i, c in enumerate(choices, 1)},
+                    "confidence": confidence,
+                },
+            }
+        raise RuntimeError("TypeSafe API requires a positive retry count")
 
     def token_usage(self) -> dict[str, int]:
         usage = {
