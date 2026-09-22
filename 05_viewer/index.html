@@ -112,6 +112,11 @@
   .reasoning .lbl { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); display: flex; justify-content: space-between; }
   .reasoning .lbl .lat { color: var(--muted); font-family: var(--mono); letter-spacing: 0; text-transform: none; }
   .reasoning p { margin: 4px 0 0; white-space: pre-wrap; }
+  .reasoning.scripted { border-left-color: var(--muted); }
+  .reasoning.scripted .lbl { color: var(--muted); }
+  .reasoning.scripted p { color: var(--muted); font-style: italic; }
+  .badge.demo { color: var(--warn); border: 1px solid rgba(251,191,36,.4); }
+  .item .tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(251,191,36,.4); color: var(--warn); margin-left: 6px; vertical-align: middle; }
   .outcome { margin-top: 10px; font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .outcome .lbl { color: var(--muted); letter-spacing: .08em; text-transform: uppercase; font-size: 11px; margin-right: 4px; }
   .eff { font-family: var(--mono); padding: 1px 8px; border-radius: 6px; background: var(--bg-3); border: 1px solid var(--line); color: var(--muted); }
@@ -247,6 +252,7 @@ const CHAPTER_BY_ID = Object.fromEntries(CHAPTERS.map(c => [c.id, c]));
 
 const I18N = {
   zh: {
+    typed_choice: '选择概率', confidence: '决策置信度', no_reasoning: '此模型不提供文字理由；选项概率不代表游戏行动的成功率。', typesafe_temp: 'JEV 不支持 temperature，结果中记为 N/A',
     home: '← 首页', god: '上帝视角', new_run: '开始一局', mode: '模式', mode_chapter: '单章', mode_campaign: '整局（多章连续）',
     language: '剧本语言', difficulty: '难度', model: '模型', persona: '人格 (persona)', temperature: 'temperature', chapter: '章节',
     chapters: '章节（按顺序连续执行，跨章记忆自动传递）', select_all: '全选', select_none: '清空', start: '▶ 开始',
@@ -256,14 +262,15 @@ const I18N = {
     footer: '被测 AI 只看到情境与选项；效果数值、判定与结局条件只呈现给你（上帝视角），不进入模型上下文。',
     not_configured: '未配置', experimental: '实验性', cli_temp: 'CLI 后端不支持 temperature，结果中记为 N/A', dry_temp: 'dry-run 不调用模型',
     status_running: '运行中', status_finished: '已完成', status_failed: '失败', status_interrupted: '已中断', status_replay: '回放',
-    thinking: 'AI 正在思考', reasoning: 'AI 的思考', outcome: '结果', ending: '结局', chapter_ending: '本章结局', survivors: '生还', deaths: '死亡',
+    thinking: 'AI 正在思考', reasoning: 'AI 的思考', scripted_reasoning: '脚本化选择（演示桩，不是 AI）', scripted_badge: '演示：scripted 是测试桩，永远选第 1 项，没有 AI 参与', outcome: '结果', ending: '结局', chapter_ending: '本章结局', survivors: '生还', deaths: '死亡',
     tokens: 'token 用量', campaign_summary: '整局回顾', col_chapter: '章节', col_ending: '结局', col_tier: '评价', stop: '■ 停止',
     step_play: '▶ 逐步回放', show_all: '⏭ 全部展示', no_runs: '还没有运行记录', no_results: '结果目录为空', samples: '样例',
     loading: '加载中…', node: '节点', narrative_only: '（剧情节点，无需选择）', started: '开始于', error: '错误', stderr: 'runner 输出（stderr）',
-    campaign_failed: '整局中断', campaign_partial: '整局未完成（进行中的检查点）', campaign_unknown: '整局回顾（状态未记录）', missing_chapters: '缺少以下章节的结果文件，请一并拖入：', chapters_of: '章', decisions: '步',
+    campaign_failed: '整局中断', campaign_partial: '整局未完成（进行中的检查点）', campaign_unknown: '整局回顾（状态未记录）', missing_chapters: '缺少以下章节的结果文件，请一并拖入：', chapters_of: '章', decisions: '步', demo_tag: '演示桩',
     campaign: '整局', single: '单章', dryrun_short: 'dry-run', cli_needed: '需要本机安装并登录',
   },
   en: {
+    typed_choice: 'Choice probabilities', confidence: 'Decision confidence', no_reasoning: 'This model provides no written rationale. Option probabilities are not in-game success rates.', typesafe_temp: 'JEV does not support temperature (recorded as N/A)',
     home: '← Home', god: "God's-eye view", new_run: 'New run', mode: 'Mode', mode_chapter: 'Single chapter', mode_campaign: 'Campaign (multi-chapter)',
     language: 'Script language', difficulty: 'Difficulty', model: 'Model', persona: 'Persona', temperature: 'temperature', chapter: 'Chapter',
     chapters: 'Chapters (run in order, cross-chapter memory carries over)', select_all: 'All', select_none: 'None', start: '▶ Start',
@@ -273,11 +280,11 @@ const I18N = {
     footer: "The AI under test only sees scenes and options; effect values, checks and ending conditions are shown to you only (god's-eye view) and never enter the model context.",
     not_configured: 'not configured', experimental: 'experimental', cli_temp: 'CLI backends ignore temperature (recorded as N/A)', dry_temp: 'dry-run makes no model calls',
     status_running: 'running', status_finished: 'finished', status_failed: 'failed', status_interrupted: 'interrupted', status_replay: 'replay',
-    thinking: 'AI is thinking', reasoning: "AI's reasoning", outcome: 'Outcome', ending: 'Ending', chapter_ending: 'Chapter ending', survivors: 'Survived', deaths: 'Died',
+    thinking: 'AI is thinking', reasoning: "AI's reasoning", scripted_reasoning: 'Scripted pick (test stub, not an AI)', scripted_badge: 'Demo: scripted is a test stub that always picks option 1, no AI involved', outcome: 'Outcome', ending: 'Ending', chapter_ending: 'Chapter ending', survivors: 'Survived', deaths: 'Died',
     tokens: 'token usage', campaign_summary: 'Campaign recap', col_chapter: 'Chapter', col_ending: 'Ending', col_tier: 'Tier', stop: '■ Stop',
     step_play: '▶ Step replay', show_all: '⏭ Show all', no_runs: 'No runs yet', no_results: 'Results directory is empty', samples: 'Samples',
     loading: 'Loading…', node: 'node', narrative_only: '(narrative node, no choice)', started: 'started', error: 'Error', stderr: 'runner output (stderr)',
-    campaign_failed: 'Campaign interrupted', campaign_partial: 'Campaign incomplete (in-progress checkpoint)', campaign_unknown: 'Campaign review (status not recorded)', missing_chapters: 'Missing chapter result files — please drop them too:', chapters_of: 'ch', decisions: 'steps',
+    campaign_failed: 'Campaign interrupted', campaign_partial: 'Campaign incomplete (in-progress checkpoint)', campaign_unknown: 'Campaign review (status not recorded)', missing_chapters: 'Missing chapter result files — please drop them too:', chapters_of: 'ch', decisions: 'steps', demo_tag: 'test stub',
     campaign: 'campaign', single: 'chapter', dryrun_short: 'dry-run', cli_needed: 'requires the CLI installed and logged in',
   },
 };
@@ -425,8 +432,9 @@ function updateModelHint() {
   const entry = m.models.find(x => x.id === modelSel.value) || {};
   modelSel.disabled = dry;
   const isCli = entry.provider === 'cli';
-  $('f-temperature').disabled = dry || isCli;
-  $('temp-hint').textContent = dry ? t('dry_temp') : (isCli ? t('cli_temp') : '');
+  const isTypesafe = entry.provider === 'typesafe';
+  $('f-temperature').disabled = dry || isCli || isTypesafe;
+  $('temp-hint').textContent = dry ? t('dry_temp') : (isCli ? t('cli_temp') : (isTypesafe ? t('typesafe_temp') : ''));
   const unconfigured = m.models.filter(x => !x.configured);
   $('model-hint').innerHTML = [
     entry.notes ? esc(entry.notes) : '',
@@ -485,7 +493,7 @@ function renderResultsList() {
   box.innerHTML = items.filter(r => r.kind !== 'chapter' || !r.campaign_member).slice(0, 40).map(r => `
     <div class="item" data-name="${esc(r.name)}">
       <div class="grow">
-        <div class="title">${r.kind === 'campaign' ? t('campaign') : chapterTitle(r.chapter)} · ${esc(r.model)} · ${esc(r.persona)} · ${esc(r.difficulty)}</div>
+        <div class="title">${r.kind === 'campaign' ? t('campaign') : chapterTitle(r.chapter)} · ${esc(r.model)} · ${esc(r.persona)} · ${esc(r.difficulty)}${r.model === 'scripted' ? `<span class="tag">${t('demo_tag')}</span>` : ''}</div>
         <div class="meta">${r.kind === 'campaign' ? `${(r.chapters || []).length} ${t('chapters_of')} · ${esc(r.status || '')}` : `${esc(r.ending_title || r.ending_id || '')}${r.tier && godView ? ` · ${esc(r.tier)}` : ''} · ${r.decision_count ?? ''} ${t('decisions')}`} · ${fmtTime(r.timestamp)}</div>
       </div>
     </div>`).join('');
@@ -545,12 +553,12 @@ function chapterToEvents(result, chapterIndex) {
   events.push({ type: 'chapter_start', ...idx, experiment_id: result.experiment_id, chapter: { id: meta.id, title: meta.title, title_zh: meta.title_zh, chapter_number: meta.n, protagonist: meta.protagonist }, language: cfg.language, config: cfg });
   let prevState = null;
   for (const d of result.decisions || []) {
-    const choices = (d.choices_shown || []).map((text, i) => ({ id: d.ai_choice_id && text === d.ai_choice_text ? d.ai_choice_id : `opt${i + 1}`, text }));
+    const choices = d.choices_with_ids || (d.choices_shown || []).map((text, i) => ({ id: d.ai_choice_id && text === d.ai_choice_text ? d.ai_choice_id : `opt${i + 1}`, text }));
     events.push({ type: 'node_shown', ...idx, node_id: d.node_id, phase: d.phase, node_type: d.node_type || (choices.length ? 'choice' : 'mandatory'), context: d.context_shown, choices });
     const effects = d.effects_applied ?? diffState(prevState, d.state_after, d.node_id);
     prevState = d.state_after;
     if (choices.length) {
-      events.push({ type: 'decision', ...idx, node_id: d.node_id, choice_id: d.ai_choice_id, choice_text: d.ai_choice_text, reasoning: d.ai_reasoning, raw: d.ai_response_raw, latency_ms: d.latency_ms, resolution_result: d.resolution_result, effects_applied: effects, state_after: d.state_after });
+      events.push({ type: 'decision', ...idx, node_id: d.node_id, choice_id: d.ai_choice_id, choice_text: d.ai_choice_text, reasoning: d.ai_reasoning, raw: d.ai_response_raw, decision_metadata: d.decision_metadata, latency_ms: d.latency_ms, resolution_result: d.resolution_result, effects_applied: effects, state_after: d.state_after });
     } else {
       events.push({ type: 'narrative', ...idx, node_id: d.node_id, resolution_result: d.resolution_result, effects_applied: effects, state_after: d.state_after });
     }
@@ -726,6 +734,9 @@ function chapterDisplayTitle(ch) {
 }
 function contentLangIsZh(ch) { return String((ch && ch.language) || (app.run.config || {}).language || 'zh').startsWith('zh'); }
 
+function isScriptedConfig(c) { return !!c && (c.backend === 'scripted' || c.model === 'scripted'); }
+function runIsScripted() { const r = app.run; return !!r && (isScriptedConfig(r.config) || (r.current && isScriptedConfig(r.current.config))); }
+
 function renderConfigBar() {
   const c = app.run.config || {};
   let bar = $('config-bar');
@@ -734,7 +745,7 @@ function renderConfigBar() {
     ['model', c.model], ['backend', c.backend], ['resolved', c.resolved_model], ['persona', c.persona], ['difficulty', c.difficulty],
     ['temperature', c.temperature], ['reasoning', c.reasoning_effort], ['lang', c.language],
   ].filter(([, v]) => v !== null && v !== undefined && v !== '');
-  bar.innerHTML = pairs.map(([k, v]) => `<span>${k} <b>${esc(v)}</b></span>`).join('') + (c.experimental_backend ? `<span class="badge exp">${t('experimental')}</span>` : '');
+  bar.innerHTML = pairs.map(([k, v]) => `<span>${k} <b>${esc(v)}</b></span>`).join('') + (c.experimental_backend ? `<span class="badge exp">${t('experimental')}</span>` : '') + (isScriptedConfig(c) ? `<span class="badge demo">${t('scripted_badge')}</span>` : '');
 }
 
 function renderSide() {
@@ -790,6 +801,14 @@ function appendNodeCard(ch, node) {
   updateNodeCard(ch, node);
   autoScroll(el);
 }
+function renderTypedChoice(decision, choices) {
+  const meta = decision.decision_metadata;
+  const percent = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? `${(value * 100).toFixed(1)}%` : '—';
+  const rows = choices.map(c => `<div>${esc(c.text)}: <strong>${percent(meta.probabilities?.[c.id])}</strong></div>`).join('');
+  const latency = decision.latency_ms != null ? `<span class="lat">${(decision.latency_ms / 1000).toFixed(1)}s</span>` : '';
+  return `<div class="reasoning"><div class="lbl"><span>${t('typed_choice')}</span>${latency}</div><p>${t('confidence')}: ${percent(meta.confidence)}</p>${rows}<p>${t('no_reasoning')}</p></div>`;
+}
+
 function updateNodeCard(ch, node) {
   const el = $(`card-${ch.index}-${node.id}`); if (!el) return;
   const zh = contentLangIsZh(ch);
@@ -802,7 +821,12 @@ function updateNodeCard(ch, node) {
   if (node.choices.length && !d) {
     tail = `<div class="thinking"><span class="spin"></span><span>${t('thinking')}… <span class="timer" data-node="${node.id}">0.0s</span></span></div>`;
   } else if (d) {
-    tail = `<div class="reasoning"><div class="lbl"><span>${t('reasoning')}</span>${d.latency_ms != null ? `<span class="lat">${(d.latency_ms / 1000).toFixed(1)}s</span>` : ''}</div><p>${esc(d.reasoning || d.raw || '')}</p></div>`;
+    const scripted = runIsScripted();
+    if (d.decision_metadata?.kind === 'typed_choice') {
+      tail = renderTypedChoice(d, node.choices);
+    } else {
+      tail = `<div class="reasoning${scripted ? ' scripted' : ''}"><div class="lbl"><span>${t(scripted ? 'scripted_reasoning' : 'reasoning')}</span>${d.latency_ms != null ? `<span class="lat">${(d.latency_ms / 1000).toFixed(1)}s</span>` : ''}</div><p>${esc(d.reasoning || d.raw || '')}</p></div>`;
+    }
   }
   const outcome = renderOutcome(d || node.narrative);
   el.innerHTML = `<div class="node-meta"><span>${esc(node.id)}</span>${node.phase ? `<span>${esc(node.phase)}</span>` : ''}${node.type && node.type !== 'choice' ? `<span>${esc(node.type)}</span>` : ''}</div>

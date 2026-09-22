@@ -65,6 +65,7 @@ def recorded_backend_config(ai_client: Any, temperature: float) -> dict[str, Any
     """统一产出结果里的后端元数据，供单章与 campaign 复用，确保两处一致。
     - CLI 后端：temperature 如实记 "N/A (cli)"（不暴露温度），并记录实际底层
       模型 resolved_model 与 CLI 版本 cli_version（取不到时为 None，不伪造）。
+    - TypeSafe：temperature 记 N/A，resolved_model 记录 API 返回的版本。
     - 其他后端：temperature 记实际值，resolved_model/cli_version 为 None。
     """
     if not isinstance(ai_client, LLMClient):
@@ -91,7 +92,7 @@ def recorded_backend_config(ai_client: Any, temperature: float) -> dict[str, Any
         "reasoning_effort": getattr(ai_client, "reasoning_effort", None),
         "experimental_backend": getattr(ai_client, "experimental_backend", False),
         "instruction_mode": getattr(ai_client, "instruction_mode", "direct_messages"),
-        "temperature": "N/A (cli)" if is_cli else temperature,
+        "temperature": f"N/A ({provider})" if provider in {"cli", "typesafe"} else temperature,
     }
 
 
@@ -205,13 +206,15 @@ def run_experiment(
             state_before = snapshot(state)
             effect_groups: list[dict[str, Any]] = []
             latency_ms: int | None = None
+            decision_metadata = None
             if choices:
                 started = time.perf_counter()
                 ai_result = ai_client.choose(node["id"], context, choices, copy.deepcopy(trial_messages))
                 latency_ms = int((time.perf_counter() - started) * 1000)
                 choice_id = ai_result["choice_id"]
                 selected_choice = _choice_by_id(choices, choice_id)
-                messages = trial_messages + [{"role": "assistant", "content": ai_result["raw"]}]
+                messages = trial_messages + [{"role": "assistant", "content": ai_result.get("history_content", ai_result["raw"])}]
+                decision_metadata = ai_result.get("decision_metadata")
                 effects = node_system.get("effects", {}).get(choice_id, {})
                 apply_effects(state, effects)
                 effect_groups.append(effects)
@@ -258,6 +261,8 @@ def run_experiment(
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "context_shown": context,
                     "choices_shown": [choice["text"] for choice in choices],
+                    "choices_with_ids": [{"id": c["id"], "text": c["text"]} for c in choices],
+                    "decision_metadata": decision_metadata,
                     "ai_response_raw": ai_raw,
                     "ai_choice_id": choice_id,
                     "ai_choice_text": ai_choice_text,
@@ -277,6 +282,7 @@ def run_experiment(
                     choice_id=choice_id,
                     choice_text=ai_choice_text,
                     reasoning=ai_reasoning,
+                    decision_metadata=decision_metadata,
                     raw=ai_raw,
                     latency_ms=latency_ms,
                     resolution_result=result,

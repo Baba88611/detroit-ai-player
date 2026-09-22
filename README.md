@@ -184,6 +184,26 @@ Treat the key like a password and never commit it; `.env` is already excluded by
 > `.env.example` to assign each model its own environment variables. A native
 > Anthropic Messages endpoint (`provider: anthropic`) must use this path.
 
+### TypeSafe JEV
+
+Select the dedicated TypeSafe backend with `--model jev`. Append these variables to your local `03_runner/.env`, preserving existing configuration. Keep the real key local:
+
+```dotenv
+TYPESAFE_BASE_URL=https://api.typesafe.ai
+TYPESAFE_MODEL=jev-1.13.0
+TYPESAFE_API_KEY=your-key-here
+```
+
+```bash
+cd 03_runner
+python src/runner.py --json ../01_json/en/ch01_the_hostage_en.json --model jev
+python src/campaign_runner.py --chapters ../01_json/en/ch*.json --model jev
+```
+
+The local viewer also offers `jev`. The adapter sends the role/persona, player-visible scenes, full chapter history and campaign summaries through one Choice question. Its instructions override only the original prompts' JSON/rationale output requirements. It saves the complete response in `ai_response_raw` and the probabilities, confidence and returned model version in `decision_metadata`; `ai_reasoning` is null. Subsequent history contains only the chosen number and text. Live and replay cards show option probabilities, which are neither game success rates nor a chain of thought.
+
+Temperature is unsupported and recorded as `N/A (typesafe)`. Pin a model version and test the English first chapter before a campaign; TypeSafe reports lower accuracy for Chinese. No additional SDK is needed. Mock API tests verify the integration, not live availability or playing quality; those require a configured key. See the official [API](https://docs.typesafe.ai/api) and [model specifications](https://docs.typesafe.ai/models).
+
 ### No API key? Use an Agent CLI backend
 
 Both CLI backends start a fresh child process only at nodes that require the model

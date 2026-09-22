@@ -133,6 +133,26 @@ cp .env.example .env        # 仅走 API key 时需要；使用 Agent CLI 后端
 
 > **多模型对照（进阶）**：想用 `--model` 在几个模型间切换跑对比，见 `02_setting/models.json` 的注册表和 `.env.example` 里的 `OPENAI_* / ANTHROPIC_*` 模板——为每个模型配一组独立变量即可。原生 Anthropic Messages 接口（`provider: anthropic`）必须走这条路。
 
+### 使用 TypeSafe JEV
+
+JEV 已有专用 `typesafe` 后端，运行时用 `--model jev`。在本地 `03_runner/.env` **追加**以下配置，保留已有模型配置（不要将真实密钥提交或发送到对话中）：
+
+```dotenv
+TYPESAFE_BASE_URL=https://api.typesafe.ai
+TYPESAFE_MODEL=jev-1.13.0
+TYPESAFE_API_KEY=填入你自己的密钥
+```
+
+```bash
+cd 03_runner
+python src/runner.py --json ../01_json/en/ch01_the_hostage_en.json --model jev
+python src/campaign_runner.py --chapters ../01_json/en/ch*.json --model jev
+```
+
+也可在本地查看器的模型下拉框选择 `jev`。依然仅发送角色、人格、玩家可见场景、章内历史和跨章摘要；通过明确的 Choice 指令覆盖原提示词的 JSON / 理由输出格式要求。完整 API 响应保存在 `ai_response_raw`，`decision_metadata` 保存选择概率、置信度及实际模型版本，`ai_reasoning` 为 null。后续历史只回传已选编号和文字；查看器实时和回放均展示概率，不将其当成游戏成功率或内部思维链。
+
+JEV 不支持温度参数，结果记为 `N/A (typesafe)`。建议固定模型版本，先测英文第一章再跑全流程；官方提示中文准确率低于英文。无需安装新 SDK。离线测试使用模拟 API，只证明适配链路；真实服务可用性和游玩表现仍需配置 key 后实测。协议和限制见 [API 文档](https://docs.typesafe.ai/api) 与 [模型文档](https://docs.typesafe.ai/models)。
+
 ### 没有 API key？使用 Agent CLI 后端
 
 两种 CLI 后端都只在需要模型选择的**决策节点**启动新的子进程；叙事节点和强制节点不调用模型。AI 人格和故事连续性不依赖常驻 CLI 会话：runner 会在每次决策调用时重新传入固定人格、完整章内历史和确定性的跨章摘要。

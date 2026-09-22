@@ -82,6 +82,9 @@ def test_meta_lists_models_personas_chapters_without_secret_values(server, monke
     monkeypatch.setenv("LLM_API_KEY", "sk-super-secret-value")
     monkeypatch.setenv("LLM_BASE_URL", "https://example.test/v1")
     monkeypatch.setenv("LLM_MODEL", "example-chat")
+    monkeypatch.setenv("TYPESAFE_API_KEY", "typesafe-secret-value")
+    monkeypatch.setenv("TYPESAFE_BASE_URL", "https://api.typesafe.test")
+    monkeypatch.setenv("TYPESAFE_MODEL", "jev-test-version")
 
     status, meta = _get(base, "/api/meta")
 
@@ -90,6 +93,11 @@ def test_meta_lists_models_personas_chapters_without_secret_values(server, monke
     models = {item["id"]: item for item in meta["models"]}
     assert models["default"]["configured"] is True
     assert models["default"]["missing"] == []
+    assert models["jev"]["configured"] is True
+    assert models["jev"]["provider"] == "typesafe"
+    assert models["jev"]["missing"] == []
+    assert "typesafe-secret-value" not in json.dumps(meta)
+    assert "jev-test-version" not in json.dumps(meta)
     assert models["codex-cli"]["experimental_backend"] is True
     assert models["codex-cli"]["provider"] == "cli"
     assert [item["id"] for item in meta["personas"]] == ["default", "machine"]
