@@ -265,28 +265,32 @@
         "resolution_rule": {
           "attempt_dodge": {
             "casual": {
-              "result": "continue",
-              "state_update": { "burial_depth": "edge" },
+              "result": "continue_edge",
               "note": "Markus rolls partially clear; buried at edge with movement room"
             },
             "experienced": {
               "probability_success": 0.5,
-              "success": { "result": "continue", "state_update": { "burial_depth": "edge" } },
-              "failure": { "result": "continue", "state_update": { "burial_depth": "deep" } }
+              "success": "continue_edge",
+              "failure": "continue_deep"
             },
             "hardcore": {
               "probability_success": 0.3,
-              "success": { "result": "continue", "state_update": { "burial_depth": "edge" } },
-              "failure": { "result": "continue", "state_update": { "burial_depth": "deep" } }
+              "success": "continue_edge",
+              "failure": "continue_deep"
             }
           },
           "brace_impact": {
-            "casual": { "result": "continue", "state_update": { "burial_depth": "protected" } },
-            "experienced": { "result": "continue", "state_update": { "burial_depth": "protected" } },
-            "hardcore": { "result": "continue", "state_update": { "burial_depth": "protected" } }
+            "casual": { "result": "continue_protected" },
+            "experienced": { "result": "continue_protected" },
+            "hardcore": { "result": "continue_protected" }
           }
         },
-        "note": "Non-terminal QTE. result=continue means proceed to n006; runner applies state_update to set burial_depth, which feeds n006 context_condition. Both choices always lead to being buried — the difference is depth and whether parts are protected."
+        "resolution_effects": {
+          "continue_edge": { "burial_depth": "edge" },
+          "continue_deep": { "burial_depth": "deep" },
+          "continue_protected": { "burial_depth": "protected" }
+        },
+        "note": "Non-terminal QTE. Every result proceeds to n006; resolution_effects sets burial_depth. Both choices always lead to being buried — the difference is depth and whether parts are protected."
       }
     },
 

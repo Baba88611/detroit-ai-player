@@ -72,7 +72,10 @@ def resolve_post_choice_result(
 
     resolution_rule = system.get("resolution_rule")
     if resolution_rule and choice_id in resolution_rule:
-        return _resolve_qte(resolution_rule[choice_id], difficulty, rng or random.Random())
+        rule = resolution_rule[choice_id]
+        if "check" in rule:
+            return resolve_check_rule(rule["check"], state)
+        return _resolve_qte(rule, difficulty, rng or random.Random())
 
     ending_resolution = system.get("ending_resolution")
     if not ending_resolution:
