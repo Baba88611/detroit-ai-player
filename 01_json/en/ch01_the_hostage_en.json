@@ -356,6 +356,9 @@
           "compromise": { "path": "final_choice" },
           "refuse": { "path": "auto_fail", "success_probability_override": 0 },
           "last_chance": { "path": "final_choice" }
+        },
+        "ending_resolution": {
+          "refuse": { "result": "ending_failed_to_reach" }
         }
       }
     },

@@ -502,6 +502,9 @@
           "last_chance": {
             "path": "final_choice"
           }
+        },
+        "ending_resolution": {
+          "refuse": { "result": "ending_failed_to_reach" }
         }
       }
     },

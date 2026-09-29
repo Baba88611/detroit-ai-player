@@ -172,25 +172,15 @@
             },
             "experienced": {
               "probability_success": 0.5,
-              "success": {
-                "result": "continue",
-                "note": "Clean landing on far side"
-              },
-              "failure": {
-                "result": "continue",
-                "note": "Markus nearly falls, catches the edge, pulls himself up — minor damage but arrives"
-              }
+              "success": "continue",
+              "failure": "continue",
+              "note": "Clean landing on success; on failure Markus nearly falls, catches the edge, and arrives with minor damage"
             },
             "hardcore": {
               "probability_success": 0.3,
-              "success": {
-                "result": "continue",
-                "note": "Clean landing"
-              },
-              "failure": {
-                "result": "continue",
-                "note": "Rough landing, some damage, but arrives"
-              }
+              "success": "continue",
+              "failure": "continue",
+              "note": "Clean landing on success; rough landing with some damage on failure"
             }
           },
           "try_lower_route": {
