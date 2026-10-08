@@ -17,43 +17,6 @@
       "decision_count": 11
     },
     {
-      "name": "campaign_scripted_default_casual_0ce493fe.json",
-      "kind": "campaign",
-      "timestamp": "2026-07-13T02:45:19.728679+00:00",
-      "model": "scripted",
-      "backend": null,
-      "persona": "default",
-      "difficulty": "casual",
-      "language": null,
-      "campaign_id": "0ce493fe-8a91-44a5-903f-df8b06bcebf9",
-      "status": null,
-      "progress": null,
-      "chapters": [
-        {
-          "chapter_index": 1,
-          "chapter": "ch01_the_hostage",
-          "experiment_id": "82c3157e-28a8-4a19-9fa0-3fbb7c5d1ab1",
-          "ending_id": "ending_snipers_shot"
-        }
-      ]
-    },
-    {
-      "name": "ch01_the_hostage_scripted_default_casual_82c3157e.json",
-      "kind": "chapter",
-      "timestamp": "2026-07-13T02:45:19.727423+00:00",
-      "model": "scripted",
-      "backend": null,
-      "persona": "default",
-      "difficulty": "casual",
-      "language": "zh-CN primary, en fallback",
-      "experiment_id": "82c3157e-28a8-4a19-9fa0-3fbb7c5d1ab1",
-      "chapter": "ch01_the_hostage",
-      "ending_id": "ending_snipers_shot",
-      "ending_title": "狙击手击毙了丹尼尔",
-      "tier": "best",
-      "decision_count": 11
-    },
-    {
       "name": "ch01_the_hostage_claude-code_default_casual_87b7caf5.json",
       "kind": "chapter",
       "timestamp": "2026-07-13T02:33:52.848014+00:00",
